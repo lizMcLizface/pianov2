@@ -672,7 +672,7 @@ function createHeptatonicScaleTable() {
                         highlightKeysForScales(scaleNotes);
                         if (scales[scaleNames[i-1]][j-1].intervals.length === 7) {
                             let identifiedChords_3 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 3);
-                            let identifiedChords_4 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 3);
+                            let identifiedChords_4 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 4);
 
                             // console.log('Identified Chords:', identifiedChords);
                             tooltip.innerHTML += `<br><em>Identified Chords:</em><br>`;
