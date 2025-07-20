@@ -634,6 +634,11 @@ function createHeptatonicScaleTable() {
                                 cell.style.backgroundColor = '#4CAF50';
                                 cell.style.color = 'white';
                             }
+                            
+                            // Update cross-reference display when scales change in multiple mode
+                            if (typeof window.updateCrossReferenceDisplay === 'function') {
+                                window.updateCrossReferenceDisplay();
+                            }
                         }
                         
                         console.log('Selected scales:', selectedScales);
@@ -692,6 +697,11 @@ function createHeptatonicScaleTable() {
         table.appendChild(row);
     }
     placeholder.appendChild(table);
+
+    // Update cross-reference display when scales change
+    if (typeof window.updateCrossReferenceDisplay === 'function') {
+        window.updateCrossReferenceDisplay();
+    }
 
     return;
 

@@ -94,7 +94,12 @@
         <span class="full-label">Chords</span>
       </button>
 
-      <button class="tablinks" onclick="openCity(event, 'CrossreferenceTab')" id="defaultOpen">
+      <button class="tablinks" onclick="openCity(event, 'PlayTab')" id="defaultOpen">
+        <span class="short-label">P</span>
+        <span class="full-label">Play</span>
+      </button>
+
+      <button class="tablinks" onclick="openCity(event, 'CrossreferenceTab')" >
         <span class="short-label">C</span>
         <span class="full-label">Cross</span>
       </button>
@@ -228,12 +233,19 @@
       </div>
       </div>
       
-      <div id="CrossreferenceTab" class="tabcontent" style="display:block;">
+      <div id="CrossreferenceTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
         <div id ="crossreferencePlaceholder">
           <p>This is a placeholder content. You can replace it with actual content later.</p>
           <p>Feel free to add more information or features as needed.</p>
-          </div>
         </div>
+      </div>
+
+      <div id="PlayTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
+        <div id ="PlayTabPlaceholder">
+          <p>This is a placeholder content. You can replace it with actual content later.</p>
+          <p>Feel free to add more information or features as needed.</p>
+        </div>
+      </div>
   
     <div id="Starting" class="tabcontent" style="display:block;">      
       <div class="selectionContainer" width='100%'>

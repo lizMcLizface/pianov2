@@ -66,7 +66,7 @@ function noteToName(input){
             noteName = 'A';
             break;
         case 10:
-            noteName = 'Bb';
+            noteName = 'A#';
             break;
         case 11:
             noteName = 'B';

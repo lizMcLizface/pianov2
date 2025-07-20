@@ -220,11 +220,16 @@ function createChordRootNoteTable() {
     } else {
         chordPlaceholder.appendChild(rootTableContainer);
     }
+    
+    // Update cross-reference display when chord root note changes
+    if (typeof window.updateCrossReferenceDisplay === 'function') {
+        window.updateCrossReferenceDisplay();
+    }
 }
 
 
 // Global variable to store selected chord suffixes (multiple selection)
-let selectedChordSuffixes = ['Major']; // Array to store multiple selections, default to Major
+let selectedChordSuffixes = ['Major', 'Minor', '7', '5', 'dim', 'dim7', 'aug', 'sus2', 'sus4', 'maj7', 'm7', '7sus4', '7b9']; // Array to store multiple selections, default to Major
 
 // Create a table for selecting chord suffixes
 function createChordSuffixTable() {
@@ -506,6 +511,11 @@ function createChordSuffixTable() {
         chordPlaceholder.replaceChild(chordTableContainer, existingContainer);
     } else {
         chordPlaceholder.appendChild(chordTableContainer);
+    }
+    
+    // Update cross-reference display when chords change
+    if (typeof window.updateCrossReferenceDisplay === 'function') {
+        window.updateCrossReferenceDisplay();
     }
 }
 

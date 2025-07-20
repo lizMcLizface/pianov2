@@ -10,6 +10,27 @@ import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from '.
 import {createHeptatonicScaleTable, selectedRootNote, selectedScales} from './scaleGenerator';
 import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from './midi';
+import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
+import {modifiers, keyToNote} from './keyboard';
+import { context,
+    masterVolume,
+    customWaveform,
+    waveform,
+    pianoNotes,
+    attackTime,
+    sustainLevel,
+    releaseTime,
+    noteLength,
+    vibratoSpeed,
+    vibratoAmount,
+    delay,
+    feedback,
+    delayAmountGain,
+    startButton,
+    stopButton,
+    tempoControl,
+    tempo,
+    isPlaying} from './synth';
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
 // root.render(
@@ -47,10 +68,13 @@ highlightKeysForChords(processChord(selectedChordRootNote + selectedChordSuffixe
 
 
 
-let crossReferencePlaceholder = document.getElementById('crossreferencePlaceholder');
 
+// Initialize the cross-reference display
+updateCrossReferenceDisplay();
 
-
+// Export the update function so other modules can call it when selections change
+window.updateCrossReferenceDisplay = updateCrossReferenceDisplay;
+window.createScaleChordCrossReference = createScaleChordCrossReference;
 
 let currentNoteIndex = 0;
 let currentBarIndex = 0;
@@ -110,66 +134,66 @@ function failure () {
 
 
 let noteArray = {};
-// let outputNoteArray = [];//[["e/4","d/4","d/5"],"e##/5","b/4","c/4","D/2","e/4","g/4","a/4","g/4","d/4"];
-// // let outputNoteArray = ["e##/5","b/4","c/4","D/2"];
+let outputNoteArray = [];//[["e/4","d/4","d/5"],"e##/5","b/4","c/4","D/2","e/4","g/4","a/4","g/4","d/4"];
+// let outputNoteArray = ["e##/5","b/4","c/4","D/2"];
 
-// var keySignature = 'C';
-// var selectedNote = 0;
-// function capitalizeFirstLetter(string) {
-//     return string.charAt(0).toUpperCase() + string.slice(1);
-//   }
+var keySignature = 'C';
+var selectedNote = 0;
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }
 
   
-// $('#modeSignatureSelect').on('change', function (e) {
-//     var currentValue = $(this).val();
-//     var keyValue = $('#keySignatureSelect').val();
-//     var majorOptions = `
-//     <option value="0">Gb</option>
-//     <option value="1">Db</option>
-//     <option value="2">Ab</option>
-//     <option value="3">Eb</option>
-//     <option value="4">Bb</option>
-//     <option value="5">F</option>
-//     <option value="6" selected>C</option>
-//     <option value="7">G</option>
-//     <option value="8">D</option>
-//     <option value="9">A</option>
-//     <option value="10">E</option>
-//     <option value="11">B</option>
-//     <option value="12">F#</option>
-//     `;
-//     var minorOptions = `
-//     <option value="0">eb</option>
-//     <option value="1">bb</option>
-//     <option value="2">f</option>
-//     <option value="3">c</option>
-//     <option value="4">g</option>
-//     <option value="5">d</option>
-//     <option value="6" selected>a</option>
-//     <option value="7">e</option>
-//     <option value="8">b</option>
-//     <option value="9">f#</option>
-//     <option value="10">c#</option>
-//     <option value="11">g#</option>
-//     <option value="12">d#</option>
-//     `;
-//     console.log(currentValue);
-//     $("#keySignatureSelect").html(currentValue == 0 ? majorOptions : minorOptions);
-//     $("#keySignatureSelect").val(keyValue);
-//     // $("#keySignatureSelect").element.dispatchEvent(new Event('change'))
-//     var key = $('#keySignatureSelect').find(':selected')[0].innerHTML;
-//     var signature = $('#modeSignatureSelect').find(':selected')[0].innerHTML;
+$('#modeSignatureSelect').on('change', function (e) {
+    var currentValue = $(this).val();
+    var keyValue = $('#keySignatureSelect').val();
+    var majorOptions = `
+    <option value="0">Gb</option>
+    <option value="1">Db</option>
+    <option value="2">Ab</option>
+    <option value="3">Eb</option>
+    <option value="4">Bb</option>
+    <option value="5">F</option>
+    <option value="6" selected>C</option>
+    <option value="7">G</option>
+    <option value="8">D</option>
+    <option value="9">A</option>
+    <option value="10">E</option>
+    <option value="11">B</option>
+    <option value="12">F#</option>
+    `;
+    var minorOptions = `
+    <option value="0">eb</option>
+    <option value="1">bb</option>
+    <option value="2">f</option>
+    <option value="3">c</option>
+    <option value="4">g</option>
+    <option value="5">d</option>
+    <option value="6" selected>a</option>
+    <option value="7">e</option>
+    <option value="8">b</option>
+    <option value="9">f#</option>
+    <option value="10">c#</option>
+    <option value="11">g#</option>
+    <option value="12">d#</option>
+    `;
+    console.log(currentValue);
+    $("#keySignatureSelect").html(currentValue == 0 ? majorOptions : minorOptions);
+    $("#keySignatureSelect").val(keyValue);
+    // $("#keySignatureSelect").element.dispatchEvent(new Event('change'))
+    var key = $('#keySignatureSelect').find(':selected')[0].innerHTML;
+    var signature = $('#modeSignatureSelect').find(':selected')[0].innerHTML;
 
-//     // key[0] = key[0].toUpperCase();
-//     key = capitalizeFirstLetter(key);
-//     if(signature == "Minor")
-//         key = key + 'm';
+    // key[0] = key[0].toUpperCase();
+    key = capitalizeFirstLetter(key);
+    if(signature == "Minor")
+        key = key + 'm';
 
-//     keySignature = key;
+    keySignature = key;
 
-//     drawNotes(inputDiv, noteArray, true);
-//     drawNotes(outputDiv, outputNoteArray, false);
-// });
+    drawNotes(inputDiv, noteArray, true);
+    drawNotes(outputDiv, outputNoteArray, false);
+});
 
 // $('#keySignatureSelect').on('change', function (e) {
 //     var key = $('#keySignatureSelect').find(':selected')[0].innerHTML;
@@ -186,8 +210,8 @@ let noteArray = {};
 //     drawNotes(outputDiv, outputNoteArray, false);
 // });
 
-// const inputDiv = document.getElementById("input");
-// const outputDiv = document.getElementById("output");
+const inputDiv = document.getElementById("input");
+const outputDiv = document.getElementById("output");
 
 // var currentHighlight = []
 // function highlightNotes(noteArray){
@@ -250,674 +274,483 @@ let noteArray = {};
 //     }
 // }
 
-// function setupStaves(div, divisions = 1){
-//     while (div.hasChildNodes()) {
-//         div.removeChild(div.lastChild);
-//     }
+function setupStaves(div, divisions = 1){
+    while (div.hasChildNodes()) {
+        div.removeChild(div.lastChild);
+    }
 
-//     const inputRenderer = new Renderer(div, Renderer.Backends.SVG);
-//     // console.log(inputDiv.offsetWidth)
+    const inputRenderer = new Renderer(div, Renderer.Backends.SVG);
+    // console.log(inputDiv.offsetWidth)
     
-//     var inputDisplayWidth = div.offsetWidth
-//     // Configure the rendering context.
-//     inputRenderer.resize(inputDisplayWidth, 350);
-//     const inputContext = inputRenderer.getContext();
-//     // Create a stave of width 400 at position 10, 40 on the canvas.
+    var inputDisplayWidth = div.offsetWidth
+    // Configure the rendering context.
+    inputRenderer.resize(inputDisplayWidth, 350);
+    const inputContext = inputRenderer.getContext();
+    // Create a stave of width 400 at position 10, 40 on the canvas.
 
-//     var maxWidth = inputDisplayWidth-100
-//     inputDisplayWidth = maxWidth;
-//     if(divisions == 0){
-//         const inputTrebleStave = new Stave(30, 80, maxWidth);
-//         const inputBassStave = new Stave(30, 200, maxWidth);
-//         // inputTrebleStave.addTimeSignature('3/8')
-//         inputTrebleStave.addClef("treble");
-//         inputBassStave.addClef("bass");
+    var maxWidth = inputDisplayWidth-100
+    inputDisplayWidth = maxWidth;
+    if(divisions == 0){
+        const inputTrebleStave = new Stave(30, 80, maxWidth);
+        const inputBassStave = new Stave(30, 200, maxWidth);
+        // inputTrebleStave.addTimeSignature('3/8')
+        inputTrebleStave.addClef("treble");
+        inputBassStave.addClef("bass");
 
-//         inputTrebleStave.addKeySignature(keySignature);
-//         inputBassStave.addKeySignature(keySignature);
+        inputTrebleStave.addKeySignature(keySignature);
+        inputBassStave.addKeySignature(keySignature);
 
-//         // Connect it to the rendering context and draw!
-//         inputTrebleStave.setContext(inputContext).draw();
-//         inputBassStave.setContext(inputContext).draw();
+        // Connect it to the rendering context and draw!
+        inputTrebleStave.setContext(inputContext).draw();
+        inputBassStave.setContext(inputContext).draw();
 
 
-//         new StaveConnector(inputBassStave, inputTrebleStave)
-//         .setType('single')
-//         .setContext(inputContext)
-//         .draw();
+        new StaveConnector(inputBassStave, inputTrebleStave)
+        .setType('single')
+        .setContext(inputContext)
+        .draw();
 
-//         new StaveConnector(inputTrebleStave, inputBassStave)
-//         .setType('brace')
-//         .setContext(inputContext)
-//         .draw();
+        new StaveConnector(inputTrebleStave, inputBassStave)
+        .setType('brace')
+        .setContext(inputContext)
+        .draw();
 
-//         return {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave}
-//     }
-//     else{
-//         var divWidth = maxWidth / divisions
-//         var trebleStaves = [];
-//         var bassStaves = [];
+        return {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave}
+    }
+    else{
+        var divWidth = maxWidth / divisions
+        var trebleStaves = [];
+        var bassStaves = [];
         
-//         trebleStaves.push(new Stave(30,80,divWidth));
-//         bassStaves.push(new Stave(30,200,divWidth));
+        trebleStaves.push(new Stave(30,80,divWidth));
+        bassStaves.push(new Stave(30,200,divWidth));
 
-//         trebleStaves[0].addClef("treble");
-//         bassStaves[0].addClef("bass");
+        trebleStaves[0].addClef("treble");
+        bassStaves[0].addClef("bass");
 
-//         trebleStaves[0].addKeySignature(keySignature);
-//         bassStaves[0].addKeySignature(keySignature);
+        trebleStaves[0].addKeySignature(keySignature);
+        bassStaves[0].addKeySignature(keySignature);
 
 
-//         for(var i = 1; i < divisions; ++i){
-//             trebleStaves.push(new Stave(trebleStaves[i-1].width + trebleStaves[i-1].x,80,divWidth));
-//             bassStaves.push(new Stave(bassStaves[i-1].width + bassStaves[i-1].x,200,divWidth));
-//         }
+        for(var i = 1; i < divisions; ++i){
+            trebleStaves.push(new Stave(trebleStaves[i-1].width + trebleStaves[i-1].x,80,divWidth));
+            bassStaves.push(new Stave(bassStaves[i-1].width + bassStaves[i-1].x,200,divWidth));
+        }
             
-//         for(var stave of trebleStaves)
-//             stave.setContext(inputContext).draw();
-//         for(var stave of bassStaves)
-//             stave.setContext(inputContext).draw();
+        for(var stave of trebleStaves)
+            stave.setContext(inputContext).draw();
+        for(var stave of bassStaves)
+            stave.setContext(inputContext).draw();
 
 
-//         new StaveConnector(bassStaves[0], trebleStaves[0])
-//         .setType('single')
-//         .setContext(inputContext)
-//         .draw();
+        new StaveConnector(bassStaves[0], trebleStaves[0])
+        .setType('single')
+        .setContext(inputContext)
+        .draw();
 
-//         new StaveConnector(trebleStaves[0], bassStaves[0])
-//         .setType('brace')
-//         .setContext(inputContext)
-//         .draw();
-// // console.log('treble Staves', trebleStaves)
-//         inputDisplayWidth = divWidth;
-//         return {inputRenderer, inputContext, inputDisplayWidth, trebleStaves, bassStaves}
-//     }
+        new StaveConnector(trebleStaves[0], bassStaves[0])
+        .setType('brace')
+        .setContext(inputContext)
+        .draw();
+// console.log('treble Staves', trebleStaves)
+        inputDisplayWidth = divWidth;
+        return {inputRenderer, inputContext, inputDisplayWidth, trebleStaves, bassStaves}
+    }
 
-// }
+}
 
-// function drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBassStave){
-//     var trebleNotes = [];
-//     var trebleAccidentals = [];
-//     var bassNotes = [];
-//     var bassAccidentals = [];
-//     if(noteArray.constructor == Object){
-//     for (const [key, value] of Object.entries(noteArray)) {
-//         // console.log(`${key}: ${value}`);
-//         if(parseInt(key.slice(-1)) >= 4){
-//             trebleNotes.push(key);
-//             // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
-//         }
-//         else{
-//             bassNotes.push(key);
-//             // bassAccidentals.push(key.includes('#') ? '#' : 'n');
+function drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBassStave){
+    var trebleNotes = [];
+    var trebleAccidentals = [];
+    var bassNotes = [];
+    var bassAccidentals = [];
+    if(noteArray.constructor == Object){
+    for (const [key, value] of Object.entries(noteArray)) {
+        // console.log(`${key}: ${value}`);
+        if(parseInt(key.slice(-1)) >= 4){
+            trebleNotes.push(key);
+            // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
+        }
+        else{
+            bassNotes.push(key);
+            // bassAccidentals.push(key.includes('#') ? '#' : 'n');
 
-//         }
-//       }
-//     }
-//     else{
-//         for (const key of noteArray) {
-//             if(parseInt(key.slice(-1)) >= 4){
-//                 trebleNotes.push(key);
-//                 // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
-//             }
-//             else{
-//                 bassNotes.push(key);
-//                 // bassAccidentals.push(key.includes('#') ? '#' : 'n');
+        }
+      }
+    }
+    else{
+        for (const key of noteArray) {
+            if(parseInt(key.slice(-1)) >= 4){
+                trebleNotes.push(key);
+                // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
+            }
+            else{
+                bassNotes.push(key);
+                // bassAccidentals.push(key.includes('#') ? '#' : 'n');
 
-//             }
-//           }
-//     }
-//     if(trebleNotes.length > 0){
-//       const sNote =  new StaveNote({keys: trebleNotes, duration:'4'});
-//       var i = 0;
-//       for( const accidental of trebleAccidentals){
-//           // console.log(accidental)
-//           // if(accidental != 'n')
-//               // sNote.addModifier(new Accidental(accidental), i++);
-//       }
+            }
+          }
+    }
+    if(trebleNotes.length > 0){
+      const sNote =  new StaveNote({keys: trebleNotes, duration:'4'});
+      var i = 0;
+      for( const accidental of trebleAccidentals){
+          // console.log(accidental)
+          // if(accidental != 'n')
+              // sNote.addModifier(new Accidental(accidental), i++);
+      }
 
-//       const notes =[ sNote];
-//       const voice = new Voice({ num_beats: 1, beat_value: 4 });
-//       voice.addTickables(notes);
-//       Accidental.applyAccidentals([voice], keySignature);
+      const notes =[ sNote];
+      const voice = new Voice({ num_beats: 1, beat_value: 4 });
+      voice.addTickables(notes);
+      Accidental.applyAccidentals([voice], keySignature);
 
-//       // Format and justify the notes to 400 pixels.
-//       new Formatter().joinVoices([voice]).format([voice], 350);
+      // Format and justify the notes to 400 pixels.
+      new Formatter().joinVoices([voice]).format([voice], 350);
       
-//       // Render voice
-//       // voice.draw(inputContext, inputTrebleStave);
-//       Formatter.FormatAndDraw(inputContext, inputTrebleStave, notes);
-//   }
-//   if(bassNotes.length > 0){
-//       const sNote =  new StaveNote({clef: "bass", keys: bassNotes, duration:'4'});
-//       var i = 0;
-//       for( const accidental of bassAccidentals){
-//           // console.log(accidental)
-//           // if(accidental != 'n')
-//               // sNote.addModifier(new Accidental(accidental), i++);
-//       }
+      // Render voice
+      // voice.draw(inputContext, inputTrebleStave);
+      Formatter.FormatAndDraw(inputContext, inputTrebleStave, notes);
+  }
+  if(bassNotes.length > 0){
+      const sNote =  new StaveNote({clef: "bass", keys: bassNotes, duration:'4'});
+      var i = 0;
+      for( const accidental of bassAccidentals){
+          // console.log(accidental)
+          // if(accidental != 'n')
+              // sNote.addModifier(new Accidental(accidental), i++);
+      }
 
-//       const notes =[ sNote];
-//       const voice = new Voice({ num_beats: 1, beat_value: 4 });
-//       voice.addTickables(notes);
-//       Accidental.applyAccidentals([voice], keySignature);
+      const notes =[ sNote];
+      const voice = new Voice({ num_beats: 1, beat_value: 4 });
+      voice.addTickables(notes);
+      Accidental.applyAccidentals([voice], keySignature);
       
-//       // Format and justify the notes to 400 pixels.
-//       new Formatter().joinVoices([voice]).format([voice], 350);
+      // Format and justify the notes to 400 pixels.
+      new Formatter().joinVoices([voice]).format([voice], 350);
 
-//       // Render voice
-//       // voice.draw(inputContext, inputBassStave);
-//       Formatter.FormatAndDraw(inputContext, inputBassStave, notes);
-//   }
+      // Render voice
+      // voice.draw(inputContext, inputBassStave);
+      Formatter.FormatAndDraw(inputContext, inputBassStave, notes);
+  }
     
-// }
+}
 
-// function drawNotes(div, noteArray, stacked = false){
-//     // console.log('Current Note State:', noteArray);
+function drawNotes(div, noteArray, stacked = false){
+    // console.log('Current Note State:', noteArray);
 
-//     var noteString = [];
-//     for (const [key, value] of Object.entries(noteArray)) {
-//         // console.log(`${key}: ${value}`);
-//         noteString.push(key);
-//       }
-//     // console.log('note string', noteString);
-//     // document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
-//     var {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave, trebleStaves, bassStaves} = 
-//         setupStaves(div, Array.isArray(noteArray) ? noteArray.length : 0);
+    var noteString = [];
+    for (const [key, value] of Object.entries(noteArray)) {
+        // console.log(`${key}: ${value}`);
+        noteString.push(key);
+      }
+    // console.log('note string', noteString);
+    // document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+    var {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave, trebleStaves, bassStaves} = 
+        setupStaves(div, Array.isArray(noteArray) ? noteArray.length : 0);
     
     
-//     if(noteArray.constructor == Object){
-//         drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBassStave);
-//         return;
-//     }
+    if(noteArray.constructor == Object){
+        drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBassStave);
+        return;
+    }
 
-//     // console.log(inputTrebleStave)
-//     if(!($('#chordCheckBox')[0].checked && $('#arpegioButton')[0].checked)){
-//         for( const [key, value] of Object.entries(noteArray)){
-//             // console.log('key value pair: ', key, value);
-//             var trebleNotes = [];
-//             var bassNotes = [];
-//             for(const note of value.notes){        
-//                 // console.log('note:', note)    
-//                 if(!Array.isArray(note)){
-//                     if(parseInt(note.slice(-1)) >= 4){
-//                         // console.log(key);
-//                         trebleNotes.push(new StaveNote({keys:[note], duration:'4'}));
-//                         bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
-//                         // trebleNotes.push(key);
-//                         // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
-//                     }
-//                     else{
-//                         // console.log(key);
-//                         bassNotes.push(new StaveNote({clef: "bass",keys:[note], duration:'4'}));
-//                         trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
-//                         // bassNotes.push(key);
-//                         // bassAccidentals.push(key.includes('#') ? '#' : 'n');
+    // console.log(inputTrebleStave)
+    if(!($('#chordCheckBox')[0].checked && $('#arpegioButton')[0].checked)){
+        for( const [key, value] of Object.entries(noteArray)){
+            // console.log('key value pair: ', key, value);
+            var trebleNotes = [];
+            var bassNotes = [];
+            for(const note of value.notes){        
+                // console.log('note:', note)    
+                if(!Array.isArray(note)){
+                    if(parseInt(note.slice(-1)) >= 4){
+                        // console.log(key);
+                        trebleNotes.push(new StaveNote({keys:[note], duration:'4'}));
+                        bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                        // trebleNotes.push(key);
+                        // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
+                    }
+                    else{
+                        // console.log(key);
+                        bassNotes.push(new StaveNote({clef: "bass",keys:[note], duration:'4'}));
+                        trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                        // bassNotes.push(key);
+                        // bassAccidentals.push(key.includes('#') ? '#' : 'n');
         
-//                     }
-//                 }else{
-//                     // console.log(note)
-//                     var localTrebleNotes = []
-//                     var localBassNotes = []
-//                     for (const k of note) {
-//                         if(parseInt(k.slice(-1)) >= 4){
-//                             localTrebleNotes.push(k);
-//                             // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
-//                         }
-//                         else{
-//                             localBassNotes.push(k);
-//                             // bassAccidentals.push(key.includes('#') ? '#' : 'n');
+                    }
+                }else{
+                    // console.log(note)
+                    var localTrebleNotes = []
+                    var localBassNotes = []
+                    for (const k of note) {
+                        if(parseInt(k.slice(-1)) >= 4){
+                            localTrebleNotes.push(k);
+                            // trebleAccidentals.push(key.includes('#') ? '#' : 'n');
+                        }
+                        else{
+                            localBassNotes.push(k);
+                            // bassAccidentals.push(key.includes('#') ? '#' : 'n');
             
-//                         }
-//                     }
-//                     //   console.log('split: ', localTrebleNotes, localBassNotes)
-//                     if(localTrebleNotes.length > 0)
-//                         trebleNotes.push(new StaveNote({keys:localTrebleNotes, duration:'4'}));
-//                     else
-//                         trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
-//                     if(localBassNotes.length > 0)
-//                     bassNotes.push(new StaveNote({clef: "bass",keys:localBassNotes, duration:'4'}));
-//                     else
-//                     bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                        }
+                    }
+                    //   console.log('split: ', localTrebleNotes, localBassNotes)
+                    if(localTrebleNotes.length > 0)
+                        trebleNotes.push(new StaveNote({keys:localTrebleNotes, duration:'4'}));
+                    else
+                        trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                    if(localBassNotes.length > 0)
+                    bassNotes.push(new StaveNote({clef: "bass",keys:localBassNotes, duration:'4'}));
+                    else
+                    bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
 
-//                 }
-//             }
-//             // console.log('treble notes:', trebleNotes)
-//             // console.log('bass notes:', bassNotes)if(key == currentBarIndex)
-//             if(key == currentBarIndex){
-//                 if(trebleNotes.length > currentNoteIndex){
-//                 trebleNotes[currentNoteIndex].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                 bassNotes[currentNoteIndex].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                 }
-//             }
-//             if(key == 0){
-//                 if(trebleNotes.length > selectedNote){
-//                 trebleNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                 bassNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                 }
-//             }
+                }
+            }
+            // console.log('treble notes:', trebleNotes)
+            // console.log('bass notes:', bassNotes)if(key == currentBarIndex)
+            if(key == currentBarIndex){
+                if(trebleNotes.length > currentNoteIndex){
+                trebleNotes[currentNoteIndex].setStyle({fillStyle: "red", strokeStyle: "red"});
+                bassNotes[currentNoteIndex].setStyle({fillStyle: "red", strokeStyle: "red"});
+                }
+            }
+            if(key == 0){
+                if(trebleNotes.length > selectedNote){
+                trebleNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                bassNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                }
+            }
 
-//             const notes = trebleNotes;
-//             const voice = new Voice({ num_beats: trebleNotes.length, beat_value: 4 });
+            const notes = trebleNotes;
+            const voice = new Voice({ num_beats: trebleNotes.length, beat_value: 4 });
 
-//             voice.addTickables(notes);
-//             Accidental.applyAccidentals([voice], keySignature);
+            voice.addTickables(notes);
+            Accidental.applyAccidentals([voice], keySignature);
             
-//             var text = new Vex.Flow.TextNote({
-//                 text: value.root + ' ' + value.scale + ' ' + value.dir,
-//                 font: {
-//                     family: "Arial",
-//                     size: 12,
-//                     weight: ""
-//                 },
-//                 duration: 'q',
-//                 y_shift:22
-//             })
-//             .setLine(10)
-//             .setStave(trebleStaves[key])
-//             // .setJustification(Vex.Flow.TextNote.Justification.CENTER);
+            var text = new Vex.Flow.TextNote({
+                text: value.root + ' ' + value.scale + ' ' + value.dir,
+                font: {
+                    family: "Arial",
+                    size: 12,
+                    weight: ""
+                },
+                duration: 'q',
+                y_shift:22
+            })
+            .setLine(10)
+            .setStave(trebleStaves[key])
+            // .setJustification(Vex.Flow.TextNote.Justification.CENTER);
 
-//             const textVoice = new Voice({ num_beats: trebleNotes.length, beat_value: 4 });
+            const textVoice = new Voice({ num_beats: trebleNotes.length, beat_value: 4 });
 
-//             var missingDuration = trebleNotes.length - 1;
+            var missingDuration = trebleNotes.length - 1;
 
-//             var textTicks = [text];
-//             while(missingDuration > 0){
-//                 if(missingDuration >= 4){
-//                     textTicks.push(new GhostNote({duration:'w'}))
-//                     missingDuration -= 4;
-//                 }
-//                 else if(missingDuration >= 2){
-//                     textTicks.push(new GhostNote({duration:'h'}))
-//                     missingDuration -= 2;
-//                 }
-//                 else if(missingDuration >= 1){
-//                     textTicks.push(new GhostNote({duration:'q'}))
-//                     missingDuration -= 1;
-//                 }
-//             }
-//             // for(var i = 0; i < missingDuration; ++i)
-//             //     textTicks.push(new GhostNote({duration:'q'}))
+            var textTicks = [text];
+            while(missingDuration > 0){
+                if(missingDuration >= 4){
+                    textTicks.push(new GhostNote({duration:'w'}))
+                    missingDuration -= 4;
+                }
+                else if(missingDuration >= 2){
+                    textTicks.push(new GhostNote({duration:'h'}))
+                    missingDuration -= 2;
+                }
+                else if(missingDuration >= 1){
+                    textTicks.push(new GhostNote({duration:'q'}))
+                    missingDuration -= 1;
+                }
+            }
+            // for(var i = 0; i < missingDuration; ++i)
+            //     textTicks.push(new GhostNote({duration:'q'}))
 
-//             textVoice.addTickables(textTicks);
+            textVoice.addTickables(textTicks);
 
-//             // Format and justify the notes to 400 pixels.
-//             const beams = Beam.generateBeams(notes);
-//             new Formatter().joinVoices([voice]).format([voice], inputDisplayWidth - (key == 0 ? 50 : 50));
+            // Format and justify the notes to 400 pixels.
+            const beams = Beam.generateBeams(notes);
+            new Formatter().joinVoices([voice]).format([voice], inputDisplayWidth - (key == 0 ? 50 : 50));
             
-//             // Render voice
-//             // voice.draw(inputContext, inputTrebleStave);
-//             // voice.draw(inputContext, inputTrebleStave);
+            // Render voice
+            // voice.draw(inputContext, inputTrebleStave);
+            // voice.draw(inputContext, inputTrebleStave);
 
-//             // console.log(inputTrebleStave)
-//             // Formatter.FormatAndDraw(inputContext, trebleStaves[key], notes);
-//             voice.draw(inputContext, trebleStaves[key]);
-//             new Formatter().joinVoices([textVoice]).format([textVoice], inputDisplayWidth - (key == 0 ? 50 : 50));
-//             text.setContext(inputContext).draw();
+            // console.log(inputTrebleStave)
+            // Formatter.FormatAndDraw(inputContext, trebleStaves[key], notes);
+            voice.draw(inputContext, trebleStaves[key]);
+            new Formatter().joinVoices([textVoice]).format([textVoice], inputDisplayWidth - (key == 0 ? 50 : 50));
+            text.setContext(inputContext).draw();
             
-//             // Formatter.FormatAndDraw(inputContext, trebleStaves[key], voice);
-//             beams.forEach(function (b) {
-//                 b.setContext(inputContext).draw();
-//             });
-//             const voice2 = new Voice({ num_beats: bassNotes.length, beat_value: 4 });
+            // Formatter.FormatAndDraw(inputContext, trebleStaves[key], voice);
+            beams.forEach(function (b) {
+                b.setContext(inputContext).draw();
+            });
+            const voice2 = new Voice({ num_beats: bassNotes.length, beat_value: 4 });
 
-//             voice2.addTickables(bassNotes);
-//             Accidental.applyAccidentals([voice2], keySignature);
+            voice2.addTickables(bassNotes);
+            Accidental.applyAccidentals([voice2], keySignature);
 
-//             // Format and justify the notes to 400 pixels.
-//             new Formatter().joinVoices([voice2]).format([voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
+            // Format and justify the notes to 400 pixels.
+            new Formatter().joinVoices([voice2]).format([voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
             
-//             // Render voice
-//             voice2.draw(inputContext, bassStaves[key]);
-//             // Formatter.FormatAndDraw(inputContext, bassStaves[key], bassNotes);
-//     // return;
-//         }
-//     }
-//     else{
-//         var chordLengths = {};
-//         chordLengths[1]  = ['4'];
-//         chordLengths[2]  = ['8','8'];
-//         chordLengths[3]  = ['8','16', '16'];
-//         chordLengths[4]  = ['16','16','16','16'];
-//         chordLengths[5]  = ['16','16','16','32','32'];
-//         chordLengths[6]  = ['16','16','32','32','32','32'];
-//         chordLengths[7]  = ['16','32','32','32','32','32','32'];
-//         chordLengths[8]  = ['32','32','32','32','32','32','32','32'];
-//         chordLengths[9]  = ['32','32','32','32','32','32','32','64','64'];
-//         chordLengths[10] = ['32','32','32','32','32','32','64','64','64','64'];
-//         // console.log(chordLengths)
-//         for( const [key, value] of Object.entries(noteArray)){
-//             // console.log('key value pair: ', key, value);
-//             var trebleNotes = [];
-//             var bassNotes = [];
+            // Render voice
+            voice2.draw(inputContext, bassStaves[key]);
+            // Formatter.FormatAndDraw(inputContext, bassStaves[key], bassNotes);
+    // return;
+        }
+    }
+    else{
+        var chordLengths = {};
+        chordLengths[1]  = ['4'];
+        chordLengths[2]  = ['8','8'];
+        chordLengths[3]  = ['8','16', '16'];
+        chordLengths[4]  = ['16','16','16','16'];
+        chordLengths[5]  = ['16','16','16','32','32'];
+        chordLengths[6]  = ['16','16','32','32','32','32'];
+        chordLengths[7]  = ['16','32','32','32','32','32','32'];
+        chordLengths[8]  = ['32','32','32','32','32','32','32','32'];
+        chordLengths[9]  = ['32','32','32','32','32','32','32','64','64'];
+        chordLengths[10] = ['32','32','32','32','32','32','64','64','64','64'];
+        // console.log(chordLengths)
+        for( const [key, value] of Object.entries(noteArray)){
+            // console.log('key value pair: ', key, value);
+            var trebleNotes = [];
+            var bassNotes = [];
 
-//             var numBeats = value['chorded'].length
-//             var addedNotes = 0;
-//             for(const chord of value['chorded']){
-//                 var chordNotes = []
-//                 for(const note of chord){
-//                     chordNotes.push(noteToMidi(note) + 12)
-//                 }
-//                 chordNotes.sort();
-//                 var treble = false;
-//                 if(chordNotes[0] >= 60)
-//                     treble = true;
-//                 if(treble){
-//                     var isSelected = false;
-//                     var isPlaying = false;
-//                     for(var i = 0; i < chord.length; ++ i){
-//                         const note = chord[i];
-//                         trebleNotes.push(new StaveNote({keys:[note], duration:chordLengths[chord.length][i]}));  
-//                         if(addedNotes == currentNoteIndex && key == currentBarIndex){
-//                             isPlaying = true;
-//                             trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                         }                      
-//                         if(addedNotes++ == selectedNote && key == 0){
-//                             isSelected = true;
-//                             trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                         }                      
-//                     }
-//                     bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
-//                     if(isPlaying){
-//                         bassNotes[bassNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                     }
-//                     if(isSelected){
-//                         bassNotes[bassNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                     }
-//                 }else{                    
-//                     for(var i = 0; i < chord.length; ++ i){
-//                         const note = chord[i];
-//                         bassNotes.push(new StaveNote({clef: "bass",keys:[note], duration:chordLengths[chord.length][i]}));   
+            var numBeats = value['chorded'].length
+            var addedNotes = 0;
+            for(const chord of value['chorded']){
+                var chordNotes = []
+                for(const note of chord){
+                    chordNotes.push(noteToMidi(note) + 12)
+                }
+                chordNotes.sort();
+                var treble = false;
+                if(chordNotes[0] >= 60)
+                    treble = true;
+                if(treble){
+                    var isSelected = false;
+                    var isPlaying = false;
+                    for(var i = 0; i < chord.length; ++ i){
+                        const note = chord[i];
+                        trebleNotes.push(new StaveNote({keys:[note], duration:chordLengths[chord.length][i]}));  
+                        if(addedNotes == currentNoteIndex && key == currentBarIndex){
+                            isPlaying = true;
+                            trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
+                        }                      
+                        if(addedNotes++ == selectedNote && key == 0){
+                            isSelected = true;
+                            trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                        }                      
+                    }
+                    bassNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                    if(isPlaying){
+                        bassNotes[bassNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
+                    }
+                    if(isSelected){
+                        bassNotes[bassNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                    }
+                }else{                    
+                    for(var i = 0; i < chord.length; ++ i){
+                        const note = chord[i];
+                        bassNotes.push(new StaveNote({clef: "bass",keys:[note], duration:chordLengths[chord.length][i]}));   
                         
-//                         if(addedNotes == currentNoteIndex && key == currentBarIndex){
-//                             isPlaying = true;
-//                             bassNotes[bassNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                         }                      
-//                         if(addedNotes++ == selectedNote && key == 0){
-//                             isSelected = true;
-//                             bassNotes[bassNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                         }                                           
-//                     }
-//                     trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
-//                     if(isPlaying){
-//                         trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
-//                     }
-//                     if(isSelected){
-//                         trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//                     }
-//                 }
+                        if(addedNotes == currentNoteIndex && key == currentBarIndex){
+                            isPlaying = true;
+                            bassNotes[bassNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
+                        }                      
+                        if(addedNotes++ == selectedNote && key == 0){
+                            isSelected = true;
+                            bassNotes[bassNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                        }                                           
+                    }
+                    trebleNotes.push(new StaveNote({keys:['b/4'], duration:'qr'}));
+                    if(isPlaying){
+                        trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "red", strokeStyle: "red"});
+                    }
+                    if(isSelected){
+                        trebleNotes[trebleNotes.length-1].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+                    }
+                }
 
-//             }
+            }
 
-//             // if(key == 0){
-//             //     if(trebleNotes.length > selectedNote){
-//             //     trebleNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//             //     bassNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
-//             //     }
-//             // }
-//             const notes = trebleNotes;
-//             // console.log('numBeats:', numBeats)
-//             // console.log('treblenotes:', trebleNotes.length)
-//             // console.log('bassnotes:', bassNotes.length)
+            // if(key == 0){
+            //     if(trebleNotes.length > selectedNote){
+            //     trebleNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+            //     bassNotes[selectedNote].setStyle({fillStyle: "blue", strokeStyle: "blue"});
+            //     }
+            // }
+            const notes = trebleNotes;
+            // console.log('numBeats:', numBeats)
+            // console.log('treblenotes:', trebleNotes.length)
+            // console.log('bassnotes:', bassNotes.length)
 
-//             const voice = new Voice({ num_beats: numBeats, beat_value: 4 });
-//             const voice2 = new Voice({ num_beats: numBeats, beat_value: 4 });
+            const voice = new Voice({ num_beats: numBeats, beat_value: 4 });
+            const voice2 = new Voice({ num_beats: numBeats, beat_value: 4 });
 
-//             voice.addTickables(trebleNotes);
-//             voice2.addTickables(bassNotes);
-//             Accidental.applyAccidentals([voice], keySignature);
-//             Accidental.applyAccidentals([voice2], keySignature);
+            voice.addTickables(trebleNotes);
+            voice2.addTickables(bassNotes);
+            Accidental.applyAccidentals([voice], keySignature);
+            Accidental.applyAccidentals([voice2], keySignature);
             
-//             var text = new Vex.Flow.TextNote({
-//                 text: value.root + ' ' + value.scale + ' ' + value.dir,
-//                 font: {
-//                     family: "Arial",
-//                     size: 12,
-//                     weight: ""
-//                 },
-//                 duration: 'q',
-//                 y_shift:22
-//             })
-//             .setLine(10)
-//             .setStave(trebleStaves[key])
-//             const textVoice = new Voice({ num_beats: numBeats, beat_value: 4 });
-//             var missingDuration = numBeats - 1;
-//             var textTicks = [text];
-//             while(missingDuration > 0){
-//                 if(missingDuration >= 4){
-//                     textTicks.push(new GhostNote({duration:'w'}))
-//                     missingDuration -= 4;
-//                 }
-//                 else if(missingDuration >= 2){
-//                     textTicks.push(new GhostNote({duration:'h'}))
-//                     missingDuration -= 2;
-//                 }
-//                 else if(missingDuration >= 1){
-//                     textTicks.push(new GhostNote({duration:'q'}))
-//                     missingDuration -= 1;
-//                 }
-//             }
-//             textVoice.addTickables(textTicks);
-//             new Formatter().joinVoices([textVoice]).format([textVoice], inputDisplayWidth - (key == 0 ? 50 : 50));
-//             text.setContext(inputContext).draw();
+            var text = new Vex.Flow.TextNote({
+                text: value.root + ' ' + value.scale + ' ' + value.dir,
+                font: {
+                    family: "Arial",
+                    size: 12,
+                    weight: ""
+                },
+                duration: 'q',
+                y_shift:22
+            })
+            .setLine(10)
+            .setStave(trebleStaves[key])
+            const textVoice = new Voice({ num_beats: numBeats, beat_value: 4 });
+            var missingDuration = numBeats - 1;
+            var textTicks = [text];
+            while(missingDuration > 0){
+                if(missingDuration >= 4){
+                    textTicks.push(new GhostNote({duration:'w'}))
+                    missingDuration -= 4;
+                }
+                else if(missingDuration >= 2){
+                    textTicks.push(new GhostNote({duration:'h'}))
+                    missingDuration -= 2;
+                }
+                else if(missingDuration >= 1){
+                    textTicks.push(new GhostNote({duration:'q'}))
+                    missingDuration -= 1;
+                }
+            }
+            textVoice.addTickables(textTicks);
+            new Formatter().joinVoices([textVoice]).format([textVoice], inputDisplayWidth - (key == 0 ? 50 : 50));
+            text.setContext(inputContext).draw();
 
-//             new Formatter().joinVoices([voice, voice2]).format([voice, voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
+            new Formatter().joinVoices([voice, voice2]).format([voice, voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
 
-//             const beams = Beam.generateBeams(notes);
-//             voice.draw(inputContext, trebleStaves[key]);
-//             beams.forEach(function (b) {
-//                 b.setContext(inputContext).draw();
-//             });
-//             const beams2 = Beam.generateBeams(bassNotes);
-//             voice2.draw(inputContext, bassStaves[key]);
-//             beams2.forEach(function (b) {
-//                 b.setContext(inputContext).draw();
-//             });
-
-
+            const beams = Beam.generateBeams(notes);
+            voice.draw(inputContext, trebleStaves[key]);
+            beams.forEach(function (b) {
+                b.setContext(inputContext).draw();
+            });
+            const beams2 = Beam.generateBeams(bassNotes);
+            voice2.draw(inputContext, bassStaves[key]);
+            beams2.forEach(function (b) {
+                b.setContext(inputContext).draw();
+            });
 
 
-//             // new Formatter().joinVoices([voice2]).format([voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
-//         }        
-//     }
 
 
-//     return;
-// }
+            // new Formatter().joinVoices([voice2]).format([voice2], inputDisplayWidth - (key == 0 ? 50 : 50));
+        }        
+    }
 
 
-// CONTEXT AND MASTER VOLUME
-var AudioContext = window.AudioContext ||
-    window.webkitAudioContext;
-  
-const context = new AudioContext();
-const masterVolume = context.createGain();
-masterVolume.connect(context.destination);
-masterVolume.gain.value = 0.05
+    return;
+}
 
-const sineTerms = new Float32Array([0, 0, 1, 0, 1]);
-const cosineTerms = new Float32Array(sineTerms.length);
-const customWaveform = context.createPeriodicWave(cosineTerms, sineTerms);
-const volumeControl = document.querySelector('#volume-control');
-
-volumeControl.addEventListener('input', function(){
-    masterVolume.gain.value = this.value;
-});
-
-//WAVEFORM SELECT
-// const waveforms = document.getElementsByName('waveform');
-let waveform = "custom";
-
-
-// $('#waveFormSelect').on('change', function(e){
-//     // console.log(e,$('#waveFormSelect').val() )
-//     switch($('#waveFormSelect').val()){
-//         case '0': waveform = 'sine'; break;
-//         case '1': waveform = 'square'; break;
-//         case '2': waveform = 'triangle'; break;
-//         case '3': waveform = 'sawtooth'; break;
-//         case '4': waveform = 'custom'; break;
-//     }
-// })
-
-// EFFECTS CONTROLS
-
-// Envelope
-let attackTime = 0.32;
-let sustainLevel = 0.8;
-let releaseTime = 0.34;
-let noteLength = 0.2;
-  
-const attackControl = document.querySelector('#attack-control');
-const releaseControl = document.querySelector('#release-control');
-const noteLengthControl = document.querySelector('#note-length-control');
-
-// attackControl.addEventListener('input', function() {
-//     attackTime = Number(this.value);
-// });
-
-// releaseControl.addEventListener('input', function() {
-//     releaseTime = Number(this.value);
-// });
-
-// noteLengthControl.addEventListener('input', function() {
-//     noteLength = Number(this.value);
-// });
-
-// Vibrato
-let vibratoSpeed = 10;
-let vibratoAmount = 0;
-const vibratoAmountControl = document.querySelector('#vibrato-amount-control');
-const vibratoSpeedControl= document.querySelector('#vibrato-speed-control');
-
-// vibratoAmountControl.addEventListener('input', function() {
-//     vibratoAmount = this.value;
-// })
-
-// vibratoSpeedControl.addEventListener('input', function() {
-//     vibratoSpeed = this.value;
-// })
-
-// Delay
-const delayAmountControl = document.querySelector('#delay-amount-control');
-const delayTimeControl= document.querySelector('#delay-time-control');
-const feedbackControl= document.querySelector('#feedback-control');
-const delay = context.createDelay();
-const feedback = context.createGain();
-const delayAmountGain = context.createGain();
-
-delayAmountGain.connect(delay)
-delay.connect(feedback)
-feedback.connect(delay)
-delay.connect(masterVolume)
-
-
-delay.delayTime.value = 0;
-delayAmountGain.gain.value = 0;
-feedback.gain.value = 0;
-
-// delayAmountControl.addEventListener('input', function() {
-//     delayAmountGain.value = this.value;
-// })
-
-// delayTimeControl.addEventListener('input', function() {
-//     delay.delayTime.value = this.value;
-// })
-
-// feedbackControl.addEventListener('input', function() {
-//     feedback.gain.value = this.value;
-// })
-
-const pianoNotes = {
-     "A/0": 27.50,
-    "Bb/0": 29.14,
-     "B/0": 30.87,
-     "C/1": 32.70,
-    "C#/1": 34.65,
-     "D/1": 36.71,
-    "D#/1": 38.89,
-     "E/1": 41.20,
-     "F/1": 43.65,
-    "F#/1": 46.25,
-     "G/1": 49.00,
-    "G#/1": 51.91,
-     "A/1": 55.00,
-    "Bb/1": 58.27,
-     "B/1": 61.74,
-     "C/2": 65.41,
-    "C#/2": 69.30,
-     "D/2": 73.42,
-    "D#/2": 77.78,
-     "E/2": 82.41,
-     "F/2": 87.31,
-    "F#/2": 92.50,
-     "G/2": 98.00,
-    "G#/2": 103.83,
-     "A/2": 110.00,
-    "Bb/2": 116.54,
-     "B/2": 123.47,
-     "C/3": 130.81,
-    "C#/3": 138.59,
-     "D/3": 146.83,
-    "D#/3": 155.56,
-     "E/3": 164.81,
-     "F/3": 174.61,
-    "F#/3": 185.00,
-     "G/3": 196.00,
-    "G#/3": 207.65,
-     "A/3": 220.00,
-    "Bb/3": 233.08,
-     "B/3": 246.94,
-     "C/4": 266.63,
-    "C#/4": 277.18,
-     "D/4": 293.66,
-    "D#/4": 311.13,
-     "E/4": 329.63,
-     "F/4": 349.23,
-    "F#/4": 369.99,
-     "G/4": 392.00,
-    "G#/4": 415.30,
-     "A/4": 440.00,
-    "Bb/4": 466.16,
-     "B/4": 493.88,
-     "C/5": 523.25,
-    "C#/5": 554.25,
-     "D/5": 587.33,
-    "D#/5": 622.26,
-     "E/5": 659.25,
-     "F/5": 698.46,
-    "F#/5": 739.99,
-     "G/5": 783.99,
-    "G#/5": 830.61,
-     "A/5": 880.00,
-    "Bb/5": 932.33,
-     "B/5": 987.77,
-     "C/6": 1046.50,
-    "C#/6": 1108.73,
-     "D/6": 1174.66,
-    "D#/6": 1244.51,
-     "E/6": 1318.51,
-     "F/6": 1396.91,
-    "F#/6": 1479.98,
-     "G/6": 1567.98,
-    "G#/6": 1661.22,
-     "A/6": 1760.00,
-    "Bb/6": 1864.00,
-     "B/6": 1975.33,
-     "C/7": 2093.00,
-    "C#/7": 2217.46,
-     "D/7": 2349.22,
-    "D#/7": 2217.46,
-     "E/7": 2637.02,
-     "F/7": 2793.83,
-    "F#/7": 2959.96,
-     "G/7": 3135.95,
-    "G#/7": 3322.44,
-     "A/7": 3520.00,
-    "Bb/7": 3729.31,
-     "B/7": 3951.07,
-     "C/8": 4186.01
-};
+drawNotes(inputDiv, noteArray, true);
+drawNotes(outputDiv, outputNoteArray, false);
 
 
 // const notes = {
@@ -937,8 +770,8 @@ const pianoNotes = {
 // }
   
 
-// document.getElementById("inputText").innerHTML = 'You have pressed: ';
-// document.getElementById("outputText").innerHTML = 'You should press: ';
+document.getElementById("inputText").innerHTML = 'You have pressed: ';
+document.getElementById("outputText").innerHTML = 'You should press: ';
 
 // function notesAreEqual(inputNotes, referenceNotes){
 //     if(inputNotes.length == 0)
@@ -980,41 +813,6 @@ const pianoNotes = {
 var currentPressed = [];
 
 var currentSynthNotes = {};
-
-
-function keyToNote(event){
-    switch (event.code){
-        case 'KeyA': return 'G/3';
-        case 'KeyW': return 'G#/3';
-        case 'KeyS': return 'A/3';
-        case 'KeyE': return 'A#/3';
-        case 'KeyD': return 'B/3';
-        case 'KeyF': return 'C/4';
-        case 'KeyT': return 'C#/4';
-        case 'KeyG': return 'D/4';
-        case 'KeyY': return 'D#/4';
-        case 'KeyH': return 'E/4';
-        case 'KeyJ': return 'F/4';
-        case 'KeyI': return 'F#/4';
-        case 'KeyK': return 'G/4';
-        case 'KeyO': return 'G#/4';
-        case 'KeyL': return 'A/4';
-        case 'KeyP': return 'A#/4';
-        case 'Semicolon': return 'B/4';
-        case 'Quote': return 'C/5';
-        case 'BracketRight': return 'C#/5';
-    }
-    return undefined;
-}
-
-var modifiers = {
-    'LeftShift': false,
-    'RightShift': false,
-    'LeftControl': false,
-    'RightControl': false,
-    'LeftAlt': false,
-    'RightAlt': false,
-}
 
 function onKeyPress(event, up) {
     console.log(event.key, event.code, event.type);
@@ -1121,13 +919,13 @@ function onKeyPress(event, up) {
         //     // console.log(`${key}: ${value}`);
         //     noteString.push(`${key}[${value}]`);
         // }
-        // document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+        document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
         // document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
 
         
 
 
-        // drawNotes(inputDiv, noteArray, true);
+        drawNotes(inputDiv, noteArray, true);
 
 
         if($('#synthEnableBox')[0].checked){
@@ -1206,7 +1004,7 @@ function onKeyPress(event, up) {
         //     // console.log(`${key}: ${value}`);
         //     noteString.push(`${key}[${value}]`);
         // }
-        // document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+        document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
         // document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
 
         if ($('#synthEnableBox')[0].checked && note in currentSynthNotes){
@@ -1219,7 +1017,7 @@ function onKeyPress(event, up) {
             currentSynthNotes[note][1].stop(endTime);
             delete currentSynthNotes[note];
         }
-        // drawNotes(inputDiv, noteArray, true);
+        drawNotes(inputDiv, noteArray, true);
 
 
 
@@ -1228,11 +1026,16 @@ function onKeyPress(event, up) {
 }
 
 
+
+
+
 document.addEventListener('keydown', onKeyPress);
 document.addEventListener('keyup', onKeyPress);
 
 function onMIDIMessage (message) {
     let pressed = message.data[0] == 144 ? true : false;
+    if (message.data[2] == 0) pressed = false; // Note off message with velocity 0
+    // console.log('MIDI Message: ', message.data, 'Pressed: ', pressed);
     var noteName = noteToName(message.data[1]);
     for( var key of currentPressed){
         var midi = noteToMidi(key) + 12;
@@ -1293,13 +1096,14 @@ function onMIDIMessage (message) {
     //     // console.log(`${key}: ${value}`);
     //     noteString.push(`${key}[${value}]`);
     //   }
-    // document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+    document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
+
     // document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
 
     
 
 
-    // drawNotes(inputDiv, noteArray, true);
+    drawNotes(inputDiv, noteArray, true);
 
     
     if(pressed){
@@ -2277,7 +2081,7 @@ function onMIDIMessage (message) {
 // console.log('outputNoteArray[0][notes]',outputNoteArray[0]['notes'])
 // console.log('outputNoteArray[0][notes][selectedNote]',outputNoteArray[0]['notes'][selectedNote])
 
-// document.getElementById("inputText").innerHTML = 'You have pressed: ';
+document.getElementById("inputText").innerHTML = 'You have pressed: ';
 // document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
 
 // $('#modeScaleSelect').on('change', function (e) {
@@ -2704,16 +2508,6 @@ if("?config" in  parsedQuery)
 
 // console.log($('#regenButton'))
 
-//LOOP CONTROLS
-const startButton = document.querySelector('#startButton8');
-const stopButton = document.querySelector('#stopButton8');
-const tempoControl = document.querySelector('#tempo-control');
-let tempo = 200.0;
-let isPlaying = false;
-
-tempoControl.addEventListener('input', function() {
-    tempo = Number(this.value);
-}, false);
 
 // function playSelectedNote(){
 //     var systainLevel = 0.5;
