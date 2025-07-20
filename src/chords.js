@@ -158,7 +158,7 @@ function createChordRootNoteTable() {
         // Add hover effects and tooltips
         cell.onmouseover = function() {
             if (!isSelected) {
-                cell.style.backgroundColor = '#e3f2fd';
+                cell.style.backgroundColor = '#606d76ff';
             }
             
             // Add tooltip
@@ -260,7 +260,7 @@ function createChordSuffixTable() {
         categoryCell.style.border = '1px solid #ccc';
         categoryCell.style.padding = '8px 12px';
         categoryCell.style.fontWeight = 'bold';
-        categoryCell.style.backgroundColor = '#f5f5f5';
+        categoryCell.style.backgroundColor = '#2a2a2aff';
         categoryCell.style.minWidth = '100px';
         categoryCell.style.verticalAlign = 'top';
         categoryCell.style.cursor = 'pointer';

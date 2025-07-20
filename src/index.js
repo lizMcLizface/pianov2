@@ -284,7 +284,7 @@ function setupStaves(div, divisions = 1){
     
     var inputDisplayWidth = div.offsetWidth
     // Configure the rendering context.
-    inputRenderer.resize(inputDisplayWidth, 350);
+    inputRenderer.resize(inputDisplayWidth, 320);
     const inputContext = inputRenderer.getContext();
     // Create a stave of width 400 at position 10, 40 on the canvas.
 
@@ -292,7 +292,7 @@ function setupStaves(div, divisions = 1){
     inputDisplayWidth = maxWidth;
     if(divisions == 0){
         const inputTrebleStave = new Stave(30, 80, maxWidth);
-        const inputBassStave = new Stave(30, 200, maxWidth);
+        const inputBassStave = new Stave(30, 160, maxWidth);
         // inputTrebleStave.addTimeSignature('3/8')
         inputTrebleStave.addClef("treble");
         inputBassStave.addClef("bass");
@@ -2155,17 +2155,17 @@ document.getElementById("inputText").innerHTML = 'You have pressed: ';
 
 //     }
 // });
-// $('#stavesCheckBox').on('change', function (e) {
-//     // console.log('stavebutton')
-//     // console.log($('#stavesCheckBox')[0].checked)
-//     // console.log($('#staveContainerBox')[0])
-//     // console.log($('#staveContainerBox')[0].style.display)
-//     if($('#stavesCheckBox')[0].checked){
-//         $('#staveContainerBox')[0].style.display = "flex"
-//     }else{
-//         $('#staveContainerBox')[0].style.display = "none"
-//     }
-// });
+$('#stavesCheckBox').on('change', function (e) {
+    // console.log('stavebutton')
+    // console.log($('#stavesCheckBox')[0].checked)
+    // console.log($('#staveContainerBox')[0])
+    // console.log($('#staveContainerBox')[0].style.display)
+    if($('#stavesCheckBox')[0].checked){
+        $('#staveContainerBox')[0].style.display = "flex"
+    }else{
+        $('#staveContainerBox')[0].style.display = "none"
+    }
+});
 
 
 

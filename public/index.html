@@ -85,7 +85,7 @@
     <div class="tab" id="mainTabBar"
          onmouseenter="this.classList.add('expanded')"
          onmouseleave="this.classList.remove('expanded')">
-         <button class="tablinks active" onclick="openCity(event, 'ScaleSelectorTab')" >
+         <button class="tablinks active" onclick="openCity(event, 'ScaleSelectorTab')" id="defaultOpen" >
         <span class="short-label">P</span>
         <span class="full-label">Scales</span>
       </button>
@@ -94,7 +94,7 @@
         <span class="full-label">Chords</span>
       </button>
 
-      <button class="tablinks" onclick="openCity(event, 'PlayTab')" id="defaultOpen">
+      <button class="tablinks" onclick="openCity(event, 'PlayTab')">
         <span class="short-label">P</span>
         <span class="full-label">Play</span>
       </button>
@@ -199,8 +199,6 @@
 
       <div id="ChordSelectorTab" class="tabcontent" style="display:block;">
         <div id ="chordPlaceholderContent">
-          <p>This is a placeholder content. You can replace it with actual content later.</p>
-          <p>Feel free to add more information or features as needed.</p>
           </div>
     <div id="container">
     <ul id="keyboard">

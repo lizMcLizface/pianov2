@@ -69,12 +69,12 @@ function createRootNoteTable() {
     const chromaticNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     
     let rootTableContainer = document.createElement('div');
-    rootTableContainer.style.marginBottom = '20px';
+    rootTableContainer.style.marginBottom = '15px';
     
     let rootTableLabel = document.createElement('h3');
     rootTableLabel.textContent = 'Root Note Selection';
-    rootTableLabel.style.margin = '0 0 10px 0';
-    rootTableLabel.style.fontSize = '16px';
+    rootTableLabel.style.margin = '0 0 8px 0';
+    rootTableLabel.style.fontSize = '17px';
     rootTableLabel.style.fontWeight = 'bold';
     
     let rootTable = document.createElement('table');
@@ -86,13 +86,14 @@ function createRootNoteTable() {
     // Add "All" cell at the beginning
     let allCell = document.createElement('td');
     allCell.style.border = '1px solid #ccc';
-    allCell.style.padding = '8px 12px';
+    allCell.style.padding = '6px 8px';
     allCell.style.textAlign = 'center';
     allCell.style.cursor = 'pointer';
     allCell.style.userSelect = 'none';
     allCell.style.fontWeight = 'bold';
-    allCell.style.minWidth = '40px';
-    allCell.style.backgroundColor = '#e0e0e0';
+    allCell.style.fontSize = '18px';
+    allCell.style.minWidth = '32px';
+    allCell.style.backgroundColor = '#353535ff';
     allCell.style.fontStyle = 'italic';
     
     allCell.textContent = 'All';
@@ -141,7 +142,7 @@ function createRootNoteTable() {
     // Add hover effects and tooltips for "All" cell
     allCell.onmouseover = function() {
         if (!allNotesSelected) {
-            allCell.style.backgroundColor = '#d0d0d0';
+            allCell.style.backgroundColor = '#3a3a3aff';
         }
         
         // Add tooltip
@@ -151,9 +152,9 @@ function createRootNoteTable() {
         tooltip.style.background = '#000';
         tooltip.style.color = 'white';
         tooltip.style.border = '1px solid #ccc';
-        tooltip.style.padding = '6px 12px';
+        tooltip.style.padding = '4px 8px';
         tooltip.style.zIndex = 1000;
-        tooltip.style.fontSize = '12px';
+        tooltip.style.fontSize = '11px';
         
         let tooltipText = `<strong>All Root Notes</strong><br>`;
         if (exclusiveMode) {
@@ -173,7 +174,7 @@ function createRootNoteTable() {
     
     allCell.onmouseleave = function() {
         if (!allNotesSelected) {
-            allCell.style.backgroundColor = '#e0e0e0';
+            allCell.style.backgroundColor = '#393939ff';
         }
         
         // Remove tooltip
@@ -191,12 +192,13 @@ function createRootNoteTable() {
     for (let note of chromaticNotes) {
         let cell = document.createElement('td');
         cell.style.border = '1px solid #ccc';
-        cell.style.padding = '8px 12px';
+        cell.style.padding = '6px 8px';
         cell.style.textAlign = 'center';
         cell.style.cursor = 'pointer';
         cell.style.userSelect = 'none';
         cell.style.fontWeight = 'bold';
-        cell.style.minWidth = '40px';
+        cell.style.fontSize = '12px';
+        cell.style.minWidth = '32px';
         
         cell.textContent = note;
         
@@ -270,7 +272,7 @@ function createRootNoteTable() {
         // Add hover effects and tooltips
         cell.onmouseover = function() {
             if (!isSelected) {
-                cell.style.backgroundColor = '#e3f2fd';
+                cell.style.backgroundColor = '#6a8090ff';
             }
             
             // Add tooltip
@@ -280,9 +282,9 @@ function createRootNoteTable() {
             tooltip.style.background = '#000';
             tooltip.style.color = 'white';
             tooltip.style.border = '1px solid #ccc';
-            tooltip.style.padding = '6px 12px';
+            tooltip.style.padding = '4px 8px';
             tooltip.style.zIndex = 1000;
-            tooltip.style.fontSize = '12px';
+            tooltip.style.fontSize = '11px';
             
             let tooltipText = `<strong>Root Note:</strong> ${note}<br>`;
             if (exclusiveMode) {
@@ -351,17 +353,17 @@ function createHeptatonicScaleTable() {
 
     // Create toggle switch container
     let toggleContainer = document.createElement('div');
-    toggleContainer.style.marginBottom = '20px';
+    toggleContainer.style.marginBottom = '15px';
     toggleContainer.style.display = 'flex';
     toggleContainer.style.alignItems = 'center';
-    toggleContainer.style.gap = '10px';
+    toggleContainer.style.gap = '8px';
     
     // Create toggle switch
     let toggleSwitch = document.createElement('label');
     toggleSwitch.style.position = 'relative';
     toggleSwitch.style.display = 'inline-block';
-    toggleSwitch.style.width = '60px';
-    toggleSwitch.style.height = '34px';
+    toggleSwitch.style.width = '50px';
+    toggleSwitch.style.height = '28px';
     
     let toggleInput = document.createElement('input');
     toggleInput.type = 'checkbox';
@@ -379,15 +381,15 @@ function createHeptatonicScaleTable() {
     slider.style.bottom = '0';
     slider.style.backgroundColor = exclusiveMode ? '#4CAF50' : '#ccc';
     slider.style.transition = '0.4s';
-    slider.style.borderRadius = '34px';
+    slider.style.borderRadius = '28px';
     
     let sliderButton = document.createElement('span');
     sliderButton.style.position = 'absolute';
     sliderButton.style.content = '';
-    sliderButton.style.height = '26px';
-    sliderButton.style.width = '26px';
-    sliderButton.style.left = exclusiveMode ? '30px' : '4px';
-    sliderButton.style.bottom = '4px';
+    sliderButton.style.height = '22px';
+    sliderButton.style.width = '22px';
+    sliderButton.style.left = exclusiveMode ? '25px' : '3px';
+    sliderButton.style.bottom = '3px';
     sliderButton.style.backgroundColor = 'white';
     sliderButton.style.transition = '0.4s';
     sliderButton.style.borderRadius = '50%';
@@ -405,14 +407,14 @@ function createHeptatonicScaleTable() {
     // Add clear button
     let clearButton = document.createElement('button');
     clearButton.textContent = 'Clear All';
-    clearButton.style.padding = '8px 16px';
+    clearButton.style.padding = '6px 12px';
     clearButton.style.backgroundColor = '#f44336';
     clearButton.style.color = 'white';
     clearButton.style.border = 'none';
-    clearButton.style.borderRadius = '4px';
+    clearButton.style.borderRadius = '3px';
     clearButton.style.cursor = 'pointer';
-    clearButton.style.fontSize = '12px';
-    clearButton.style.marginLeft = '10px';
+    clearButton.style.fontSize = '14px';
+    clearButton.style.marginLeft = '8px';
     
     clearButton.onclick = function() {
         selectedScales = ['Major-1']; // Reset to default first scale
@@ -449,7 +451,8 @@ function createHeptatonicScaleTable() {
 
     let table = document.createElement('table');
     table.style.borderCollapse = 'collapse';
-    table.style.margin = '20px 0';
+    table.style.margin = '15px 0';
+    table.style.fontSize = '18px';
 
     // Dynamic number of rows: 1 header row + number of scale families
     for (let i = 0; i < scaleNames.length + 1; i++) {
@@ -458,10 +461,11 @@ function createHeptatonicScaleTable() {
         for (let j = 0; j < numColumns; j++) {
             let cell = document.createElement('td');
             cell.style.border = '1px solid #ccc';
-            cell.style.padding = '6px 12px';
+            cell.style.padding = '4px 8px';
+            cell.style.fontSize = '16px';
             if (j==0){
                 cell.style.fontWeight = 'bold';
-                cell.style.backgroundColor = '#f0f0f0';
+                cell.style.backgroundColor = '#474747ff';
                 cell.textContent = i === 0 ? 'Scale' : `${scaleNames[i-1]}`;
                 
                 // Add click functionality to select/deselect entire row
@@ -548,9 +552,9 @@ function createHeptatonicScaleTable() {
                         tooltip.style.background = '#000';
                         tooltip.style.color = 'white';
                         tooltip.style.border = '1px solid #ccc';
-                        tooltip.style.padding = '6px 12px';
+                        tooltip.style.padding = '4px 8px';
                         tooltip.style.zIndex = 1000;
-                        tooltip.style.fontSize = '12px';
+                        tooltip.style.fontSize = '11px';
                         tooltip.innerHTML = `
                             <strong>Scale Family:</strong> ${scaleName}<br>
                             <em>Click to ${allSelected ? 'deselect' : 'select'} entire row</em>
@@ -571,7 +575,7 @@ function createHeptatonicScaleTable() {
             }
             else if (i === 0 && j > 0) {
                 cell.style.fontWeight = 'bold';
-                cell.style.backgroundColor = '#f0f0f0';
+                cell.style.backgroundColor = '#474747ff';
                 cell.textContent = j === 0 ? 'Degree' : `${intToRoman(j)}`;
             }
             else{
@@ -653,9 +657,9 @@ function createHeptatonicScaleTable() {
                         tooltip.style.background = '#000';
                         tooltip.style.color = 'white';
                         tooltip.style.border = '1px solid #ccc';
-                        tooltip.style.padding = '6px 12px';
+                        tooltip.style.padding = '4px 8px';
                         tooltip.style.zIndex = 1000;
-                        tooltip.style.fontSize = '12px';
+                        tooltip.style.fontSize = '11px';
                         tooltip.innerHTML = `
                             <strong>Scale:</strong> ${scaleName}<br>
                             <strong>Interval:</strong> ${interval}<br>
