@@ -85,7 +85,12 @@
     <div class="tab" id="mainTabBar"
          onmouseenter="this.classList.add('expanded')"
          onmouseleave="this.classList.remove('expanded')">
-      <button class="tablinks active" onclick="openCity(event, 'Starting')" id="defaultOpen">
+         <button class="tablinks active" onclick="openCity(event, 'Placeholder')" id="defaultOpen">
+        <span class="short-label">P</span>
+        <span class="full-label">Placeholder</span>
+      </button>
+
+      <button class="tablinks active" onclick="openCity(event, 'Starting')">
         <span class="short-label">S</span>
         <span class="full-label">Starting Page</span>
       </button>
@@ -140,7 +145,16 @@
         </span>
         <span style="width:10%" class="tableCell">
           <button class="btn warning" style="width:100%" id="regenButton">Regenerate Notes</button>
+        </span>      </div>
+
+      <div id="Placeholder" class="tabcontent" style="display:block;">
+        <span style="width:60%;text-align: left;" class="tableCell">
+          <h3>Placeholder</h3>
         </span>
+        <div id ="placeholderContent">
+          <p>This is a placeholder content. You can replace it with actual content later.</p>
+          <p>Feel free to add more information or features as needed.</p>
+          </div>
       </div>
   
     <div id="Starting" class="tabcontent" style="display:block;">      
@@ -1448,74 +1462,6 @@
 </div>
       </div>
   
-  <div class="selectionContainer" style="position:fixed; left:80px; bottom:0; width:100%; z-index:999; background:#464646;">
-    <span style="width:5%;text-align: center;" class="tableCell">
-      <div style="display: flex; align-items: center; height: 100%;">
-        <h4 style="margin: 0;">Metronome</h4>
-      </div>
-    </span>
-    <span style="width:7.5%" class="tableCell">
-      <div style="display: flex; align-items: center; gap: 8px; height: 100%;">
-        <span>Enable</span>
-        <label class="switch" style="margin-bottom:0;">
-          <input type="checkbox" id='metronomeCheckBox' checked>
-          <span class="slider round"></span>
-        </label>
-      </div>
-    </span>
-  </span>
-  <span style="width:7.5%" class="tableCell">
-      <div style="display: flex; align-items: center; gap: 8px; height: 100%;">
-        <span>Sound</span>
-        <label class="switch" style="margin-bottom:0;">
-          <input type="checkbox" id='metronomeSoundCheckBox'>
-          <span class="slider round"></span>
-        </label>
-      </div>
-</span>
-<span style="width:10%" class="tableCell">
-      <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-        <span style="display: flex; align-items: center;">
-          <span style="margin-right: 8px;">BPM:</span>
-          <label id='bpmText' style="width:40px; text-align:center; margin-right: 8px;">60</label>
-          <input type="range" id="bpmSlider" value="60" min="10" max="180" step="1" style="width:120px;">
-        </span>
-      </div>
-</label>
-</span>
-<span style="width:60%" class="tableCell">
-<span style="width:100%;justify-content:center; align-items:center;display:inline-block" class="tableCell">
-  <div style="display:flex;gap:-4px">
-    <div class='metronome metronome01' data-animation></div>
-    <div class='metronome metronome02' data-animation></div>
-    <div class='metronome metronome03' data-animation></div>
-    <div class='metronome metronome04' data-animation></div>
-    <div class='metronome metronome05' data-animation></div>
-    <div class='metronome metronome06' data-animation></div>
-    <div class='metronome metronome07' data-animation></div>
-    <div class='metronome metronome08' data-animation></div>
-    <div class='metronome metronome09' data-animation></div>
-    <div class='metronome metronome10' data-animation></div>
-    <div class='metronome metronome11' data-animation></div>
-    <div class='metronome metronome12' data-animation></div>
-    <div class='metronome metronome13' data-animation></div>
-    <div class='metronome metronome14' data-animation></div>
-    <div class='metronome metronome15' data-animation></div>
-    <div class='metronome metronome16' data-animation></div>
-    <div class='metronome metronome17' data-animation></div>
-    <div class='metronome metronome18' data-animation></div>
-    <div class='metronome metronome19' data-animation></div>
-    <div class='metronome metronome20' data-animation></div>
-    <div class='metronome metronome21' data-animation></div>
-    <div class='metronome metronome22' data-animation></div>
-    <div class='metronome metronome23' data-animation></div>
-    <div class='metronome metronome24' data-animation></div>
-  </div>
-</span>
-</span>
-</span>
-
-</div>
 <div class="selectionContainer" id="staveContainerBox">
 </div> 
 
@@ -1625,6 +1571,74 @@
     </ul>
   </div> 
   </div>
+  <div class="selectionContainer" style="position:fixed; left:80px; bottom:0; width:100%; z-index:999; background:#464646;">
+    <span style="width:5%;text-align: center;" class="tableCell">
+      <div style="display: flex; align-items: center; height: 100%;">
+        <h4 style="margin: 0;">Metronome</h4>
+      </div>
+    </span>
+    <span style="width:7.5%" class="tableCell">
+      <div style="display: flex; align-items: center; gap: 8px; height: 100%;">
+        <span>Enable</span>
+        <label class="switch" style="margin-bottom:0;">
+          <input type="checkbox" id='metronomeCheckBox' checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+    </span>
+  </span>
+  <span style="width:7.5%" class="tableCell">
+      <div style="display: flex; align-items: center; gap: 8px; height: 100%;">
+        <span>Sound</span>
+        <label class="switch" style="margin-bottom:0;">
+          <input type="checkbox" id='metronomeSoundCheckBox'>
+          <span class="slider round"></span>
+        </label>
+      </div>
+</span>
+<span style="width:10%" class="tableCell">
+      <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+        <span style="display: flex; align-items: center;">
+          <span style="margin-right: 8px;">BPM:</span>
+          <label id='bpmText' style="width:40px; text-align:center; margin-right: 8px;">60</label>
+          <input type="range" id="bpmSlider" value="60" min="10" max="180" step="1" style="width:120px;">
+        </span>
+      </div>
+</label>
+</span>
+<span style="width:60%" class="tableCell">
+<span style="width:100%;justify-content:center; align-items:center;display:inline-block" class="tableCell">
+  <div style="display:flex;gap:-4px">
+    <div class='metronome metronome01' data-animation></div>
+    <div class='metronome metronome02' data-animation></div>
+    <div class='metronome metronome03' data-animation></div>
+    <div class='metronome metronome04' data-animation></div>
+    <div class='metronome metronome05' data-animation></div>
+    <div class='metronome metronome06' data-animation></div>
+    <div class='metronome metronome07' data-animation></div>
+    <div class='metronome metronome08' data-animation></div>
+    <div class='metronome metronome09' data-animation></div>
+    <div class='metronome metronome10' data-animation></div>
+    <div class='metronome metronome11' data-animation></div>
+    <div class='metronome metronome12' data-animation></div>
+    <div class='metronome metronome13' data-animation></div>
+    <div class='metronome metronome14' data-animation></div>
+    <div class='metronome metronome15' data-animation></div>
+    <div class='metronome metronome16' data-animation></div>
+    <div class='metronome metronome17' data-animation></div>
+    <div class='metronome metronome18' data-animation></div>
+    <div class='metronome metronome19' data-animation></div>
+    <div class='metronome metronome20' data-animation></div>
+    <div class='metronome metronome21' data-animation></div>
+    <div class='metronome metronome22' data-animation></div>
+    <div class='metronome metronome23' data-animation></div>
+    <div class='metronome metronome24' data-animation></div>
+  </div>
+</span>
+</span>
+</span>
+
+</div>
 
     <noscript>You need to enable JavaScript to run this app.</noscript>
     

@@ -4,6 +4,9 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import $ from 'jquery';
+import { metronome, reset } from './metronome';
+import {processChord} from './intervals';
+import {HeptatonicScales, scales} from './scales';
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
 // root.render(
@@ -18,7 +21,372 @@ import $ from 'jquery';
 reportWebVitals();
 
 
+console.log(processChord('Cmaj7'));
+
 window.$ = window.jQuery = require('jquery');
+
+// Global array to store selected scales
+let selectedScales = [];
+let exclusiveMode = false; // Toggle between exclusive and multiple selection modes
+
+// Utility functions to manage selected scales
+function getSelectedScales() {
+    return selectedScales.slice(); // Return a copy of the array
+}
+
+function clearSelectedScales() {
+    selectedScales = [];
+    // Refresh the table to update visual state
+    createHeptatonicScaleTable();
+}
+
+function addSelectedScale(scaleId) {
+    if (!selectedScales.includes(scaleId)) {
+        selectedScales.push(scaleId);
+        // Refresh the table to update visual state
+        createHeptatonicScaleTable();
+    }
+}
+
+function removeSelectedScale(scaleId) {
+    const index = selectedScales.indexOf(scaleId);
+    if (index > -1) {
+        selectedScales.splice(index, 1);
+        // Refresh the table to update visual state
+        createHeptatonicScaleTable();
+    }
+}
+
+function toggleSelectionMode() {
+    exclusiveMode = !exclusiveMode;
+    
+    // If switching to exclusive mode and multiple items are selected, keep only the first one
+    if (exclusiveMode && selectedScales.length > 1) {
+        selectedScales = [selectedScales[0]];
+    }
+    
+    console.log(`Selection mode: ${exclusiveMode ? 'Exclusive' : 'Multiple'}`);
+    // Don't call createHeptatonicScaleTable here - let the event listener handle it
+}
+
+let placeholder = document.getElementById('placeholderContent');
+while (placeholder.firstChild) {
+    placeholder.removeChild(placeholder.firstChild);
+}
+
+function intToRoman(num){
+    const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
+    return romanNumerals[num] || "";
+}
+
+// Create a table for the 7 heptatonic base scales and their scale degrees
+function createHeptatonicScaleTable() {
+    // Clear all existing content
+    while (placeholder.firstChild) {
+        placeholder.removeChild(placeholder.firstChild);
+    }
+
+    // Create toggle switch container
+    let toggleContainer = document.createElement('div');
+    toggleContainer.style.marginBottom = '20px';
+    toggleContainer.style.display = 'flex';
+    toggleContainer.style.alignItems = 'center';
+    toggleContainer.style.gap = '10px';
+    
+    // Create toggle switch
+    let toggleSwitch = document.createElement('label');
+    toggleSwitch.style.position = 'relative';
+    toggleSwitch.style.display = 'inline-block';
+    toggleSwitch.style.width = '60px';
+    toggleSwitch.style.height = '34px';
+    
+    let toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = exclusiveMode;
+    toggleInput.style.opacity = '0';
+    toggleInput.style.width = '0';
+    toggleInput.style.height = '0';
+    
+    let slider = document.createElement('span');
+    slider.style.position = 'absolute';
+    slider.style.cursor = 'pointer';
+    slider.style.top = '0';
+    slider.style.left = '0';
+    slider.style.right = '0';
+    slider.style.bottom = '0';
+    slider.style.backgroundColor = exclusiveMode ? '#4CAF50' : '#ccc';
+    slider.style.transition = '0.4s';
+    slider.style.borderRadius = '34px';
+    
+    let sliderButton = document.createElement('span');
+    sliderButton.style.position = 'absolute';
+    sliderButton.style.content = '';
+    sliderButton.style.height = '26px';
+    sliderButton.style.width = '26px';
+    sliderButton.style.left = exclusiveMode ? '30px' : '4px';
+    sliderButton.style.bottom = '4px';
+    sliderButton.style.backgroundColor = 'white';
+    sliderButton.style.transition = '0.4s';
+    sliderButton.style.borderRadius = '50%';
+    
+    slider.appendChild(sliderButton);
+    toggleSwitch.appendChild(toggleInput);
+    toggleSwitch.appendChild(slider);
+    
+    // Add label text
+    let toggleLabel = document.createElement('span');
+    toggleLabel.textContent = exclusiveMode ? 'Exclusive Selection' : 'Multiple Selection';
+    toggleLabel.style.fontWeight = 'bold';
+    toggleLabel.style.fontSize = '14px';
+    
+    // Add clear button
+    let clearButton = document.createElement('button');
+    clearButton.textContent = 'Clear All';
+    clearButton.style.padding = '8px 16px';
+    clearButton.style.backgroundColor = '#f44336';
+    clearButton.style.color = 'white';
+    clearButton.style.border = 'none';
+    clearButton.style.borderRadius = '4px';
+    clearButton.style.cursor = 'pointer';
+    clearButton.style.fontSize = '12px';
+    clearButton.style.marginLeft = '10px';
+    
+    clearButton.onclick = function() {
+        selectedScales = [];
+        createHeptatonicScaleTable();
+    };
+    
+    // Add event listener to toggle
+    toggleInput.addEventListener('change', function() {
+        toggleSelectionMode();
+        createHeptatonicScaleTable();
+    });
+    
+    toggleContainer.appendChild(toggleSwitch);
+    toggleContainer.appendChild(toggleLabel);
+    toggleContainer.appendChild(clearButton);
+    placeholder.appendChild(toggleContainer);
+
+    let scales = HeptatonicScales;
+
+    let scaleNames = Object.keys(scales);
+    console.log('scaleNames:', scaleNames);
+
+    let table = document.createElement('table');
+    table.style.borderCollapse = 'collapse';
+    table.style.margin = '20px 0';
+
+    for (let i = 0; i < 8; i++) {
+        let row = document.createElement('tr');
+        for (let j = 0; j < 8; j++) {
+            let cell = document.createElement('td');
+            cell.style.border = '1px solid #ccc';
+            cell.style.padding = '6px 12px';
+            if (j==0){
+                cell.style.fontWeight = 'bold';
+                cell.style.backgroundColor = '#f0f0f0';
+                cell.textContent = i === 0 ? 'Scale' : `${scaleNames[i-1]}`;
+                
+                // Add click functionality to select/deselect entire row
+                if (i > 0) { // Skip the header row
+                    cell.style.cursor = 'pointer';
+                    cell.style.userSelect = 'none';
+                    
+                    cell.onclick = function() {
+                        // Remove any existing tooltips
+                        const existingTooltips = document.querySelectorAll('.scale-tooltip');
+                        existingTooltips.forEach(tooltip => {
+                            if (tooltip.parentNode) {
+                                tooltip.parentNode.removeChild(tooltip);
+                            }
+                        });
+                        
+                        const scaleName = scaleNames[i-1];
+                        const rowScaleIds = [];
+                        
+                        // Generate all scale IDs for this row
+                        for (let col = 1; col < 8; col++) {
+                            rowScaleIds.push(`${scaleName}-${col}`);
+                        }
+                        
+                        // Check if all scales in this row are selected
+                        const allSelected = rowScaleIds.every(id => selectedScales.includes(id));
+                        
+                        if (allSelected) {
+                            // Deselect all scales in this row
+                            rowScaleIds.forEach(id => {
+                                const index = selectedScales.indexOf(id);
+                                if (index > -1) {
+                                    selectedScales.splice(index, 1);
+                                }
+                            });
+                        } else {
+                            if (exclusiveMode) {
+                                // In exclusive mode, clear all selections first, then select this row
+                                selectedScales = [];
+                                selectedScales.push(...rowScaleIds);
+                            } else {
+                                // In multiple mode, add all unselected scales in this row
+                                rowScaleIds.forEach(id => {
+                                    if (!selectedScales.includes(id)) {
+                                        selectedScales.push(id);
+                                    }
+                                });
+                            }
+                        }
+                        
+                        console.log('Selected scales:', selectedScales);
+                        
+                        // Refresh the table to update visual state
+                        createHeptatonicScaleTable();
+                    };
+                    
+                    // Add tooltip for row selection
+                    cell.onmouseover = function() {
+                        const scaleName = scaleNames[i-1];
+                        const rowScaleIds = [];
+                        
+                        for (let col = 1; col < 8; col++) {
+                            rowScaleIds.push(`${scaleName}-${col}`);
+                        }
+                        
+                        const allSelected = rowScaleIds.every(id => selectedScales.includes(id));
+                        
+                        let tooltip = document.createElement('div');
+                        tooltip.className = 'scale-tooltip';
+                        tooltip.style.position = 'absolute';
+                        tooltip.style.background = '#000';
+                        tooltip.style.color = 'white';
+                        tooltip.style.border = '1px solid #ccc';
+                        tooltip.style.padding = '6px 12px';
+                        tooltip.style.zIndex = 1000;
+                        tooltip.style.fontSize = '12px';
+                        tooltip.innerHTML = `
+                            <strong>Scale Family:</strong> ${scaleName}<br>
+                            <em>Click to ${allSelected ? 'deselect' : 'select'} entire row</em>
+                        `;
+                        document.body.appendChild(tooltip);
+
+                        cell.onmousemove = function(e) {
+                            tooltip.style.left = (e.pageX + 10) + 'px';
+                            tooltip.style.top = (e.pageY + 10) + 'px';
+                        };
+                        cell.onmouseleave = function() {
+                            document.body.removeChild(tooltip);
+                            cell.onmousemove = null;
+                            cell.onmouseleave = null;
+                        };
+                    };
+                }
+            }
+            else if (i === 0 && j > 0) {
+                cell.style.fontWeight = 'bold';
+                cell.style.backgroundColor = '#f0f0f0';
+                cell.textContent = j === 0 ? 'Degree' : `${intToRoman(j)}`;
+            }
+            else{
+                    let currentScale = scales[scaleNames[i-1]];
+                    let currentDegree = j - 2;
+                    let scaleName = currentScale[j-1]['name'];
+                    let scaleId = `${scaleNames[i-1]}-${j}`;
+
+                    cell.textContent = scaleName;
+                    cell.style.cursor = 'pointer';
+                    cell.style.userSelect = 'none';
+                    
+                    // Check if this scale is already selected
+                    if (selectedScales.includes(scaleId)) {
+                        cell.style.backgroundColor = '#4CAF50';
+                        cell.style.color = 'white';
+                    } else {
+                        cell.style.backgroundColor = '';
+                        cell.style.color = '';
+                    }
+                    
+                    // Add click event to toggle selection
+                    cell.onclick = function() {
+                        // Remove any existing tooltips
+                        const existingTooltips = document.querySelectorAll('.scale-tooltip');
+                        existingTooltips.forEach(tooltip => {
+                            if (tooltip.parentNode) {
+                                tooltip.parentNode.removeChild(tooltip);
+                            }
+                        });
+                        
+                        const index = selectedScales.indexOf(scaleId);
+                        
+                        if (exclusiveMode) {
+                            if (index > -1) {
+                                // Scale is selected, deselect it
+                                selectedScales.splice(index, 1);
+                            } else {
+                                // Scale is not selected, clear all and select only this one
+                                selectedScales = [scaleId];
+                            }
+                            // In exclusive mode, always refresh the entire table
+                            createHeptatonicScaleTable();
+                        } else {
+                            // Multiple selection mode (original behavior)
+                            if (index > -1) {
+                                // Scale is selected, remove it
+                                selectedScales.splice(index, 1);
+                                cell.style.backgroundColor = '';
+                                cell.style.color = '';
+                            } else {
+                                // Scale is not selected, add it
+                                selectedScales.push(scaleId);
+                                cell.style.backgroundColor = '#4CAF50';
+                                cell.style.color = 'white';
+                            }
+                        }
+                        
+                        console.log('Selected scales:', selectedScales);
+                    };
+                    
+                    cell.onmouseover = function() {
+                        const interval = currentScale[j-1]?.intervals || '';
+                        const altNames = currentScale[j-1]?.alternativeNames || [];
+                        let tooltip = document.createElement('div');
+                        tooltip.className = 'scale-tooltip';
+                        tooltip.style.position = 'absolute';
+                        tooltip.style.background = '#000';
+                        tooltip.style.color = 'white';
+                        tooltip.style.border = '1px solid #ccc';
+                        tooltip.style.padding = '6px 12px';
+                        tooltip.style.zIndex = 1000;
+                        tooltip.style.fontSize = '12px';
+                        tooltip.innerHTML = `
+                            <strong>Scale:</strong> ${scaleName}<br>
+                            <strong>Interval:</strong> ${interval}<br>
+                            <strong>Alternative Names:</strong> ${altNames.join(', ')}<br>
+                            <em>Click to ${selectedScales.includes(scaleId) ? 'deselect' : 'select'}</em>
+                        `;
+                        document.body.appendChild(tooltip);
+
+                        cell.onmousemove = function(e) {
+                            tooltip.style.left = (e.pageX + 10) + 'px';
+                            tooltip.style.top = (e.pageY + 10) + 'px';
+                        };
+                        cell.onmouseleave = function() {
+                            document.body.removeChild(tooltip);
+                            cell.onmousemove = null;
+                            cell.onmouseleave = null;
+                        };
+                    };
+                
+            }
+            row.appendChild(cell);
+        }
+        table.appendChild(row);
+    }
+    placeholder.appendChild(table);
+
+    return;
+
+}
+createHeptatonicScaleTable();
+
+
 
 
 let currentNoteIndex = 0;
@@ -3036,409 +3404,5 @@ tempoControl.addEventListener('input', function() {
 // }
 
 
-const animations = document.querySelectorAll('[data-animation');
-
-function reset(){    
-    var el = document.getElementsByClassName('metronome');
-    Array.from(el).forEach((e) =>{
-      e.style.animationName = 'none';
-      void(e.offsetHeight); /* trigger reflow */
-      e.style.animationName = null; 
-    })
-}
-
-$('#metronomeCheckBox').on('change', function (e) {
-    animations.forEach(animation => {
-      const running = getComputedStyle(animation).getPropertyValue("--animps") || 'running';
-      animation.style.setProperty('--animps', running === 'running' ? 'paused' : 'running');
-    })
-    if($('#metronomeCheckBox')[0].checked){
-        reset();
-    }else{
-    }
-});
 
 
-
-// $('#metronomeModeSelect').on('change', function (e) {
-// 	if($('#metronomeModeSelect').val() == '0'){
-// 		$('.metronome01')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome02')[0].style.setProperty('--box-shadow-color', '#c8e020')
-// 		$('.metronome03')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 		$('.metronome04')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome05')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome06')[0].style.setProperty('--box-shadow-color', '#20a486')
-// 		$('.metronome07')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome08')[0].style.setProperty('--box-shadow-color', '#287c8e')
-// 		$('.metronome09')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome10')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome11')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome12')[0].style.setProperty('--box-shadow-color', '#481f70')
-// 		$('.metronome13')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome14')[0].style.setProperty('--box-shadow-color', '#481f70')
-// 		$('.metronome15')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome16')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome17')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome18')[0].style.setProperty('--box-shadow-color', '#287c8e')
-// 		$('.metronome19')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome20')[0].style.setProperty('--box-shadow-color', '#20a486')
-// 		$('.metronome21')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome22')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome23')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 		$('.metronome24')[0].style.setProperty('--box-shadow-color', '#c8e020')
-// 	}
-// 	if($('#metronomeModeSelect').val() == '1'){
-// 		$('.metronome01')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome02')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 		$('.metronome03')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome04')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome05')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome06')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome07')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome08')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome09')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome10')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome11')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome12')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 		$('.metronome13')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome14')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 		$('.metronome15')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome16')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome17')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome18')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome19')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome20')[0].style.setProperty('--box-shadow-color', '#443983')
-// 		$('.metronome21')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome22')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome23')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome24')[0].style.setProperty('--box-shadow-color', '#90d743')
-// 	}
-// 	if($('#metronomeModeSelect').val() == '2'){
-// 		$('.metronome01')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome02')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome03')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome04')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome05')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome06')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome07')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome08')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome09')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome10')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome11')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome12')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome13')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome14')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome15')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome16')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome17')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome18')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome19')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome20')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 		$('.metronome21')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome22')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome23')[0].style.setProperty('--box-shadow-color', '#31688e')
-// 		$('.metronome24')[0].style.setProperty('--box-shadow-color', '#35b779')
-// 	}
-// 	if($('#metronomeModeSelect').val() == '3'){
-// 		$('.metronome01')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome02')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome03')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome04')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome05')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome06')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome07')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome08')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 		$('.metronome09')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome10')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 		$('.metronome11')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome12')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome13')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome14')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome15')[0].style.setProperty('--box-shadow-color', '#21908d')
-// 		$('.metronome16')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome17')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome18')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome19')[0].style.setProperty('--box-shadow-color', '#21908d')
-// 		$('.metronome20')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome21')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome22')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome23')[0].style.setProperty('--box-shadow-color', '#21908d')
-// 		$('.metronome24')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 	}
-// 	if($('#metronomeModeSelect').val() == '4'){
-// 		$('.metronome01')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome02')[0].style.setProperty('--box-shadow-color', '#addc30')
-// 		$('.metronome03')[0].style.setProperty('--box-shadow-color', '#5ec962')
-// 		$('.metronome04')[0].style.setProperty('--box-shadow-color', '#28ae80')
-// 		$('.metronome05')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome06')[0].style.setProperty('--box-shadow-color', '#2c728e')
-// 		$('.metronome07')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome08')[0].style.setProperty('--box-shadow-color', '#472d7b')
-// 		$('.metronome09')[0].style.setProperty('--box-shadow-color', '#440154')
-// 		$('.metronome10')[0].style.setProperty('--box-shadow-color', '#472d7b')
-// 		$('.metronome11')[0].style.setProperty('--box-shadow-color', '#3b528b')
-// 		$('.metronome12')[0].style.setProperty('--box-shadow-color', '#2c728e')
-// 		$('.metronome13')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome14')[0].style.setProperty('--box-shadow-color', '#28ae80')
-// 		$('.metronome15')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 		$('.metronome16')[0].style.setProperty('--box-shadow-color', '#addc30')
-// 		$('.metronome17')[0].style.setProperty('--box-shadow-color', '#fde725')
-// 		$('.metronome18')[0].style.setProperty('--box-shadow-color', '#addc30')
-// 		$('.metronome19')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 		$('.metronome20')[0].style.setProperty('--box-shadow-color', '#28ae80')
-// 		$('.metronome21')[0].style.setProperty('--box-shadow-color', '#21918c')
-// 		$('.metronome22')[0].style.setProperty('--box-shadow-color', '#28ae80')
-// 		$('.metronome23')[0].style.setProperty('--box-shadow-color', '#5cc863')
-// 		$('.metronome24')[0].style.setProperty('--box-shadow-color', '#aadc32')
-// 	}
-// });
-
-
-class Metronome
-{
-    constructor(tempo = 120)
-    {
-        this.audioContext = null;
-        this.notesInQueue = [];         // notes that have been put into the web audio and may or may not have been played yet {note, time}
-        this.currentBeatInBar = 0;
-        this.currentNoteInBeat = 0;
-        this.beatsPerBar = 4;
-        this.tempo = tempo;
-        this.lookahead = 25;          // How frequently to call scheduling function (in milliseconds)
-        this.scheduleAheadTime = 0.1;   // How far ahead to schedule audio (sec)
-        this.nextNoteTime = 0.0;     // when the next note is due
-        this.isRunning = false;
-        this.intervalID = null;
-    }
-
-    nextNote()
-    {
-        // Advance current note and time by a quarter note (crotchet if you're posh)
-        var secondsPerBeat = 60.0 / this.tempo; // Notice this picks up the CURRENT tempo value to calculate beat length.
-        // console.log($('#metronomeModeSelect').val());
-        // switch($('#metronomeModeSelect').val()){
-            // case '0':
-                this.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
-            
-                this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-                if (this.currentBeatInBar == this.beatsPerBar) {
-                    this.currentBeatInBar = 0;
-                }
-                // break;
-            // case '1':
-            //     this.nextNoteTime += secondsPerBeat / 2.; // Add beat length to last beat time
-            //     this.currentNoteInBeat++;
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     if(this.currentNoteInBeat == 2){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         // console.log('Advancing beat number'); 
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '2':
-            //     this.nextNoteTime += secondsPerBeat / 4.; // Add beat length to last beat time
-            //     this.currentNoteInBeat++;
-            //     if(this.currentNoteInBeat == 4){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '3':
-            //     this.nextNoteTime += secondsPerBeat / 3.; // Add beat length to last beat time
-                
-            //     this.currentNoteInBeat++;
-            //     if(this.currentNoteInBeat == 3){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '4':
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     this.nextNoteTime += this.currentNoteInBeat == 0 ? secondsPerBeat / 3. * 2. : secondsPerBeat / 3.; // Add beat length to last beat time
-            //     // console.log('---------------------')
-            //     this.currentNoteInBeat++;
-            //     // if(this.currentNoteInBeat == 2){
-            //         // this.currentNoteInBeat++;
-            //         // this.nextNoteTime += secondsPerBeat / 3; // Add beat length to last beat time
-            //     // }
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     if(this.currentNoteInBeat == 2){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-
-        // }
-        // this.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
-    
-        // this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-        // if (this.currentBeatInBar == this.beatsPerBar) {
-        //     this.currentBeatInBar = 0;
-        // }
-    }
-
-    scheduleNote(beatNumber, noteNumber, time)
-    {
-        // push the note on the queue, even if we're not playing.
-        this.notesInQueue.push({ note: beatNumber, time: time });
-    
-        // create an oscillator
-        const osc = this.audioContext.createOscillator();
-        const envelope = this.audioContext.createGain();
-        
-        osc.frequency.value = 800;
-        if ((beatNumber % this.beatsPerBar == 0) && noteNumber == 0) 
-            osc.frequency.value = 800;
-        else if (noteNumber != 0)
-            osc.frequency.value = 800;
-        else
-            osc.frequency.value=800;
-        envelope.gain.value = 1;
-        envelope.gain.exponentialRampToValueAtTime(volumeControl.value, time + 0.001);
-        envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
-
-
-        osc.connect(envelope);
-        envelope.connect(this.audioContext.destination);
-
-                
-
-        osc.start(time);
-        osc.stop(time + 0.03);
-    }
-
-    scheduler()
-    {
-        // while there are notes that will need to play before the next interval, schedule them and advance the pointer.
-        while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime ) {
-            this.scheduleNote(this.currentBeatInBar, this.currentNoteInBeat, this.nextNoteTime);
-            this.nextNote();
-        }
-    }
-
-    start()
-    {
-        if (this.isRunning) return;
-
-        if (this.audioContext == null)
-        {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        this.isRunning = true;
-
-        this.currentBeatInBar = 0;
-        this.nextNoteTime = this.audioContext.currentTime + 0.05;
-
-        this.intervalID = setInterval(() => this.scheduler(), this.lookahead);
-    }
-
-    stop()
-    {
-        this.isRunning = false;
-
-        clearInterval(this.intervalID);
-    }
-
-    startStop()
-    {
-        if (this.isRunning) {
-            this.stop();
-        }
-        else {
-            this.start();
-        }
-    }
-}
-
-
-
-const bpmSlider = document.querySelector('#bpmSlider');
-bpmSlider.addEventListener('input', function() {
-    var bpm = Number(this.value)
-    document.getElementById("bpmText").innerHTML = bpm;
-
-    var el = document.getElementsByClassName('metronome');
-    Array.from(el).forEach((e) =>{
-        e.style.animationDuration = 60/bpm + 's';
-    //   e.style.animationName = 'none';
-      void(e.offsetHeight); /* trigger reflow */
-    //   e.style.animationName = null; 
-    })
-
-    var isRunning = metronome.isRunning;
-    metronome.stop();
-    reset()
-    metronome.tempo = bpm;
-    if (isRunning)
-        metronome.start();
-    metronome.currentBeatInBar = 0;
-
-
-    // animations.forEach(animation => {
-    //     const running = getComputedStyle(animation).getPropertyValue("--animps") || 'running';
-    //     animation.style.setProperty('--animdur', 1 / bpm);
-    //   })
-
-    // console.log(bpm)
-    // attackTime = Number(this.value);
-});
-
-// $('#metronomeModeSelect').on('change', function (e) {
-//     var currentValue = $(this).val();
-
-//     metronome.stop();
-//     reset()
-//     // metronome.tempo = bpm;
-//     metronome.start();
-//     metronome.currentBeatInBar = 0;
-//     metronome.currentNoteInBeat = 0;
-// });
-
-// $('#metronomeLengthSelect').on('change', function (e) {
-//     var currentValue = $(this).val();
-
-//     // metronome.stop();
-//     // reset()
-//     // metronome.tempo = bpm;
-//     // metronome.start();
-
-//     if(currentValue == '8'){
-//         metronome.beatsPerBar = -1
-//         metronome.currentBeatInBar = 0;
-//         metronome.currentNoteInBeat = 0;
-//     }else{
-//         metronome.beatsPerBar = Number(currentValue) + 1
-//         if(metronome.currentBeatInBar > metronome.beatsPerBar)
-//             metronome.currentBeatInBar = metronome.beatsPerBar - 1;
-//         // metronome.currentBeatInBar = 0;
-//         // metronome.currentNoteInBeat = 0;
-
-//     }
-//     // metronome.currentBeatInBar = 0;
-//     // metronome.currentNoteInBeat = 0;
-// });
-
-$('#metronomeSoundCheckBox').on('change', function (e) {
-    if($('#metronomeSoundCheckBox')[0].checked){
-        reset()
-        metronome.tempo = Number(bpmSlider.value);
-        metronome.currentBeatInBar = 0;
-        metronome.start();
-    }else{
-        metronome.stop();
-    }
-});
-
-var metronome = new Metronome(Number(bpmSlider.value));
