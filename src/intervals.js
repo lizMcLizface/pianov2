@@ -133,6 +133,40 @@ function chordToIntervals(chordType) {
             return ['P1', 'm3', 'd5', 'd7', 'M9'];
         case 'diminished minor ninth':
             return ['P1', 'm3', 'd5', 'd7', 'm9'];
+        case 'eleventh':
+            return ['P1', 'M3', 'P5', 'm7', 'M9', 'P11'];
+        case 'minor eleventh':
+            return ['P1', 'm3', 'P5', 'm7', 'M9', 'P11'];
+        case 'major eleventh':
+            return ['P1', 'M3', 'P5', 'M7', 'M9', 'P11'];
+        case 'minor major eleventh':
+            return ['P1', 'm3', 'P5', 'M7', 'M9', 'P11'];
+        case 'augmented major eleventh':
+            return ['P1', 'M3', 'A5', 'M7', 'M9', 'P11'];
+        case 'augmented eleventh':
+            return ['P1', 'M3', 'A5', 'm7', 'M9', 'P11'];
+        case 'half diminished eleventh':
+            return ['P1', 'm3', 'd5', 'm7', 'M9', 'P11'];
+        case 'diminished eleventh':
+            return ['P1', 'm3', 'd5', 'd7', 'M9', 'P11'];
+        case 'major thirteenth':
+            return ['P1', 'M3', 'P5', 'M7', 'M9', 'P11', 'M13'];
+        case 'minor thirteenth':
+            return ['P1', 'm3', 'P5', 'm7', 'M9', 'P11', 'M13'];
+        case 'dominant thirteenth':
+            return ['P1', 'M3', 'P5', 'm7', 'M9', 'P11', 'M13'];
+        case 'minor major thirteenth':
+            return ['P1', 'm3', 'P5', 'M7', 'M9', 'P11', 'M13'];
+        case 'augmented major thirteenth':
+            return ['P1', 'M3', 'A5', 'M7', 'M9', 'P11', 'M13'];
+        case 'augmented thirteenth':
+            return ['P1', 'M3', 'A5', 'm7', 'M9', 'P11', 'M13'];
+        case 'half diminished thirteenth':
+            return ['P1', 'm3', 'd5', 'm7', 'M9', 'P11', 'M13'];
+        case 'diminished thirteenth':
+            return ['P1', 'm3', 'd5', 'd7', 'M9', 'P11', 'M13'];
+        case 'diminished minor thirteenth':
+            return ['P1', 'm3', 'd5', 'd7', 'm9', 'P11', 'M13'];
         default:
             throw new Error(`Unknown chord type: ${chordName}`);
     }
@@ -351,6 +385,7 @@ function resolveChord(chordName) {
     };
 }
 function processChord(chordName) {
+    console.log("Processing chord:", chordName);
     const chord = resolveChord(chordName);
     const rootNote = chord.rootNote;
     const chordType = chord.chordType;

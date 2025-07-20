@@ -1,3 +1,4 @@
+import { noteToMidi, noteToName } from './midi';
 
 let HeptatonicScales = {
     'Major': [
@@ -209,6 +210,76 @@ let HeptatonicScales = {
     }
     
 ],
+'Hexatonic':[
+    {
+        'name': 'Major Hexatonic',
+        'alternativeNames': ['Major Hexatonic'],
+        'intervals': ['W', 'W', 'H', 'W', 'W', 'A']
+    },
+    {
+        'name': 'Minor Hexatonic',
+        'alternativeNames': ['Minor Hexatonic'],
+        'intervals':['W', 'H', 'W', 'W', 'A', 'W']
+    },
+    {
+        'name': "Ritsu Onkai",
+        'alternativeNames': ['Ritsu Onkai'],
+        'intervals': ['H', 'W', 'W', 'A', 'W', 'W']
+    },
+    {
+        'name': 'Raga Kumud',
+        'alternativeNames': ['Raga Kumud'],
+        'intervals': ['W', 'W', 'A', 'W', 'H', 'W']
+    },
+    {
+        'name': 'Mixolydian hexatonic',
+        'alternativeNames': ['Mixolydian hexatonic'],
+        'intervals': ['W', 'A', 'W', 'W', 'H', 'W']
+    },
+    {
+        'name': 'Phyrgian hexatonic',
+        'alternativeNames': ['Phyrgian hexatonic'],
+        'intervals': ['A', 'W', 'W', 'H', 'W', 'W']
+    },
+    {
+        'name': 'Blues',
+        'alternativeNames': ['Blues'],
+        'intervals': ['A', 'W', 'H', 'H', 'A', 'W']
+    }
+    
+],
+'Pentatonic':[
+    {
+        'name': 'Major Pentatonic',
+        'alternativeNames': ['Major Pentatonic', 'gōng', 'Bhoopali', 'Mohanam', 'Mullaittīmpāṇi'],
+        'intervals': ['W', 'W', 'A', 'W', 'A']
+    },
+    {
+        'name': 'Egyptian',
+        'alternativeNames': ['Egyptian', 'Suspended', 'shāng', 'Megh', 'Madhyamavati', 'Centurutti'],
+        'intervals': ['W', 'A', 'W', 'A', 'W']
+    },
+    {
+        'name': 'Blues Minor',
+        'alternativeNames': ['Blues Minor', 'Man Gong', 'jué', 'Malkauns', 'Hindolam', 'Intaḷam'],
+        'intervals': ['A', 'W', 'A', 'W', 'W']
+    },
+    {
+        'name': 'Blues Major',
+        'alternativeNames': ['Blues Major', 'ritsusen', 'yo', 'zhǐ', 'Durga', 'Shuddha Saveri', 'Koṉṟai'],
+        'intervals': ['W', 'A', 'W', 'W', 'A']
+    },
+    {
+        'name': 'Minor Pentatonic',
+        'alternativeNames': ['Minor Pentatonic', 'yǔ', 'Dhani', 'Shuddha Dhanyāsī', 'āmpal'],
+        'intervals': ['A', 'W', 'W', 'A', 'W']
+    },
+    {
+        'name': 'Japanese',
+        'alternativeNames': ['Japanese', 'Insen', 'Ryukyu'],
+        'intervals:': ['W', 'H', 'P', 'H', 'P']
+    }
+]
 }
 
 let HexatonicScales = [
@@ -301,4 +372,81 @@ let scales = [
     }
 ]
 
-export { HeptatonicScales, HexatonicScales, PentatonicScales, scales };
+
+
+const getElementByNote = (note) =>
+  note && document.querySelector(`[note="${note}_scale"]`);
+const getElementByMIDI = (note) =>
+  note && document.querySelector(`[midi="${note}_scale"]`);
+
+const keys_chords = {
+    60 : { element: getElementByMIDI("60"), note: "C",  octave: 4 },
+    61 : { element: getElementByMIDI("61"), note: "C#", octave: 4 },
+    62 : { element: getElementByMIDI("62"), note: "D",  octave: 4 },
+    63 : { element: getElementByMIDI("63"), note: "D#", octave: 4 },
+    64 : { element: getElementByMIDI("64"), note: "E",  octave: 4 },
+    65 : { element: getElementByMIDI("65"), note: "F",  octave: 4 },
+    66 : { element: getElementByMIDI("66"), note: "F#", octave: 4 },
+    67 : { element: getElementByMIDI("67"), note: "G",  octave: 4 },
+    68 : { element: getElementByMIDI("68"), note: "G#", octave: 4 },
+    69 : { element: getElementByMIDI("69"), note: "A",  octave: 4 },
+    70 : { element: getElementByMIDI("70"), note: "A#", octave: 4 },
+    71 : { element: getElementByMIDI("71"), note: "B",  octave: 4 },
+    72 : { element: getElementByMIDI("72"), note: "C",  octave: 5 },
+    73 : { element: getElementByMIDI("73"), note: "C#", octave: 5 },
+    74 : { element: getElementByMIDI("74"), note: "D",  octave: 5 },
+    75 : { element: getElementByMIDI("75"), note: "D#", octave: 5 },
+    76 : { element: getElementByMIDI("76"), note: "E",  octave: 5 },
+    77 : { element: getElementByMIDI("77"), note: "F",  octave: 5 },
+    78 : { element: getElementByMIDI("78"), note: "F#", octave: 5 },
+    79 : { element: getElementByMIDI("79"), note: "G",  octave: 5 },
+    80 : { element: getElementByMIDI("80"), note: "G#", octave: 5 },
+    81 : { element: getElementByMIDI("81"), note: "A",  octave: 5 },
+    82 : { element: getElementByMIDI("82"), note: "A#", octave: 5 },
+    83 : { element: getElementByMIDI("83"), note: "B",  octave: 5 },
+    84 : { element: getElementByMIDI("84"), note: "C",  octave: 6 },
+};
+
+function highlightKeysForScales(notes){
+    for(var key in keys_chords) {
+        if (keys_chords[key].element) {
+            keys_chords[key].element.classList.remove('highlightedKey');
+        }
+    }
+    console.log("Highlighting keys for notes:", notes);
+    if (notes && notes.length > 0) {
+        notes.forEach(note => {
+            var n = noteToMidi(note) + 12;
+            let key = keys_chords[n];
+            console.log("Key for note:", note, "is", key, "MIDI:", n);
+            if (key && key.element) {
+                console.log("Highlighting key:", key.note, "Octave:", key.octave);
+                key.element.classList.add('highlightedKey');
+            }
+        });
+    }
+}
+function getScaleNotes(rootNote, intervals) {
+    console.log("Generating scale notes for root:", rootNote, "with intervals:", intervals);
+    let rootNoteMidi = noteToMidi(rootNote + "/5");
+    let notes = [rootNoteMidi];
+    for (let i = 0; i < intervals.length; i++) {
+        let interval = intervals[i];
+        if (interval === 'W') {
+            rootNoteMidi += 2; // Whole step
+        } else if (interval === 'H') {
+            rootNoteMidi += 1; // Half step
+        } else if (interval === 'A') {
+            rootNoteMidi += 3; // Augmented step
+        } else if (interval === 'P') {
+            rootNoteMidi += 4; // Perfect step
+        }
+        notes.push(rootNoteMidi);
+    }
+    return notes.map(midi => { 
+        let noteName = noteToName(midi);
+        return noteName ? noteName : midi; // Fallback to MIDI number if name is not found
+    });
+}
+
+export { HeptatonicScales, HexatonicScales, PentatonicScales, scales, highlightKeysForScales, getScaleNotes };

@@ -85,9 +85,18 @@
     <div class="tab" id="mainTabBar"
          onmouseenter="this.classList.add('expanded')"
          onmouseleave="this.classList.remove('expanded')">
-         <button class="tablinks active" onclick="openCity(event, 'Placeholder')" id="defaultOpen">
+         <button class="tablinks active" onclick="openCity(event, 'ScaleSelectorTab')" >
         <span class="short-label">P</span>
-        <span class="full-label">Placeholder</span>
+        <span class="full-label">Scales</span>
+      </button>
+      <button class="tablinks" onclick="openCity(event, 'ChordSelectorTab')">
+        <span class="short-label">C</span>
+        <span class="full-label">Chords</span>
+      </button>
+
+      <button class="tablinks" onclick="openCity(event, 'CrossreferenceTab')" id="defaultOpen">
+        <span class="short-label">C</span>
+        <span class="full-label">Cross</span>
       </button>
 
       <button class="tablinks active" onclick="openCity(event, 'Starting')">
@@ -147,15 +156,84 @@
           <button class="btn warning" style="width:100%" id="regenButton">Regenerate Notes</button>
         </span>      </div>
 
-      <div id="Placeholder" class="tabcontent" style="display:block;">
-        <span style="width:60%;text-align: left;" class="tableCell">
-          <h3>Placeholder</h3>
-        </span>
+      <div id="ScaleSelectorTab" class="tabcontent" style="display:block;">
         <div id ="placeholderContent">
           <p>This is a placeholder content. You can replace it with actual content later.</p>
           <p>Feel free to add more information or features as needed.</p>
           </div>
+    <div id="container">
+    <ul id="keyboard">
+      <li midi='60_scale' note= "C/4_scale"        class="white ">C</li>
+      <li midi='61_scale' note="C#/4_scale"        class="black">C#</li>
+      <li midi='62_scale' note= "D/4_scale"  class="white offset">D</li>
+      <li midi='63_scale' note="D#/4_scale"        class="black">D#</li>
+      <li midi='64_scale' note= "E/4_scale"  class="white offset">E</li>
+      <li midi='65_scale' note= "F/4_scale"         class="white">F</li>
+      <li midi='66_scale' note="F#/4_scale"        class="black">F#</li>
+      <li midi='67_scale' note= "G/4_scale"  class="white offset">G</li>
+      <li midi='68_scale' note="G#/4_scale"        class="black">G#</li>
+      <li midi='69_scale' note= "A/4_scale"  class="white offset">A</li>
+      <li midi='70_scale' note="A#/4_scale"        class="black">A#</li>
+      <li midi='71_scale' note= "B/5_scale"  class="white offset">B</li>
+      <li midi='72_scale' note= "C/5_scale"        class="white ">C</li>
+      <li midi='73_scale' note="C#/5_scale"        class="black">C#</li>
+      <li midi='74_scale' note= "D/5_scale"  class="white offset">D</li>
+      <li midi='75_scale' note="D#/5_scale"        class="black">D#</li>
+      <li midi='76_scale' note= "E/5_scale"  class="white offset">E</li>
+      <li midi='77_scale' note= "F/5_scale"         class="white">F</li>
+      <li midi='78_scale' note="F#/5_scale"        class="black">F#</li>
+      <li midi='79_scale' note= "G/5_scale"  class="white offset">G</li>
+      <li midi='80_scale' note="G#/5_scale"        class="black">G#</li>
+      <li midi='81_scale' note= "A/5_scale"  class="white offset">A</li>
+      <li midi='82_scale' note="A#/5_scale"        class="black">A#</li>
+      <li midi='83_scale' note= "B/5_scale"  class="white offset">B</li>
+      <li midi='84_scale' note= "C/6_scale"        class="white ">C</li>
+      </ul>
       </div>
+      </div>
+
+      <div id="ChordSelectorTab" class="tabcontent" style="display:block;">
+        <div id ="chordPlaceholderContent">
+          <p>This is a placeholder content. You can replace it with actual content later.</p>
+          <p>Feel free to add more information or features as needed.</p>
+          </div>
+    <div id="container">
+    <ul id="keyboard">
+      <li midi='60_chord' note= "C/4_chord"        class="white ">C</li>
+      <li midi='61_chord' note="C#/4_chord"        class="black">C#</li>
+      <li midi='62_chord' note= "D/4_chord"  class="white offset">D</li>
+      <li midi='63_chord' note="D#/4_chord"        class="black">D#</li>
+      <li midi='64_chord' note= "E/4_chord"  class="white offset">E</li>
+      <li midi='65_chord' note= "F/4_chord"         class="white">F</li>
+      <li midi='66_chord' note="F#/4_chord"        class="black">F#</li>
+      <li midi='67_chord' note= "G/4_chord"  class="white offset">G</li>
+      <li midi='68_chord' note="G#/4_chord"        class="black">G#</li>
+      <li midi='69_chord' note= "A/4_chord"  class="white offset">A</li>
+      <li midi='70_chord' note="A#/4_chord"        class="black">A#</li>
+      <li midi='71_chord' note= "B/5_chord"  class="white offset">B</li>
+      <li midi='72_chord' note= "C/5_chord"        class="white ">C</li>
+      <li midi='73_chord' note="C#/5_chord"        class="black">C#</li>
+      <li midi='74_chord' note= "D/5_chord"  class="white offset">D</li>
+      <li midi='75_chord' note="D#/5_chord"        class="black">D#</li>
+      <li midi='76_chord' note= "E/5_chord"  class="white offset">E</li>
+      <li midi='77_chord' note= "F/5_chord"         class="white">F</li>
+      <li midi='78_chord' note="F#/5_chord"        class="black">F#</li>
+      <li midi='79_chord' note= "G/5_chord"  class="white offset">G</li>
+      <li midi='80_chord' note="G#/5_chord"        class="black">G#</li>
+      <li midi='81_chord' note= "A/5_chord"  class="white offset">A</li>
+      <li midi='82_chord' note="A#/5_chord"        class="black">A#</li>
+      <li midi='83_chord' note= "B/5_chord"  class="white offset">B</li>
+      <li midi='84_chord' note= "C/6_chord"        class="white ">C</li>
+      </ul>
+      </div>
+      </div>
+      
+      <div id="CrossreferenceTab" class="tabcontent" style="display:block;">
+        <div id ="crossreferencePlaceholder">
+          <p>This is a placeholder content. You can replace it with actual content later.</p>
+          <p>Feel free to add more information or features as needed.</p>
+          </div>
+        </div>
   
     <div id="Starting" class="tabcontent" style="display:block;">      
       <div class="selectionContainer" width='100%'>
