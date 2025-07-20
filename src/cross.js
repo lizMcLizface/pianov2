@@ -221,8 +221,23 @@ function updateCrossReferenceDisplay() {
         return;
     }
     
+    let counter = 0;
     // Create tables for each combination of root note and scale
     rootNotes.forEach(rootNote => {
+            if (counter == 3) {
+                const message = document.createElement('div');
+                message.textContent = 'Maximum of 3 cross-reference tables reached. Please deselect some scales or chords.';
+                message.style.textAlign = 'center';
+                message.style.color = '#f44336';
+                message.style.fontStyle = 'italic';
+                message.style.padding = '20px';
+                crossReferencePlaceholder.appendChild(message);
+                counter++;
+                return;
+            }
+            if (counter >3){
+                return;
+            }
         scales.forEach(scaleId => {
             const [family, mode] = scaleId.split('-');
             const modeNumber = parseInt(mode, 10);
@@ -230,6 +245,7 @@ function updateCrossReferenceDisplay() {
             try {
                 const table = createScaleChordCrossReference(family, modeNumber, rootNote, chords);
                 crossReferencePlaceholder.appendChild(table);
+                counter++;
             } catch (error) {
                 console.error(`Error creating cross-reference table for ${rootNote} ${family} mode ${modeNumber}:`, error);
             }
