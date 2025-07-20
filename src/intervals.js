@@ -1,3 +1,6 @@
+import {scales, getScaleNotes} from './scales';
+import { chords } from './chords';
+
 function intervalToSemitones(interval) {
     switch (interval) {
         case 'P1':
@@ -167,6 +170,10 @@ function chordToIntervals(chordType) {
             return ['P1', 'm3', 'd5', 'd7', 'M9', 'P11', 'M13'];
         case 'diminished minor thirteenth':
             return ['P1', 'm3', 'd5', 'd7', 'm9', 'P11', 'M13'];
+        case 'minor sixth':
+            return ['P1', 'm3', 'P5', 'M6'];
+        case 'major sixth':
+            return ['P1', 'M3', 'P5', 'M6'];
         default:
             throw new Error(`Unknown chord type: ${chordName}`);
     }
@@ -228,6 +235,23 @@ function resolveChord(chordName) {
     chordName = chordName.replace(/\s+/g, '')
         .replace(/Major/gi, 'maj')
         .replace(/Minor/gi, 'min');
+
+    
+    let flatNotes = [];
+    if (chordName.includes('b3') || chordName.includes('b5') || chordName.includes('b7')) {
+        if (chordName.includes('b3')) {
+            flatNotes.push(3);
+            chordName = chordName.replace('b3', '');
+        }
+        if (chordName.includes('b5')) {
+            flatNotes.push(5);
+            chordName = chordName.replace('b5', '');
+        }
+        if (chordName.includes('b7')) {
+            flatNotes.push(7);
+            chordName = chordName.replace('b7', '');
+        }
+    }
 
     // Regex for root note and chord type
     const noteRegex = /^([A-G](?:b|#|♮|♭|♯|𝄫|𝄪|)?)(.*)$/;
@@ -371,6 +395,11 @@ function resolveChord(chordName) {
         chord = 'Augmented Thirteenth';
     } else if (['ø13'].includes(chordType)) {
         chord = 'Half Diminished Thirteenth';
+    } else if (['min6', 'm6'].includes(chordType)) {
+        chord = 'Minor Sixth';
+    }
+    else if (['M6', 'maj6', '6'].includes(chordType)) {
+        chord = 'Major Sixth';
     } else {
         throw new Error(`Unknown chord type: ${chordType}`);
     }
@@ -381,11 +410,12 @@ function resolveChord(chordName) {
         suspended,
         addedTone,
         bassNote,
-        noTone
+        noTone,
+        flatNotes
     };
 }
 function processChord(chordName) {
-    console.log("Processing chord:", chordName);
+    // console.log("Processing chord:", chordName);
     const chord = resolveChord(chordName);
     const rootNote = chord.rootNote;
     const chordType = chord.chordType;
@@ -393,6 +423,7 @@ function processChord(chordName) {
     const addedTone = chord.addedTone;
     const bassNote = chord.bassNote;
     const noTone = chord.noTone;
+    const flatNotes = chord.flatNotes;
 
     let intervals = chordToIntervals(chordType);
 
@@ -404,6 +435,17 @@ function processChord(chordName) {
             intervals[1] = 'M2';
         } else if (suspended === 'sus4') {
             intervals[1] = 'P4';
+        }
+    }
+    if (flatNotes && flatNotes.length > 0) {
+        for (const note of flatNotes) {
+            if (note === 3) {
+                intervals[1] = 'm3';
+            } else if (note === 5) {
+                intervals[2] = 'd5';
+            } else if (note === 7) {
+                intervals[3] = 'm7';
+            }
         }
     }
 
@@ -449,5 +491,138 @@ function processChord(chordName) {
         notes
     };
 }
+function matchChord(inputChord, chords, verbose = false) {
+    if (verbose) {
+        console.log(`Matching Chord: ${inputChord}`);
+    }
+    const candidates = [];
+    for (const chordGroup in chords) {
+        if (inputChord.length === 3 && chordGroup !== 'triads') continue;
+        if (inputChord.length === 4 && chordGroup !== 'sevenths') continue;
+        if (verbose) {
+            console.log(`${chordGroup.charAt(0).toUpperCase() + chordGroup.slice(1)} Chords:`);
+        }
+        for (const chord of chords[chordGroup]) {
+            let chordNotes = processChord(inputChord[0] + chord).notes;
+            chordNotes = chordNotes.map(note => note.replace(/\/\d+$/, '')); // Remove octave info
+            if (verbose) {
+                console.log(`  ${chord.padEnd(16)}: ${chordNotes.join(', ')}`);
+            }
+            if (chordNotes.length === inputChord.length && chordNotes.join(',') === inputChord.join(',')) {
+                candidates.push(chord);
+            }
+        }
+        if (candidates.length === 0) {
+            if (verbose) {
+                console.log(`No matches found in ${chordGroup.charAt(0).toUpperCase() + chordGroup.slice(1)} Chords`);
+                console.log('Trying sus2');
+            }
+            for (const chord of chords[chordGroup]) {
+                if (chord.includes('sus')) continue;
+                if (chord === 'b5') continue;
+                let chordNotes = processChord(inputChord[0] + chord + 'sus2').notes;
+                chordNotes = chordNotes.map(note => note.replace(/\/\d+$/, ''));
+                if (verbose) {
+                    console.log(`  ${chord.padEnd(16)}sus2: ${chordNotes.join(', ')}`);
+                }
+                if (chordNotes.length === inputChord.length && chordNotes.join(',') === inputChord.join(',')) {
+                    candidates.push(chord + 'sus2');
+                }
+            }
+        }
+        if (candidates.length === 0) {
+            if (verbose) {
+                console.log(`No matches found in ${chordGroup.charAt(0).toUpperCase() + chordGroup.slice(1)} Chords with sus2`);
+                console.log('Trying sus4');
+            }
+            for (const chord of chords[chordGroup]) {
+                if (chord.includes('sus')) continue;
+                if (chord === 'b5') continue;
+                let chordNotes = processChord(inputChord[0] + chord + 'sus4').notes;
+                chordNotes = chordNotes.map(note => note.replace(/\/\d+$/, ''));
+                if (verbose) {
+                    console.log(`  ${chord.padEnd(16)}sus4: ${chordNotes.join(', ')}`);
+                }
+                if (chordNotes.length === inputChord.length && chordNotes.join(',') === inputChord.join(',')) {
+                    candidates.push(chord + 'sus4');
+                }
+            }
+        }
+    }
+    return candidates;
+}
 
-export { intervalToSemitones, chordToIntervals, noteToMidi, midiToNote, resolveChord, processChord };
+function generateSyntheticChords(scale, length = 3) {
+    const scaleNotes = getScaleNotes('C', scale.intervals);
+    const syntheticChords = [];
+    for (let i = 0; i < scaleNotes.length - 1; i++) {
+        const chordNotes = [];
+        for (let j = 0; j < length; j++) {
+            chordNotes.push(scaleNotes[(i + j * 2) % (scaleNotes.length - 1)]);
+        }
+        syntheticChords.push(chordNotes);
+    }
+    return syntheticChords;
+}
+// Assuming scales and getScale are defined/imported elsewhere
+
+// const scale = scales[0]['scales']['Double Harmonic Major'][2];
+// console.log(`Scale: ${scale.name}, Intervals: ${scale.intervals}`);
+
+// const scaleNotes = getScaleNotes('C', scale.intervals);
+// console.log(`Scale Notes for ${scale.name}: ${scaleNotes}`);
+
+// const syntheticChords = generateSyntheticChords(scale, 3);
+
+// const trimmedSyntheticChords = syntheticChords.map(chord =>
+//     chord.map(note => note.slice(0, -2))
+// );
+
+// console.log(`Synthetic Chords for ${scale.name}:`);
+// console.log(`Scale Notes: ${scaleNotes}`);
+
+// trimmedSyntheticChords.forEach((chord, i) => {
+//     console.log(`Synthetic Chord ${i + 1} for ${scale.name}: ${chord}`);
+// });
+
+// console.log('\n\n---------------------------------\n\n');
+// trimmedSyntheticChords.forEach(chord => {
+//     const matchedChords = matchChord(chord, chords, false);
+//     if (matchedChords && matchedChords.length > 0) {
+//         console.log(`Matched Chords for ${chord}: ${matchedChords}`);
+//     } else {
+//         console.log(`No matches found for ${chord}`);
+//         matchChord(chord, chords, true);
+//     }
+// });
+
+function identifySyntheticChords(scale, length = 3, root = 'C') {
+    const scaleNotes = getScaleNotes(root, scale.intervals);
+
+    const syntheticChords = generateSyntheticChords(scale, length);
+    const trimmedSyntheticChords = syntheticChords.map(chord =>
+        chord.map(note => note.slice(0, -2))
+    );
+    let matchedChords_ = [];
+    trimmedSyntheticChords.forEach(chord => {
+        const matchedChords = matchChord(chord, chords, false);
+        if (matchedChords && matchedChords.length > 0) {
+            matchedChords_.push({
+                chord: chord,
+                matches: matchedChords
+            });
+            // console.log(`Matched Chords for ${chord}: ${matchedChords}`);
+        } else {
+            console.log(`No matches found for ${chord}`);
+            matchChord(chord, chords, true);
+            throw new Error(`No matches found for ${chord}`);
+        }
+    });
+    return matchedChords_;
+}
+
+// let identifiedChords = identifySyntheticChords(scales[0]['scales']['Double Harmonic Major'][2], 4);
+// console.log('Identified Chords:', identifiedChords);
+
+
+export { intervalToSemitones, chordToIntervals, noteToMidi, midiToNote, resolveChord, processChord, matchChord, generateSyntheticChords, identifySyntheticChords };

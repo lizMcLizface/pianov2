@@ -2,8 +2,8 @@ import { processChord } from "./intervals"
 import {noteToMidi} from './midi';
 
 let chordSuffixesCommon = ['Major', 'Minor', '7', '5', 'dim', 'dim7', 'aug', 'sus2', 'sus4', 'maj7', 'm7', '7sus4', '7b9']
-let chordSuffixesTriads = ['M', 'm', '+', 'o']
-let chordSuffixesSevenths = ['7', 'M7','mM7', 'm7', '+M7','+7','ø', 'o7', '7b5']
+let chordSuffixesTriads = ['M', 'm', '+', 'o', 'b5', 'sus2', 'sus4']
+let chordSuffixesSevenths = ['7', 'M7','mM7', 'm7', '+M7','+7','ø', 'o7', '7b5', 'm6', '6']
 let chordSuffixesNines = ['M9', '9', '7b9', 'm9', 'mM9', '+M9', '+9', 'ø9', 'o9', 'ob9']
 let chordSuffixesElevens = ['11', 'm11', 'M11', 'mM11', '+M11', '+11', 'ø11', 'o11']
 let chordSuffixesThirteens = ['13', 'm13', 'M13', 'mM13', '+M13', '+13', 'ø13']

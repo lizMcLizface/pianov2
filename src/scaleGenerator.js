@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import {HeptatonicScales, scales, highlightKeysForScales, getScaleNotes} from './scales';
+import {identifySyntheticChords} from './intervals';
 
 // Global array to store selected scales
 let selectedScales = ['Major-1']; // Default to first scale
@@ -669,6 +670,21 @@ function createHeptatonicScaleTable() {
                         let scaleNotes = getScaleNotes(selectedRootNote[0], currentScale[j-1].intervals);
                         console.log("Scale Notes for", scaleName, ":", scaleNotes);
                         highlightKeysForScales(scaleNotes);
+                        if (scales[scaleNames[i-1]][j-1].intervals.length === 7) {
+                            let identifiedChords_3 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 3);
+                            let identifiedChords_4 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 3);
+
+                            // console.log('Identified Chords:', identifiedChords);
+                            tooltip.innerHTML += `<br><em>Identified Chords:</em><br>`;
+                            for (let k = 0; k < identifiedChords_3.length; k++) {
+                                tooltip.innerHTML += `${intToRoman(k+1)}: Triad - ${identifiedChords_3[k].matches}, Seventh - ${identifiedChords_4[k].matches}<br>`;
+                            }
+
+
+                            // identifiedChords.forEach(chord => {
+                            //     tooltip.innerHTML += `${chord.chord} - ${selectedRootNote[0]}${chord.matches}<br>`;
+                            // });
+                        }
                         
                         document.body.appendChild(tooltip);
 
