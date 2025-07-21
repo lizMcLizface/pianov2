@@ -4,6 +4,7 @@ import { identifySyntheticChords } from './intervals';
 import { HeptatonicScales } from './scales';
 import {outputNoteArray, drawNotes, outputDiv} from './index'
 import { noteToMidi, noteToName } from './midi';
+import {updateOutputText, highlightBothPositions} from './index.js';
 
 // Import VexFlow components for staff display
 const { Vex, Formatter, Renderer, Stave, Accidental, StaveNote, BarNote, Beam, Dot, StaveConnector, Voice, GhostNote } = require("vexflow");
@@ -1319,6 +1320,8 @@ function replaceOutputWithProgression() {
     window.addDrawNotes(window.outputDiv, convertedProgression, true);
     
     console.log('Successfully replaced output grid with progression');
+    highlightBothPositions();
+    updateOutputText();
 }
 
 export {chord_progressions, selectedProgressions, progressionOptions, createProgressionTable, createProgressionOptionsPanel, createProgressionStaffDisplay, drawProgressionStaff, addProgressionToOutput, replaceOutputWithProgression}

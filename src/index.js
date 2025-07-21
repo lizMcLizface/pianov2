@@ -82,9 +82,17 @@ let currentNoteIndex = 0;
 let currentBarIndex = 0;
 // isPlaying is now a global variable - window.isPlaying
 
+// Second highlight system variables
+let selectedNoteIndex = 0;
+let selectedBarIndex = 0;
+
 // Make playback variables globally accessible
 window.currentNoteIndex = currentNoteIndex;
 window.currentBarIndex = currentBarIndex;
+
+// Make selection variables globally accessible
+window.selectedNoteIndex = selectedNoteIndex;
+window.selectedBarIndex = selectedBarIndex;
 
 
 
@@ -797,9 +805,27 @@ window.drawNotes2 = drawNotes2;
 window.isPlaying = false; // Will be updated by playback functions
 window.resetPlaybackPosition = resetPlaybackPosition;
 
+// Make selection functions globally accessible
+window.highlightSelectedNotesSecondary = highlightSelectedNotesSecondary;
+window.highlightBothPositions = highlightBothPositions;
+window.getSelectedNotes = getSelectedNotes;
+window.getPlaybackNotes = getPlaybackNotes;
+window.setSelectedPosition = setSelectedPosition;
+window.advanceSelectedPosition = advanceSelectedPosition;
+window.retreatSelectedPosition = retreatSelectedPosition;
+window.resetSelectedPosition = resetSelectedPosition;
+window.resetBothPositions = resetBothPositions;
+window.getSelectionStatus = getSelectionStatus;
+window.getCompleteStatus = getCompleteStatus;
+window.updateOutputText = updateOutputText;
+window.initializeSelectionSystem = initializeSelectionSystem;
+
 // Global variable to store grid-aligned note data (accessible from other JS files)
 window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
 console.log('Grid-aligned notes:', window.gridData);
+
+// Initialize the selection system to highlight first note and update outputText
+initializeSelectionSystem();
 
 // Example usage of highlighting function:
 // Highlight the first beat of the first bar in red and second beat of second bar in blue
@@ -874,6 +900,207 @@ function highlightSelectedNotes(barIndex, beatIndex) {
     highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
 }
 
+// Enhanced helper function to highlight selected notes with separate tracking
+function highlightSelectedNotesSecondary(barIndex, beatIndex) {
+    console.log('Highlighting selected notes at Bar:', barIndex, 'Beat:', beatIndex);
+    // Update the selected position
+    selectedBarIndex = barIndex;
+    selectedNoteIndex = beatIndex;
+    
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'green' };
+    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+    
+    // Update the outputText div with selected notes
+    updateOutputText();
+}
+
+// Helper function to highlight both playback and selection positions simultaneously
+function highlightBothPositions() {
+    const highlights = [
+        { barIndex: currentBarIndex, beatIndex: currentNoteIndex, color: 'red' },      // Playback position
+        { barIndex: selectedBarIndex, beatIndex: selectedNoteIndex, color: 'green' }   // Selected position
+    ];
+    highlightNotesInNotation(outputDiv, outputNoteArray, highlights);
+}
+
+// Helper function to get notes at selected position
+function getSelectedNotes() {
+    if (!window.gridData || !window.gridData[selectedBarIndex]) {
+        console.log('No grid data available or invalid bar index:', selectedBarIndex);
+        return null;
+    }
+    
+    const barData = window.gridData[selectedBarIndex];
+    if (!barData.notes || !barData.notes[selectedNoteIndex]) {
+        console.log('No notes available at selected position - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+        return null;
+    }
+    
+    const selectedNoteData = barData.notes[selectedNoteIndex];
+    
+    return {
+        barIndex: selectedBarIndex,
+        noteIndex: selectedNoteIndex,
+        duration: selectedNoteData.duration,
+        notes: selectedNoteData.notes || [],
+        isPause: selectedNoteData.isPause || false
+    };
+}
+
+// Helper function to update the outputText div with selected notes
+function updateOutputText() {
+    const selectedData = getSelectedNotes();
+    
+    if (!selectedData) {
+        document.getElementById("outputText").innerHTML = 'You should press: (no notes available)';
+        return;
+    }
+    
+    if (selectedData.isPause) {
+        document.getElementById("outputText").innerHTML = 'You should press: (pause/rest)';
+        return;
+    }
+    
+    const notes = selectedData.notes || [];
+    if (notes.length === 0) {
+        document.getElementById("outputText").innerHTML = 'You should press: (no notes)';
+        return;
+    }
+    
+    // Format the notes for display
+    const notesList = notes.filter(note => note !== "Pause").join(', ');
+    document.getElementById("outputText").innerHTML = `You should press: ${notesList}`;
+}
+
+// Helper function to initialize selection system
+function initializeSelectionSystem() {
+    // Default to first note of first bar
+    selectedBarIndex = 0;
+    selectedNoteIndex = 0;
+    
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    // Highlight the first note and update display
+    highlightSelectedNotesSecondary(0, 0);
+}
+
+// Helper function to get notes at playback position
+function getPlaybackNotes() {
+    if (!window.gridData || !window.gridData[currentBarIndex]) {
+        console.log('No grid data available or invalid bar index:', currentBarIndex);
+        return null;
+    }
+    
+    const barData = window.gridData[currentBarIndex];
+    if (!barData.notes || !barData.notes[currentNoteIndex]) {
+        console.log('No notes available at playback position - Bar:', currentBarIndex, 'Beat:', currentNoteIndex);
+        return null;
+    }
+    
+    const playbackNoteData = barData.notes[currentNoteIndex];
+    
+    return {
+        barIndex: currentBarIndex,
+        noteIndex: currentNoteIndex,
+        duration: playbackNoteData.duration,
+        notes: playbackNoteData.notes || [],
+        isPause: playbackNoteData.isPause || false
+    };
+}
+
+// Helper function to set selected position
+function setSelectedPosition(barIndex, noteIndex) {
+    selectedBarIndex = barIndex;
+    selectedNoteIndex = noteIndex;
+    
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    // Update the output text
+    updateOutputText();
+    
+    console.log('Selected position set to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+}
+
+// Helper function to advance selected position
+function advanceSelectedPosition() {
+    if (!window.gridData || selectedBarIndex >= window.gridData.length) {
+        console.log('Cannot advance - no grid data or at end');
+        return false;
+    }
+    
+    const currentBarData = window.gridData[selectedBarIndex];
+    if (!currentBarData || !currentBarData.notes) {
+        console.log('Cannot advance - invalid bar data');
+        return false;
+    }
+    
+    // Try to advance within current bar
+    if (selectedNoteIndex + 1 < currentBarData.notes.length) {
+        selectedNoteIndex++;
+    } else {
+        // Move to next bar
+        if (selectedBarIndex + 1 < window.gridData.length) {
+            selectedBarIndex++;
+            selectedNoteIndex = 0;
+        } else {
+            console.log('At end of notation');
+            selectedBarIndex = 0;
+            selectedNoteIndex = 0; // Reset to start if at end
+            // return false;
+        }
+    }
+    
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    // Update the output text
+    updateOutputText();
+    
+    console.log('Selected position advanced to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    return true;
+}
+
+// Helper function to retreat selected position
+function retreatSelectedPosition() {
+    // Try to retreat within current bar
+    if (selectedNoteIndex > 0) {
+        selectedNoteIndex--;
+    } else {
+        // Move to previous bar
+        if (selectedBarIndex > 0) {
+            selectedBarIndex--;
+            // Set to last note of previous bar
+            if (window.gridData && window.gridData[selectedBarIndex] && window.gridData[selectedBarIndex].notes) {
+                selectedNoteIndex = window.gridData[selectedBarIndex].notes.length - 1;
+            } else {
+                selectedNoteIndex = 0;
+            }
+        } else {
+            console.log('At beginning of notation');
+            return false;
+        }
+    }
+    
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    // Update the output text
+    updateOutputText();
+    
+    console.log('Selected position retreated to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    return true;
+}
+
 // Helper function to clear highlighting (reset to black)
 function clearNoteHighlighting() {
     window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
@@ -895,12 +1122,49 @@ function resetPlaybackPosition() {
     clearNoteHighlighting();
 }
 
+// Helper function to reset selected position
+function resetSelectedPosition() {
+    selectedBarIndex = 0;
+    selectedNoteIndex = 0;
+    // Update global versions
+    window.selectedBarIndex = selectedBarIndex;
+    window.selectedNoteIndex = selectedNoteIndex;
+    
+    // Update the output text
+    updateOutputText();
+    
+    console.log('Selected position reset to - Bar: 0, Beat: 0');
+}
+
+// Helper function to reset both positions
+function resetBothPositions() {
+    resetPlaybackPosition();
+    resetSelectedPosition();
+}
+
 // Helper function to get current playback status
 function getPlaybackStatus() {
     return {
         isPlaying: window.isPlaying,
         currentBarIndex: currentBarIndex,
         currentNoteIndex: currentNoteIndex
+    };
+}
+
+// Helper function to get current selection status
+function getSelectionStatus() {
+    return {
+        selectedBarIndex: selectedBarIndex,
+        selectedNoteIndex: selectedNoteIndex,
+        selectedNotes: getSelectedNotes()
+    };
+}
+
+// Helper function to get complete status
+function getCompleteStatus() {
+    return {
+        playback: getPlaybackStatus(),
+        selection: getSelectionStatus()
     };
 }
 
@@ -1489,6 +1753,18 @@ function onKeyPress(event, up) {
 
     }
 
+    console.log('Input: ', noteArray);  
+    console.log('Current Grid Data: ', window.gridData);
+    console.log('Selected Bar Index: ', selectedBarIndex);
+    console.log('Selected Note Index: ', selectedNoteIndex);
+    console.log('Current Output: ', window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
+
+    let matching = compareStates(noteArray, window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
+    console.log('Matching: ', matching);
+    if(matching){
+        advanceSelectedPosition();
+        highlightBothPositions();
+    }
 }
 
 
@@ -1658,6 +1934,74 @@ function onMIDIMessage (message) {
     // console.log(str);
 
     // console.log(message.data);
+
+    console.log('Input: ', noteArray);  
+    console.log('Current Grid Data: ', window.gridData);
+    console.log('Selected Bar Index: ', selectedBarIndex);
+    console.log('Selected Note Index: ', selectedNoteIndex);
+    console.log('Current Output: ', window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
+
+    let matching = compareStates(noteArray, window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
+    console.log('Matching: ', matching);
+    if(matching){
+        advanceSelectedPosition();
+        highlightBothPositions();
+    }
+    }
+
+function compareStates(inputState, targetState){
+    // Convert inputState to MIDI numbers
+    const inputStateMidi = Object.keys(inputState).map(note => noteToMidi(note) + 12);
+    // Convert targetState to MIDI numbers
+    const referenceStateMidi = targetState.map(note => noteToMidi(note) + 12);
+    let yoloMode = ($('#yoloMode')[0] && $('#yoloMode')[0].checked);
+    if(yoloMode){
+        // YOLO mode: compare only pitch class (modulo 12)
+        const inputMod = inputStateMidi.map(n => n % 12).sort();
+        const referenceMod = referenceStateMidi.map(n => n % 12).sort();
+
+        let uniqueInputMod = [...new Set(inputMod)];
+        let uniqueReferenceMod = [...new Set(referenceMod)];
+
+        console.log('Unique Input MIDI: ', uniqueInputMod);
+        console.log('Unique Reference MIDI: ', uniqueReferenceMod);
+
+        if (uniqueInputMod.length !== uniqueReferenceMod.length) {
+            // console.log('Input and reference states do not match in YOLO mode.');
+            return false;
+        }
+        for (let i = 0; i < uniqueInputMod.length; i++) {
+            if (uniqueInputMod[i] !== uniqueReferenceMod[i]) {
+                // console.log('Input and reference states do not match in YOLO mode.');
+                return false;
+            }
+        }
+        console.log('Input and reference states match in YOLO mode.');
+        return true;        
+    }
+
+    console.log('Input State MIDI: ', inputStateMidi);
+    console.log('Reference State MIDI: ', referenceStateMidi);
+
+    let uniqueInputs = [...new Set(inputStateMidi)];
+    let uniqueReferences = [...new Set(referenceStateMidi)];
+
+    if (uniqueInputs.length !== uniqueReferences.length) {
+        // console.log('Input and reference states do not match.');
+        return false;
+    }
+    let sortedInput = uniqueInputs.slice().sort();
+    let sortedReference = uniqueReferences.slice().sort();
+    for (let i = 0; i < sortedInput.length; i++) {
+        if (sortedInput[i] !== sortedReference[i]) {
+            // console.log('Input and reference states do not match.');
+            return false;
+        }
+    }
+    console.log('Input and reference states match.');
+    return true;
+
+
 }
 
 // function getScaleModes(mode){
@@ -3020,8 +3364,9 @@ if("?config" in  parsedQuery)
 
 $('#playButton').on('click', function(e) {
     // Use global grid data for single note playback
-    highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
+    // highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
     playCurrentNote();
+    highlightBothPositions();
 })
 // $('#playButton2').on('click', function(e) {playCurrentNote();})
 // $('#playButton3').on('click', function(e) {playCurrentNote();})
@@ -3063,7 +3408,9 @@ function noteLoop() {
     const secondsPerBeat = 60.0 / tempo;
     if (window.isPlaying) {
         // Highlight current note being played
-        highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
+        highlightBothPositions();
+        // highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
+        // highlightSelectedNotesSecondary(window.selectedBarIndex, window.selectedNoteIndex);
         
         playCurrentNote();
         nextNote();
@@ -3074,6 +3421,7 @@ function noteLoop() {
     } else {
         // Clear highlighting when playback stops
         clearNoteHighlighting();
+        highlightSelectedNotesSecondary(window.selectedBarIndex, window.selectedNoteIndex);
     }
 }
 
@@ -3098,6 +3446,9 @@ function nextNote() {
     // Keep global variables in sync
     window.currentNoteIndex = currentNoteIndex;
     window.currentBarIndex = currentBarIndex;
+
+    // setSelectedPosition(window.highlightedBarIndex, window.highlightedNoteIndex);
+    // window.highlightedBarIndex
 }
   
 function playCurrentNote() {
@@ -3179,8 +3530,10 @@ function playNote(note, chordSize = 1) {
     noteGain.connect(delay);
 }
 
+updateOutputText()
+
 
 // drawNotes(outputDiv, outputNoteArray, false);
 
-export {drawNotes, outputNoteArray, outputDiv}
+export {drawNotes, outputNoteArray, outputDiv, updateOutputText, highlightBothPositions}
 
