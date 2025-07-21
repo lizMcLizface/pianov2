@@ -85,7 +85,7 @@
     <div class="tab" id="mainTabBar"
          onmouseenter="this.classList.add('expanded')"
          onmouseleave="this.classList.remove('expanded')">
-         <button class="tablinks active" onclick="openCity(event, 'ScaleSelectorTab')" id="defaultOpen" >
+         <button class="tablinks active" onclick="openCity(event, 'ScaleSelectorTab')" >
         <span class="short-label">P</span>
         <span class="full-label">Scales</span>
       </button>
@@ -94,9 +94,9 @@
         <span class="full-label">Chords</span>
       </button>
 
-      <button class="tablinks" onclick="openCity(event, 'PlayTab')">
+      <button class="tablinks" onclick="openCity(event, 'ProgressionTab')" id="defaultOpen">
         <span class="short-label">P</span>
-        <span class="full-label">Play</span>
+        <span class="full-label">Progressions</span>
       </button>
 
       <button class="tablinks" onclick="openCity(event, 'CrossreferenceTab')" >
@@ -238,10 +238,8 @@
         </div>
       </div>
 
-      <div id="PlayTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
-        <div id ="PlayTabPlaceholder">
-          <p>This is a placeholder content. You can replace it with actual content later.</p>
-          <p>Feel free to add more information or features as needed.</p>
+      <div id="ProgressionTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
+        <div id ="ProgressionTabPlaceholder">
         </div>
       </div>
   
@@ -1550,23 +1548,23 @@
 </div>
       </div>
   
-<div class="selectionContainer" id="staveContainerBox">
-</div> 
-
-    <div class="staveContainer" width='100%' >
-      <div class="fixed" id="input"></div>
-      <div class="flex-item" id="output"></div>
-    </div>
-    <div class="selectionContainer">
-    </div>
+<div class="selectionContainer">
     <div class="selectionContainer" >
       <span style="width:50%" class="tableCell"><div width='100%' id="inputText" style="text-align: left;"></div></span>
   </div>
   <div class="selectionContainer" id="outputContainer">
       <span style="width:50%" class="tableCell"><div width='100%' id="outputText" style="text-align: left;"></div></span>
 </div>
+
+    <div class="staveContainer" width='100%'  id="staveContainerBox">
+      <div class="fixed" id="input"></div>
+      <div class="flex-item" id="output"></div>
+    </div>
+    <!-- <div class="selectionContainer"> -->
+    <!-- </div> -->
+</div> 
   
-    <div id="container">
+    <div id="pianoContainer">
     <ul id="keyboard">
       <li midi='21' note="A/0" class="white">A/0</li>
       <li midi='22' note="A#/0" class="black">A#/0</li>

@@ -333,6 +333,16 @@ const bpmSlider = document.querySelector('#bpmSlider');
 const initialBPM = bpmSlider ? Number(bpmSlider.value) : 120;
 export const metronome = new Metronome(initialBPM);
 
+
+var el = document.getElementsByClassName('metronome');
+Array.from(el).forEach((e) =>{
+e.style.animationDuration = 60/initialBPM*2 + 's';
+//   e.style.animationName = 'none';
+void(e.offsetHeight); /* trigger reflow */
+//   e.style.animationName = null; 
+})
+
+
 // Export the reset function for external use
 export { reset };
 
@@ -342,7 +352,7 @@ bpmSlider.addEventListener('input', function() {
 
     var el = document.getElementsByClassName('metronome');
     Array.from(el).forEach((e) =>{
-        e.style.animationDuration = 60/bpm + 's';
+        e.style.animationDuration = 60/bpm*2 + 's';
     //   e.style.animationName = 'none';
       void(e.offsetHeight); /* trigger reflow */
     //   e.style.animationName = null; 

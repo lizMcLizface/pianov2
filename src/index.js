@@ -28,9 +28,10 @@ import { context,
     delayAmountGain,
     startButton,
     stopButton,
-    tempoControl,
-    tempo,
-    isPlaying} from './synth';
+    tempoControl, 
+    tempo} from './synth';
+import { chord_progressions } from './progressions';
+
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
 // root.render(
@@ -78,6 +79,7 @@ window.createScaleChordCrossReference = createScaleChordCrossReference;
 
 let currentNoteIndex = 0;
 let currentBarIndex = 0;
+let isPlaying = false;
 
 
 
@@ -134,8 +136,8 @@ function failure () {
 
 
 let noteArray = {};
-let outputNoteArray = [];//[["e/4","d/4","d/5"],"e##/5","b/4","c/4","D/2","e/4","g/4","a/4","g/4","d/4"];
-// let outputNoteArray = ["e##/5","b/4","c/4","D/2"];
+// let outputNoteArray = [];//[["e/4","d/4","d/5"],"e##/5","b/4","c/4","D/2","e/4","g/4","a/4","g/4","d/4"];
+// let outputNoteArray = [{"e#/5":50}, {"e#/5":50,"b/4":50,"c/4":50,"D/2":50}];
 
 var keySignature = 'C';
 var selectedNote = 0;
@@ -144,55 +146,57 @@ function capitalizeFirstLetter(string) {
   }
 
   
-$('#modeSignatureSelect').on('change', function (e) {
-    var currentValue = $(this).val();
-    var keyValue = $('#keySignatureSelect').val();
-    var majorOptions = `
-    <option value="0">Gb</option>
-    <option value="1">Db</option>
-    <option value="2">Ab</option>
-    <option value="3">Eb</option>
-    <option value="4">Bb</option>
-    <option value="5">F</option>
-    <option value="6" selected>C</option>
-    <option value="7">G</option>
-    <option value="8">D</option>
-    <option value="9">A</option>
-    <option value="10">E</option>
-    <option value="11">B</option>
-    <option value="12">F#</option>
-    `;
-    var minorOptions = `
-    <option value="0">eb</option>
-    <option value="1">bb</option>
-    <option value="2">f</option>
-    <option value="3">c</option>
-    <option value="4">g</option>
-    <option value="5">d</option>
-    <option value="6" selected>a</option>
-    <option value="7">e</option>
-    <option value="8">b</option>
-    <option value="9">f#</option>
-    <option value="10">c#</option>
-    <option value="11">g#</option>
-    <option value="12">d#</option>
-    `;
-    console.log(currentValue);
-    $("#keySignatureSelect").html(currentValue == 0 ? majorOptions : minorOptions);
-    $("#keySignatureSelect").val(keyValue);
-    // $("#keySignatureSelect").element.dispatchEvent(new Event('change'))
-    var key = $('#keySignatureSelect').find(':selected')[0].innerHTML;
-    var signature = $('#modeSignatureSelect').find(':selected')[0].innerHTML;
+$(document).ready(function() {
+    $('#modeSignatureSelect').on('change', function (e) {
+        var currentValue = $(this).val();
+        var keyValue = $('#keySignatureSelect').val();
+        var majorOptions = `
+        <option value="0">Gb</option>
+        <option value="1">Db</option>
+        <option value="2">Ab</option>
+        <option value="3">Eb</option>
+        <option value="4">Bb</option>
+        <option value="5">F</option>
+        <option value="6" selected>C</option>
+        <option value="7">G</option>
+        <option value="8">D</option>
+        <option value="9">A</option>
+        <option value="10">E</option>
+        <option value="11">B</option>
+        <option value="12">F#</option>
+        `;
+        var minorOptions = `
+        <option value="0">eb</option>
+        <option value="1">bb</option>
+        <option value="2">f</option>
+        <option value="3">c</option>
+        <option value="4">g</option>
+        <option value="5">d</option>
+        <option value="6" selected>a</option>
+        <option value="7">e</option>
+        <option value="8">b</option>
+        <option value="9">f#</option>
+        <option value="10">c#</option>
+        <option value="11">g#</option>
+        <option value="12">d#</option>
+        `;
+        console.log(currentValue);
+        $("#keySignatureSelect").html(currentValue == 0 ? majorOptions : minorOptions);
+        $("#keySignatureSelect").val(keyValue);
+        // $("#keySignatureSelect").element.dispatchEvent(new Event('change'))
+        var key = $('#keySignatureSelect').find(':selected')[0].innerHTML;
+        var signature = $('#modeSignatureSelect').find(':selected')[0].innerHTML;
 
-    // key[0] = key[0].toUpperCase();
-    key = capitalizeFirstLetter(key);
-    if(signature == "Minor")
-        key = key + 'm';
+        // key[0] = key[0].toUpperCase();
+        key = capitalizeFirstLetter(key);
+        if(signature == "Minor")
+            key = key + 'm';
 
-    keySignature = key;
+        keySignature = key;
 
-    drawNotes(inputDiv, noteArray, true);
-    drawNotes(outputDiv, outputNoteArray, false);
+        drawNotes(inputDiv, noteArray, true);
+        drawNotes(outputDiv, outputNoteArray, false);
+    });
 });
 
 // $('#keySignatureSelect').on('change', function (e) {
@@ -274,6 +278,8 @@ const outputDiv = document.getElementById("output");
 //     }
 // }
 
+
+// ppp ~16 pp ~ 33 p ~ 49 mp ~ 64 mf ~ 80 f ~ 96 ff ~ 112 fff ~ 127
 function setupStaves(div, divisions = 1){
     while (div.hasChildNodes()) {
         div.removeChild(div.lastChild);
@@ -323,7 +329,7 @@ function setupStaves(div, divisions = 1){
         var bassStaves = [];
         
         trebleStaves.push(new Stave(30,80,divWidth));
-        bassStaves.push(new Stave(30,200,divWidth));
+        bassStaves.push(new Stave(30,160,divWidth));
 
         trebleStaves[0].addClef("treble");
         bassStaves[0].addClef("bass");
@@ -334,7 +340,7 @@ function setupStaves(div, divisions = 1){
 
         for(var i = 1; i < divisions; ++i){
             trebleStaves.push(new Stave(trebleStaves[i-1].width + trebleStaves[i-1].x,80,divWidth));
-            bassStaves.push(new Stave(bassStaves[i-1].width + bassStaves[i-1].x,200,divWidth));
+            bassStaves.push(new Stave(bassStaves[i-1].width + bassStaves[i-1].x,160,divWidth));
         }
             
         for(var stave of trebleStaves)
@@ -437,7 +443,7 @@ function drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBas
 }
 
 function drawNotes(div, noteArray, stacked = false){
-    // console.log('Current Note State:', noteArray);
+    console.log('Current Note State:', noteArray);
 
     var noteString = [];
     for (const [key, value] of Object.entries(noteArray)) {
@@ -749,8 +755,402 @@ function drawNotes(div, noteArray, stacked = false){
     return;
 }
 
+
+
+
 drawNotes(inputDiv, noteArray, true);
-drawNotes(outputDiv, outputNoteArray, false);
+
+
+// Format should be like this:
+// Output Note Array: [[Treble Notes], [Bass Notes]]
+// Treble Notes: [[bar1], [bar2], ...]
+// Bass Notes: [[bar1], [bar2], ...]
+// barn: [{"note": "C/4", "duration": "4"}, {"note": "D/4", "duration": "4"}, {"note": "Pause", "duration": "4"}]
+// Example:
+var outputNoteArray = [
+    [ //treble notes
+        [{"note": "C/4", "duration": "4"}, {"note": ["D/3"], "duration": "4"}, {"note": ["E/3"], "duration": "4"}, {"note": "F/3", "duration": "4"}], // bar 1
+        [{"note": "G/4", "duration": "4"}, {"note": "A/3", "duration": "4"}, {"note": "B/3", "duration": "4"}, {"note": "C/4", "duration": "4"}], // bar 2
+        [{"note": ["D/5"], "duration": "4"}, {"note": ["E/4"], "duration": "4"}, {"note": "F/4", "duration": "4"}], // bar 1
+        [{"note": "G/5", "duration": "8"}, {"note": "A/4", "duration": "4"}, {"note": "B/4", "duration": "4"}, {"note": "C/6", "duration": "4"}]
+    ],
+    [ //bass notes
+        [{"note": "C/3", "duration": "4"}, {"note": ["D/3"], "duration": "4"}, {"note": ["E/3"], "duration": "4"}, {"note": "F/3", "duration": "4"}], // bar 1
+        [{"note": "G/3", "duration": "4"}, {"note": "A/3", "duration": "4"}, {"note": "B/3", "duration": "4"}, {"note": "C/4", "duration": "4"}], // bar 2
+        [{"note": ["D/4"], "duration": "4"}, {"note": ["E/4"], "duration": "4"}, {"note": "F/4", "duration": "4"}], // bar 1
+        [{"note": "G/4", "duration": "4"}, {"note": "A/4", "duration": "4"}, {"note": "B/4", "duration": "4"}, {"note": "C/5", "duration": "4"}]
+    ]
+];
+
+const gridData = drawNotes2(outputDiv, outputNoteArray, false);
+console.log('Grid-aligned notes:', gridData);
+
+// Example usage of highlighting function:
+// Highlight the first beat of the first bar in red and second beat of second bar in blue
+/*
+const highlightExamples = [
+    { barIndex: 0, beatIndex: 0, color: 'red' },    // First beat of first bar
+    { barIndex: 1, beatIndex: 1, color: 'blue' },   // Second beat of second bar
+    { barIndex: 2, beatIndex: 2, color: 'green' }   // Third beat of third bar
+];
+highlightNotesInNotation(outputDiv, outputNoteArray, highlightExamples);
+*/
+
+// highlightPlaybackPosition(1, 1)
+
+// Helper function to highlight current playback position
+function highlightPlaybackPosition(barIndex, beatIndex) {
+    const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'red' };
+    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+}
+
+// Helper function to highlight selected notes
+function highlightSelectedNotes(barIndex, beatIndex) {
+    const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'blue' };
+    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+}
+
+// Helper function to clear highlighting (reset to black)
+function clearNoteHighlighting() {
+    drawNotes2(outputDiv, outputNoteArray, false);
+}
+
+// Helper function to highlight multiple positions with different colors
+function highlightMultiplePositions(highlightArray) {
+    // highlightArray format: [{ barIndex: 0, beatIndex: 1, color: 'red' }, ...]
+    highlightNotesInNotation(outputDiv, outputNoteArray, highlightArray);
+}
+
+// Helper function to reset playback position
+function resetPlaybackPosition() {
+    currentBarIndex = 0;
+    currentNoteIndex = 0;
+    clearNoteHighlighting();
+}
+
+// Helper function to get current playback status
+function getPlaybackStatus() {
+    return {
+        isPlaying: isPlaying,
+        currentBarIndex: currentBarIndex,
+        currentNoteIndex: currentNoteIndex
+    };
+}
+
+
+function drawNotes2(div, noteArray, stacked = false){
+    console.log('Current Note State:', noteArray);
+
+    // noteArray format: [[trebleNotes], [bassNotes]]
+    // Each contains bars: [[bar1], [bar2], ...]
+    // Each bar contains notes: [{"note": "C/4", "duration": "4"}, {"note": ["C/4", "E/4"], "duration": "4"}, ...]
+    
+    if (!noteArray || noteArray.length < 2) {
+        console.log('Invalid noteArray format for drawNotes2');
+        return;
+    }
+
+    const trebleNotes = noteArray[0];
+    const bassNotes = noteArray[1];
+    const numBars = Math.max(trebleNotes.length, bassNotes.length);
+
+    var {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave, trebleStaves, bassStaves} = 
+        setupStaves(div, numBars);
+
+    // Initialize the result structure to return
+    const gridAlignedNotes = [];
+
+    // Process each bar
+    for (let barIndex = 0; barIndex < numBars; barIndex++) {
+        const trebleBar = trebleNotes[barIndex] || [];
+        const bassBar = bassNotes[barIndex] || [];
+        
+        // Combine notes at the same temporal position
+        const maxLength = Math.max(trebleBar.length, bassBar.length);
+        
+        const trebleStaveNotes = [];
+        const bassStaveNotes = [];
+        let totalBeats = 0;
+
+        // Initialize the bar data for the result
+        const barData = [];
+
+        for (let noteIndex = 0; noteIndex < maxLength; noteIndex++) {
+            const trebleNoteObj = trebleBar[noteIndex];
+            const bassNoteObj = bassBar[noteIndex];
+            
+            // Use the duration from whichever note exists (they should match)
+            const duration = trebleNoteObj ? trebleNoteObj.duration : (bassNoteObj ? bassNoteObj.duration : '4');
+            const durationValue = duration === 'w' ? 4 : 
+                                duration === 'h' ? 2 : 
+                                duration === 'q' || duration === '4' ? 1 : 
+                                duration === '8' ? 0.5 : 
+                                duration === '16' ? 0.25 : 1;
+            totalBeats += durationValue;
+
+            // Collect all notes that should play simultaneously
+            const allNotesAtThisTime = [];
+            if (trebleNoteObj) allNotesAtThisTime.push(trebleNoteObj);
+            if (bassNoteObj) allNotesAtThisTime.push(bassNoteObj);
+
+            // Separate notes by clef based on pitch
+            const trebleNotesToPlay = [];
+            const bassNotesToPlay = [];
+            const simultaneousNotes = [];
+            let isPause = false;
+
+            for (const noteObj of allNotesAtThisTime) {
+                if (noteObj.note === "Pause") {
+                    isPause = true;
+                    simultaneousNotes.push("Pause");
+                    break;
+                } else {
+                    // Handle both single notes (string) and chords (array)
+                    const notes = Array.isArray(noteObj.note) ? noteObj.note : [noteObj.note];
+                    
+                    for (const note of notes) {
+                        simultaneousNotes.push(note);
+                        const octave = parseInt(note.slice(-1));
+                        if (octave >= 4) {
+                            trebleNotesToPlay.push(note);
+                        } else {
+                            bassNotesToPlay.push(note);
+                        }
+                    }
+                }
+            }
+
+            // Add to result data structure
+            barData.push({
+                notes: simultaneousNotes,
+                duration: duration,
+                durationValue: durationValue,
+                isPause: isPause
+            });
+
+            // Add notes or rests to appropriate staves
+            if (isPause) {
+                trebleStaveNotes.push(new StaveNote({keys: ['b/4'], duration: duration + 'r'}));
+                bassStaveNotes.push(new StaveNote({clef: "bass", keys: ['b/2'], duration: duration + 'r'}));
+            } else {
+                if (trebleNotesToPlay.length > 0) {
+                    trebleStaveNotes.push(new StaveNote({keys: trebleNotesToPlay, duration: duration}));
+                } else {
+                    trebleStaveNotes.push(new StaveNote({keys: ['b/4'], duration: duration + 'r'}));
+                }
+
+                if (bassNotesToPlay.length > 0) {
+                    bassStaveNotes.push(new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: duration}));
+                } else {
+                    bassStaveNotes.push(new StaveNote({clef: "bass", keys: ['D/3'], duration: duration + 'r'}));
+                }
+            }
+        }
+
+        // Render treble staff for this bar
+        if (trebleStaveNotes.length > 0) {
+            const trebleVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            trebleVoice.addTickables(trebleStaveNotes);
+            Accidental.applyAccidentals([trebleVoice], keySignature);
+
+            new Formatter().joinVoices([trebleVoice]).format([trebleVoice], inputDisplayWidth - 50);
+            trebleVoice.draw(inputContext, trebleStaves[barIndex]);
+        }
+
+        // Render bass staff for this bar
+        if (bassStaveNotes.length > 0) {
+            const bassVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            bassVoice.addTickables(bassStaveNotes);
+            Accidental.applyAccidentals([bassVoice], keySignature);
+
+            new Formatter().joinVoices([bassVoice]).format([bassVoice], inputDisplayWidth - 50);
+            bassVoice.draw(inputContext, bassStaves[barIndex]);
+        }
+
+        // Add this bar's data to the result
+        gridAlignedNotes.push({
+            barIndex: barIndex,
+            totalBeats: totalBeats,
+            notes: barData
+        });
+    }
+
+    return gridAlignedNotes;
+}
+
+// Function to highlight specific notes in the notation based on bar and beat position
+function highlightNotesInNotation(div, noteArray, highlightData = null) {
+    // highlightData format: { barIndex: number, beatIndex: number, color: 'red'|'blue'|'black' }
+    // or array of highlight objects: [{ barIndex: 0, beatIndex: 1, color: 'red' }, ...]
+    
+    if (!noteArray || noteArray.length < 2) {
+        console.log('Invalid noteArray format for highlightNotesInNotation');
+        return;
+    }
+
+    const trebleNotes = noteArray[0];
+    const bassNotes = noteArray[1];
+    const numBars = Math.max(trebleNotes.length, bassNotes.length);
+
+    var {inputRenderer, inputContext, inputDisplayWidth, inputTrebleStave, inputBassStave, trebleStaves, bassStaves} = 
+        setupStaves(div, numBars);
+
+    // Initialize the result structure to return
+    const gridAlignedNotes = [];
+
+    // Process each bar
+    for (let barIndex = 0; barIndex < numBars; barIndex++) {
+        const trebleBar = trebleNotes[barIndex] || [];
+        const bassBar = bassNotes[barIndex] || [];
+        
+        // Combine notes at the same temporal position
+        const maxLength = Math.max(trebleBar.length, bassBar.length);
+        
+        const trebleStaveNotes = [];
+        const bassStaveNotes = [];
+        let totalBeats = 0;
+
+        // Initialize the bar data for the result
+        const barData = [];
+
+        for (let noteIndex = 0; noteIndex < maxLength; noteIndex++) {
+            const trebleNoteObj = trebleBar[noteIndex];
+            const bassNoteObj = bassBar[noteIndex];
+            
+            // Use the duration from whichever note exists (they should match)
+            const duration = trebleNoteObj ? trebleNoteObj.duration : (bassNoteObj ? bassNoteObj.duration : '4');
+            const durationValue = duration === 'w' ? 4 : 
+                                duration === 'h' ? 2 : 
+                                duration === 'q' || duration === '4' ? 1 : 
+                                duration === '8' ? 0.5 : 
+                                duration === '16' ? 0.25 : 1;
+            totalBeats += durationValue;
+
+            // Collect all notes that should play simultaneously
+            const allNotesAtThisTime = [];
+            if (trebleNoteObj) allNotesAtThisTime.push(trebleNoteObj);
+            if (bassNoteObj) allNotesAtThisTime.push(bassNoteObj);
+
+            // Separate notes by clef based on pitch
+            const trebleNotesToPlay = [];
+            const bassNotesToPlay = [];
+            const simultaneousNotes = [];
+            let isPause = false;
+
+            for (const noteObj of allNotesAtThisTime) {
+                if (noteObj.note === "Pause") {
+                    isPause = true;
+                    simultaneousNotes.push("Pause");
+                    break;
+                } else {
+                    // Handle both single notes (string) and chords (array)
+                    const notes = Array.isArray(noteObj.note) ? noteObj.note : [noteObj.note];
+                    
+                    for (const note of notes) {
+                        simultaneousNotes.push(note);
+                        const octave = parseInt(note.slice(-1));
+                        if (octave >= 4) {
+                            trebleNotesToPlay.push(note);
+                        } else {
+                            bassNotesToPlay.push(note);
+                        }
+                    }
+                }
+            }
+
+            // Add to result data structure
+            barData.push({
+                notes: simultaneousNotes,
+                duration: duration,
+                durationValue: durationValue,
+                isPause: isPause
+            });
+
+            // Check if this note should be highlighted
+            let highlightColor = null;
+            if (highlightData) {
+                const highlights = Array.isArray(highlightData) ? highlightData : [highlightData];
+                for (const highlight of highlights) {
+                    if (highlight.barIndex === barIndex && highlight.beatIndex === noteIndex) {
+                        highlightColor = highlight.color;
+                        break;
+                    }
+                }
+            }
+
+            // Add notes or rests to appropriate staves
+            if (isPause) {
+                const trebleNote = new StaveNote({keys: ['b/4'], duration: duration + 'r'});
+                const bassNote = new StaveNote({clef: "bass", keys: ['b/2'], duration: duration + 'r'});
+                
+                if (highlightColor && highlightColor !== 'black') {
+                    trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+                
+                trebleStaveNotes.push(trebleNote);
+                bassStaveNotes.push(bassNote);
+            } else {
+                if (trebleNotesToPlay.length > 0) {
+                    const trebleNote = new StaveNote({keys: trebleNotesToPlay, duration: duration});
+                    if (highlightColor && highlightColor !== 'black') {
+                        trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    trebleStaveNotes.push(trebleNote);
+                } else {
+                    const trebleNote = new StaveNote({keys: ['b/4'], duration: duration + 'r'});
+                    if (highlightColor && highlightColor !== 'black') {
+                        trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    trebleStaveNotes.push(trebleNote);
+                }
+
+                if (bassNotesToPlay.length > 0) {
+                    const bassNote = new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: duration});
+                    if (highlightColor && highlightColor !== 'black') {
+                        bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    bassStaveNotes.push(bassNote);
+                } else {
+                    const bassNote = new StaveNote({clef: "bass", keys: ['D/3'], duration: duration + 'r'});
+                    if (highlightColor && highlightColor !== 'black') {
+                        bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    bassStaveNotes.push(bassNote);
+                }
+            }
+        }
+
+        // Render treble staff for this bar
+        if (trebleStaveNotes.length > 0) {
+            const trebleVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            trebleVoice.addTickables(trebleStaveNotes);
+            Accidental.applyAccidentals([trebleVoice], keySignature);
+
+            new Formatter().joinVoices([trebleVoice]).format([trebleVoice], inputDisplayWidth - 50);
+            trebleVoice.draw(inputContext, trebleStaves[barIndex]);
+        }
+
+        // Render bass staff for this bar
+        if (bassStaveNotes.length > 0) {
+            const bassVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            bassVoice.addTickables(bassStaveNotes);
+            Accidental.applyAccidentals([bassVoice], keySignature);
+
+            new Formatter().joinVoices([bassVoice]).format([bassVoice], inputDisplayWidth - 50);
+            bassVoice.draw(inputContext, bassStaves[barIndex]);
+        }
+
+        // Add this bar's data to the result
+        gridAlignedNotes.push({
+            barIndex: barIndex,
+            totalBeats: totalBeats,
+            notes: barData
+        });
+    }
+
+    return gridAlignedNotes;
+}
 
 
 // const notes = {
@@ -2139,32 +2539,38 @@ document.getElementById("inputText").innerHTML = 'You have pressed: ';
 //     // generateOutputNotes(true);setScaleText()
 // });
 
-// $('#pianoCheckBox').on('change', function (e) {
-//     if($('#pianoCheckBox')[0].checked){
-//         $('#container')[0].style.display = "flex"
-//     }else{
-//         $('#container')[0].style.display = "none"
+$(document).ready(function() {
+    $('#pianoCheckBox').on('change', function (e) {
+        if($('#pianoCheckBox')[0].checked){
+            $('#pianoContainer')[0].style.display = "flex"
+        }else{
+            $('#pianoContainer')[0].style.display = "none"
 
-//     }
-// });
-// $('#promptCheckBox').on('change', function (e) {
-//     if($('#promptCheckBox')[0].checked){
-//         $('#outputContainer')[0].style.display = "flex"
-//     }else{
-//         $('#outputContainer')[0].style.display = "none"
+        }
+    });
+});
+$(document).ready(function() {
+    $('#promptCheckBox').on('change', function (e) {
+        if($('#promptCheckBox')[0].checked){
+            $('#outputContainer')[0].style.display = "flex"
+        }else{
+            $('#outputContainer')[0].style.display = "none"
 
-//     }
-// });
-$('#stavesCheckBox').on('change', function (e) {
-    // console.log('stavebutton')
-    // console.log($('#stavesCheckBox')[0].checked)
-    // console.log($('#staveContainerBox')[0])
-    // console.log($('#staveContainerBox')[0].style.display)
-    if($('#stavesCheckBox')[0].checked){
-        $('#staveContainerBox')[0].style.display = "flex"
-    }else{
-        $('#staveContainerBox')[0].style.display = "none"
-    }
+        }
+    });
+});
+$(document).ready(function() {
+    $('#stavesCheckBox').on('change', function (e) {
+        // console.log('stavebutton')
+        // console.log($('#stavesCheckBox')[0].checked)
+        // console.log($('#staveContainerBox')[0])
+        // console.log($('#staveContainerBox')[0].style.display)
+        if($('#stavesCheckBox')[0].checked){
+            $('#staveContainerBox')[0].style.display = "flex"
+        }else{
+            $('#staveContainerBox')[0].style.display = "none"
+        }
+    });
 });
 
 
@@ -2546,7 +2952,12 @@ if("?config" in  parsedQuery)
 
 // }
 
-// $('#playButton').on('click', function(e) {playCurrentNote();})
+$('#playButton').on('click', function(e) {
+    // Generate grid data for single note playback
+    const gridData = drawNotes2(outputDiv, outputNoteArray, false);
+    highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
+    playCurrentNote(gridData);
+})
 // $('#playButton2').on('click', function(e) {playCurrentNote();})
 // $('#playButton3').on('click', function(e) {playCurrentNote();})
 // $('#playButton4').on('click', function(e) {playCurrentNote();})
@@ -2555,7 +2966,14 @@ if("?config" in  parsedQuery)
 // $('#playButton7').on('click', function(e) {playCurrentNote();})
 // $('#playButton8').on('click', function(e) {playCurrentNote();})
 
-// $('#startButton').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
+$('#startButton').on('click', function(e) {
+    if (!isPlaying){
+        isPlaying = true; 
+        // Initialize grid data for playback when starting
+        const gridData = drawNotes2(outputDiv, outputNoteArray, false);
+        noteLoop(gridData);
+    }
+})
 // $('#startButton2').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 // $('#startButton3').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 // $('#startButton4').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
@@ -2564,7 +2982,11 @@ if("?config" in  parsedQuery)
 // $('#startButton7').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 // $('#startButton8').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 
-// $('#stopButton').on('click', function(e) {isPlaying = false;})
+$('#stopButton').on('click', function(e) {
+    isPlaying = false;
+    // Clear any highlighting when stopping playback
+    clearNoteHighlighting();
+})
 // $('#stopButton2').on('click', function(e) {isPlaying = false;})
 // $('#stopButton3').on('click', function(e) {isPlaying = false;})
 // $('#stopButton4').on('click', function(e) {isPlaying = false;})
@@ -2573,121 +2995,121 @@ if("?config" in  parsedQuery)
 // $('#stopButton7').on('click', function(e) {isPlaying = false;})
 // $('#stopButton8').on('click', function(e) {isPlaying = false;})
 
-// function noteLoop() {
-//     const secondsPerBeat = 60.0 / tempo;
-//     if (isPlaying) {
-//         playCurrentNote();
-//         nextNote();
-//         // playCurrentNote();
-//         // nextNote();
-//         window.setTimeout(function() {
-//             noteLoop();
-//         }, secondsPerBeat * 1000)
-//     };
-// }
+function noteLoop(gridData) {
+    const secondsPerBeat = 60.0 / tempo;
+    if (isPlaying) {
+        // Highlight current note being played
+        highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
+        
+        playCurrentNote(gridData);
+        nextNote(gridData);
+        
+        window.setTimeout(function() {
+            noteLoop(gridData);
+        }, secondsPerBeat * 1000)
+    } else {
+        // Clear highlighting when playback stops
+        clearNoteHighlighting();
+    }
+}
 
-// function nextNote() {
-//     // noteSelects[currentNoteIndex].style.background = "yellow";
-//     // if (noteSelects[currentNoteIndex - 1]) {
-//     //     noteSelects[currentNoteIndex - 1].style.background = "white";
-//     // } else {
-//     //     noteSelects[7].style.background = "white"
-//     // }
-//     currentNoteIndex++;
-//     // console.log('notes: ', outputNoteArray[0]['notes'])
-//     if (currentNoteIndex >= outputNoteArray[currentBarIndex]['notes'].length) {
-//         currentNoteIndex = 0;
-//         currentBarIndex = currentBarIndex + 1;
-//         if(currentBarIndex >= outputNoteArray.length)
-//             currentBarIndex = 0;
-//     }
-// }
+function nextNote(gridData) {
+    currentNoteIndex++;
+    
+    // Check bounds using grid data
+    if (gridData && currentBarIndex < gridData.length) {
+        if (currentNoteIndex >= gridData[currentBarIndex].notes.length) {
+            console.log('Moving to next bar from bar', currentBarIndex, 'to bar', currentBarIndex + 1);
+            currentNoteIndex = 0;
+            currentBarIndex = currentBarIndex + 1;
+            if (currentBarIndex >= gridData.length) {
+                console.log('Wrapping around to start - total bars was', gridData.length);
+                currentBarIndex = 0;
+            }
+        }
+    } else {
+        console.log('Warning: no gridData provided to nextNote');
+    }
+}
   
-// function playCurrentNote() {
-//     if(currentBarIndex >= outputNoteArray.length){
-//         currentBarIndex = 0;
-//         currentNoteIndex = 0;
-//     }
-//     if(currentNoteIndex >= outputNoteArray[currentBarIndex]['notes'].flat().length)
-//         currentNoteIndex = 0;
-//     if(!Array.isArray(outputNoteArray[currentBarIndex]['notes'][currentNoteIndex])){
-//         console.log('playing single note', outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]);
-//         const osc = context.createOscillator();
-//         const noteGain = context.createGain();
-//         noteGain.gain.setValueAtTime(0, 0);
-//         noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
-//         noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
-//         noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
+function playCurrentNote(gridData) {
+    if (!gridData) {
+        console.log('Warning: no gridData provided to playCurrentNote');
+        return;
+    }
 
-//         var lfoGain = context.createGain();
-//         lfoGain.gain.setValueAtTime(vibratoAmount, 0);
-//         lfoGain.connect(osc.frequency)
+    // Reset position if out of bounds
+    if (currentBarIndex >= gridData.length) {
+        currentBarIndex = 0;
+        currentNoteIndex = 0;
+    }
+    
+    // Check if current position is valid within grid data
+    if (currentBarIndex >= gridData.length || currentNoteIndex >= gridData[currentBarIndex].notes.length) {
+        console.log('Invalid position in grid data, skipping playback');
+        return;
+    }
 
-//         var lfo = context.createOscillator();
-//         lfo.frequency.setValueAtTime(vibratoSpeed, 0);
-//         lfo.start(0);
-//         lfo.stop(context.currentTime + noteLength);
-//         lfo.connect(lfoGain); 
+    const noteEvent = gridData[currentBarIndex].notes[currentNoteIndex];
+    
+    if (noteEvent.isPause) {
+        console.log('playing pause/rest');
+        return; // Don't play anything for pauses
+    }
+    
+    const notesToPlay = noteEvent.notes;
+    console.log('playing grid data notes:', notesToPlay);
 
-//         if(waveform == "custom")
-//         osc.setPeriodicWave(customWaveform);
-//     else
-//         osc.type = waveform;
+    // Play the notes
+    if (notesToPlay.length === 1) {
+        // Single note
+        playNote(notesToPlay[0]);
+    } else if (notesToPlay.length > 1) {
+        // Multiple notes (chord)
+        for (const note of notesToPlay) {
+            playNote(note, notesToPlay.length); // Pass chord size for volume adjustment
+        }
+    }
+}
 
+function playNote(note, chordSize = 1) {
+    const osc = context.createOscillator();
+    const noteGain = context.createGain();
+    noteGain.gain.setValueAtTime(0, 0);
+    
+    // Adjust volume based on chord size
+    const adjustedSustainLevel = chordSize > 1 ? (0.5 / chordSize) : sustainLevel;
+    noteGain.gain.linearRampToValueAtTime(adjustedSustainLevel, context.currentTime + noteLength * attackTime);
+    noteGain.gain.setValueAtTime(adjustedSustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
+    noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
 
+    var lfoGain = context.createGain();
+    lfoGain.gain.setValueAtTime(vibratoAmount, 0);
+    lfoGain.connect(osc.frequency);
 
+    var lfo = context.createOscillator();
+    lfo.frequency.setValueAtTime(vibratoSpeed, 0);
+    lfo.start(0);
+    lfo.stop(context.currentTime + noteLength);
+    lfo.connect(lfoGain); 
 
-//         osc.frequency.setValueAtTime(pianoNotes[outputNoteArray[currentBarIndex]['notes'].flat()[currentNoteIndex]], 0);
-//         osc.start(0);
-//         osc.stop(context.currentTime + noteLength);
-//         osc.connect(noteGain);
+    if (waveform == "custom") {
+        osc.setPeriodicWave(customWaveform);
+    } else {
+        osc.type = waveform;
+    }
 
-//         noteGain.connect(masterVolume);
-//         noteGain.connect(delay);
-//     }
-//     else{
-//         console.log('playing note array', outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]);
-//         for(var note of outputNoteArray[currentBarIndex]['notes'][currentNoteIndex]){
-//             // console.log('playing note', note);
-//             const osc = context.createOscillator();
-//             const noteGain = context.createGain();
-//             noteGain.gain.setValueAtTime(0, 0);
-//             sustainLevel = 0.5 / outputNoteArray[currentBarIndex]['notes'][currentNoteIndex].length;
-//             noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
-//             noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
-//             noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
-        
-//             var lfoGain = context.createGain();
-//             lfoGain.gain.setValueAtTime(vibratoAmount, 0);
-//             lfoGain.connect(osc.frequency)
-        
-//             var lfo = context.createOscillator();
-//             lfo.frequency.setValueAtTime(vibratoSpeed, 0);
-//             lfo.start(0);
-//             lfo.stop(context.currentTime + noteLength);
-//             lfo.connect(lfoGain); 
-        
-//             if(waveform == "custom")
-//             osc.setPeriodicWave(customWaveform);
-//         else
-//             osc.type = waveform;
-        
-        
-        
-//             // console.log(note, pianoNotes[note])
-//             osc.frequency.setValueAtTime(pianoNotes[note], 0);
-//             osc.start(0);
-//             osc.stop(context.currentTime + noteLength);
-//             osc.connect(noteGain);
-        
-//             noteGain.connect(masterVolume);
-//             noteGain.connect(delay);
+    osc.frequency.setValueAtTime(pianoNotes[note], 0);
+    osc.start(0);
+    osc.stop(context.currentTime + noteLength);
+    osc.connect(noteGain);
 
-//         }
-//     }
-//     drawNotes(outputDiv, outputNoteArray, false);
-// }
+    noteGain.connect(masterVolume);
+    noteGain.connect(delay);
+}
 
 
+// drawNotes(outputDiv, outputNoteArray, false);
 
+export {drawNotes, outputNoteArray, outputDiv}
 
