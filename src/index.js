@@ -12,6 +12,7 @@ import {chords, processedChords, highlightKeysForChords, createChordRootNoteTabl
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
 import {modifiers, keyToNote} from './keyboard';
+import './staves'; // Import stave functions - functions will be available on window object
 import { context,
     masterVolume,
     customWaveform,
@@ -79,7 +80,11 @@ window.createScaleChordCrossReference = createScaleChordCrossReference;
 
 let currentNoteIndex = 0;
 let currentBarIndex = 0;
-let isPlaying = false;
+// isPlaying is now a global variable - window.isPlaying
+
+// Make playback variables globally accessible
+window.currentNoteIndex = currentNoteIndex;
+window.currentBarIndex = currentBarIndex;
 
 
 
@@ -216,6 +221,10 @@ $(document).ready(function() {
 
 const inputDiv = document.getElementById("input");
 const outputDiv = document.getElementById("output");
+
+// Make DOM elements globally accessible for staves.js module
+window.outputDiv = outputDiv;
+window.inputDiv = inputDiv;
 
 // var currentHighlight = []
 // function highlightNotes(noteArray){
@@ -782,8 +791,15 @@ var outputNoteArray = [
     ]
 ];
 
-const gridData = drawNotes2(outputDiv, outputNoteArray, false);
-console.log('Grid-aligned notes:', gridData);
+// Make variables globally accessible for staves.js module
+window.outputNoteArray = outputNoteArray;
+window.drawNotes2 = drawNotes2;
+window.isPlaying = false; // Will be updated by playback functions
+window.resetPlaybackPosition = resetPlaybackPosition;
+
+// Global variable to store grid-aligned note data (accessible from other JS files)
+window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
+console.log('Grid-aligned notes:', window.gridData);
 
 // Example usage of highlighting function:
 // Highlight the first beat of the first bar in red and second beat of second bar in blue
@@ -794,6 +810,54 @@ const highlightExamples = [
     { barIndex: 2, beatIndex: 2, color: 'green' }   // Third beat of third bar
 ];
 highlightNotesInNotation(outputDiv, outputNoteArray, highlightExamples);
+*/
+
+// Example usage of addDrawNotes function (functions now work with global state):
+/*
+// Add new bars to existing notation - no return value, updates window.gridData directly
+const newBars = [
+    [ // Treble bars to add
+        [{"note": "E/5", "duration": "4"}, {"note": "F/5", "duration": "4"}], // New bar 5
+        [{"note": "G/5", "duration": "2"}, {"note": "A/5", "duration": "2"}]  // New bar 6
+    ],
+    [ // Bass bars to add  
+        [{"note": "E/3", "duration": "4"}, {"note": "F/3", "duration": "4"}], // New bar 5
+        [{"note": "G/3", "duration": "2"}, {"note": "A/3", "duration": "2"}]  // New bar 6
+    ]
+];
+addDrawNotes(outputDiv, newBars); // Updates window.gridData automatically
+
+// Or add a single bar
+addSingleBar(outputDiv, 
+    [{"note": "C/5", "duration": "4"}, {"note": "D/5", "duration": "4"}], // Treble notes
+    [{"note": "C/2", "duration": "4"}, {"note": "D/2", "duration": "4"}]  // Bass notes
+);
+
+// Remove the last bar (useful for undo functionality)
+removeLastBar(outputDiv); // Removes last bar and updates window.gridData
+
+// Clear all notation and start fresh
+clearAllNotation(outputDiv); // Resets window.gridData to empty array
+
+// Access grid data from anywhere: console.log(window.gridData);
+*/
+
+// Test the addDrawNotes functionality (uncomment to test):
+/*
+// Wait a moment, then add some bars
+setTimeout(() => {
+    console.log('Adding test bars...');
+    const testBars = [
+        [ // Treble bars to add
+            [{"note": "E/5", "duration": "4"}, {"note": "F/5", "duration": "4"}], // Test bar 1
+        ],
+        [ // Bass bars to add  
+            [{"note": "E/3", "duration": "4"}, {"note": "F/3", "duration": "4"}], // Test bar 1
+        ]
+    ];
+    addDrawNotes(outputDiv, testBars);
+    console.log('Updated grid data:', window.gridData); // Check the global state
+}, 2000);
 */
 
 // highlightPlaybackPosition(1, 1)
@@ -812,7 +876,7 @@ function highlightSelectedNotes(barIndex, beatIndex) {
 
 // Helper function to clear highlighting (reset to black)
 function clearNoteHighlighting() {
-    drawNotes2(outputDiv, outputNoteArray, false);
+    window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
 }
 
 // Helper function to highlight multiple positions with different colors
@@ -825,18 +889,20 @@ function highlightMultiplePositions(highlightArray) {
 function resetPlaybackPosition() {
     currentBarIndex = 0;
     currentNoteIndex = 0;
+    // Update global versions
+    window.currentBarIndex = currentBarIndex;
+    window.currentNoteIndex = currentNoteIndex;
     clearNoteHighlighting();
 }
 
 // Helper function to get current playback status
 function getPlaybackStatus() {
     return {
-        isPlaying: isPlaying,
+        isPlaying: window.isPlaying,
         currentBarIndex: currentBarIndex,
         currentNoteIndex: currentNoteIndex
     };
 }
-
 
 function drawNotes2(div, noteArray, stacked = false){
     console.log('Current Note State:', noteArray);
@@ -2953,10 +3019,9 @@ if("?config" in  parsedQuery)
 // }
 
 $('#playButton').on('click', function(e) {
-    // Generate grid data for single note playback
-    const gridData = drawNotes2(outputDiv, outputNoteArray, false);
+    // Use global grid data for single note playback
     highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
-    playCurrentNote(gridData);
+    playCurrentNote();
 })
 // $('#playButton2').on('click', function(e) {playCurrentNote();})
 // $('#playButton3').on('click', function(e) {playCurrentNote();})
@@ -2967,11 +3032,10 @@ $('#playButton').on('click', function(e) {
 // $('#playButton8').on('click', function(e) {playCurrentNote();})
 
 $('#startButton').on('click', function(e) {
-    if (!isPlaying){
-        isPlaying = true; 
-        // Initialize grid data for playback when starting
-        const gridData = drawNotes2(outputDiv, outputNoteArray, false);
-        noteLoop(gridData);
+    if (!window.isPlaying){
+        window.isPlaying = true; 
+        // Use global grid data for playback loop
+        noteLoop();
     }
 })
 // $('#startButton2').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
@@ -2983,7 +3047,7 @@ $('#startButton').on('click', function(e) {
 // $('#startButton8').on('click', function(e) {if (!isPlaying){isPlaying = true; noteLoop();}})
 
 $('#stopButton').on('click', function(e) {
-    isPlaying = false;
+    window.isPlaying = false;
     // Clear any highlighting when stopping playback
     clearNoteHighlighting();
 })
@@ -2995,17 +3059,17 @@ $('#stopButton').on('click', function(e) {
 // $('#stopButton7').on('click', function(e) {isPlaying = false;})
 // $('#stopButton8').on('click', function(e) {isPlaying = false;})
 
-function noteLoop(gridData) {
+function noteLoop() {
     const secondsPerBeat = 60.0 / tempo;
-    if (isPlaying) {
+    if (window.isPlaying) {
         // Highlight current note being played
         highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
         
-        playCurrentNote(gridData);
-        nextNote(gridData);
+        playCurrentNote();
+        nextNote();
         
         window.setTimeout(function() {
-            noteLoop(gridData);
+            noteLoop();
         }, secondsPerBeat * 1000)
     } else {
         // Clear highlighting when playback stops
@@ -3013,44 +3077,51 @@ function noteLoop(gridData) {
     }
 }
 
-function nextNote(gridData) {
+function nextNote() {
     currentNoteIndex++;
     
-    // Check bounds using grid data
-    if (gridData && currentBarIndex < gridData.length) {
-        if (currentNoteIndex >= gridData[currentBarIndex].notes.length) {
+    // Check bounds using global grid data
+    if (window.gridData && currentBarIndex < window.gridData.length) {
+        if (currentNoteIndex >= window.gridData[currentBarIndex].notes.length) {
             console.log('Moving to next bar from bar', currentBarIndex, 'to bar', currentBarIndex + 1);
             currentNoteIndex = 0;
             currentBarIndex = currentBarIndex + 1;
-            if (currentBarIndex >= gridData.length) {
-                console.log('Wrapping around to start - total bars was', gridData.length);
+            if (currentBarIndex >= window.gridData.length) {
+                console.log('Wrapping around to start - total bars was', window.gridData.length);
                 currentBarIndex = 0;
             }
         }
     } else {
-        console.log('Warning: no gridData provided to nextNote');
+        console.log('Warning: no gridData available in global scope');
     }
+    
+    // Keep global variables in sync
+    window.currentNoteIndex = currentNoteIndex;
+    window.currentBarIndex = currentBarIndex;
 }
   
-function playCurrentNote(gridData) {
-    if (!gridData) {
-        console.log('Warning: no gridData provided to playCurrentNote');
+function playCurrentNote() {
+    if (!window.gridData) {
+        console.log('Warning: no gridData available in global scope');
         return;
     }
 
     // Reset position if out of bounds
-    if (currentBarIndex >= gridData.length) {
+    if (currentBarIndex >= window.gridData.length) {
         currentBarIndex = 0;
         currentNoteIndex = 0;
+        // Keep global variables in sync
+        window.currentBarIndex = currentBarIndex;
+        window.currentNoteIndex = currentNoteIndex;
     }
     
     // Check if current position is valid within grid data
-    if (currentBarIndex >= gridData.length || currentNoteIndex >= gridData[currentBarIndex].notes.length) {
+    if (currentBarIndex >= window.gridData.length || currentNoteIndex >= window.gridData[currentBarIndex].notes.length) {
         console.log('Invalid position in grid data, skipping playback');
         return;
     }
 
-    const noteEvent = gridData[currentBarIndex].notes[currentNoteIndex];
+    const noteEvent = window.gridData[currentBarIndex].notes[currentNoteIndex];
     
     if (noteEvent.isPause) {
         console.log('playing pause/rest');

@@ -3,6 +3,7 @@ import { selectedRootNote, selectedScales } from './scaleGenerator';
 import { identifySyntheticChords } from './intervals';
 import { HeptatonicScales } from './scales';
 import {outputNoteArray, drawNotes, outputDiv} from './index'
+import { noteToMidi, noteToName } from './midi';
 
 // Import VexFlow components for staff display
 const { Vex, Formatter, Renderer, Stave, Accidental, StaveNote, BarNote, Beam, Dot, StaveConnector, Voice, GhostNote } = require("vexflow");
@@ -79,12 +80,12 @@ let selectedProgressions = ['50s progression']; // Default to first progression
 let progressionOptions = {
     voicing: 'natural',           // 'natural', 'first_inversion', 'leading'
     splitChord: true,            // true/false
-    lowerOctave: 4,              // 1-7
+    lowerOctave: 3,              // 1-7
     upperOctave: 5,              // 1-7
     root: 'both',                // 'lower', 'upper', 'both'
-    third: 'both',               // 'lower', 'upper', 'both'
-    fifth: 'both',               // 'lower', 'upper', 'both'
-    seventh: 'both',             // 'lower', 'upper', 'both'
+    third: 'upper',               // 'lower', 'upper', 'both'
+    fifth: 'upper',               // 'lower', 'upper', 'both'
+    seventh: 'upper',             // 'lower', 'upper', 'both'
     playStyle: 'block',          // 'block', 'arpeggiated', 'broken'
     timing: 'even',              // 'even', 'swing', 'rubato'
     velocity: 'medium',          // 'soft', 'medium', 'loud', 'dynamic'
@@ -379,6 +380,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.voicing, function(e) {
         progressionOptions.voicing = e.target.value;
         console.log('Voicing changed to:', progressionOptions.voicing);
+        drawProgressionStaff();
     });
     
     // Split chord option
@@ -390,18 +392,21 @@ function createProgressionOptionsPanel() {
         console.log('Split chord changed to:', progressionOptions.splitChord);
         // Refresh options to enable/disable lower octave
         createProgressionOptionsPanel();
+        drawProgressionStaff();
     });
     
     // Lower octave (only enabled if split chord is yes)
     const lowerOctaveGroup = createNumberInput('Lower Octave', 1, 7, progressionOptions.lowerOctave, function(e) {
         progressionOptions.lowerOctave = parseInt(e.target.value);
         console.log('Lower octave changed to:', progressionOptions.lowerOctave);
+        drawProgressionStaff();
     }, !progressionOptions.splitChord);
     
     // Upper octave (always enabled)
     const upperOctaveGroup = createNumberInput('Upper Octave', 1, 7, progressionOptions.upperOctave, function(e) {
         progressionOptions.upperOctave = parseInt(e.target.value);
         console.log('Upper octave changed to:', progressionOptions.upperOctave);
+        drawProgressionStaff();
     });
     
     // Voice distribution options
@@ -412,6 +417,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.root, function(e) {
         progressionOptions.root = e.target.value;
         console.log('Root distribution changed to:', progressionOptions.root);
+        drawProgressionStaff();
     });
     
     const thirdGroup = createOptionGroup('Third', {
@@ -421,6 +427,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.third, function(e) {
         progressionOptions.third = e.target.value;
         console.log('Third distribution changed to:', progressionOptions.third);
+        drawProgressionStaff();
     });
     
     const fifthGroup = createOptionGroup('Fifth', {
@@ -430,6 +437,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.fifth, function(e) {
         progressionOptions.fifth = e.target.value;
         console.log('Fifth distribution changed to:', progressionOptions.fifth);
+        drawProgressionStaff();
     });
     
     const seventhGroup = createOptionGroup('Seventh', {
@@ -439,6 +447,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.seventh, function(e) {
         progressionOptions.seventh = e.target.value;
         console.log('Seventh distribution changed to:', progressionOptions.seventh);
+        drawProgressionStaff();
     });
     
     // Play style options
@@ -449,6 +458,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.playStyle, function(e) {
         progressionOptions.playStyle = e.target.value;
         console.log('Play style changed to:', progressionOptions.playStyle);
+        drawProgressionStaff();
     });
     
     // Timing options
@@ -459,6 +469,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.timing, function(e) {
         progressionOptions.timing = e.target.value;
         console.log('Timing changed to:', progressionOptions.timing);
+        drawProgressionStaff();
     });
     
     // Velocity options
@@ -470,6 +481,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.velocity, function(e) {
         progressionOptions.velocity = e.target.value;
         console.log('Velocity changed to:', progressionOptions.velocity);
+        drawProgressionStaff();
     });
     
     // Sustain pedal
@@ -479,6 +491,7 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.sustain.toString(), function(e) {
         progressionOptions.sustain = e.target.value === 'true';
         console.log('Sustain changed to:', progressionOptions.sustain);
+        drawProgressionStaff();
     });
     
     // Bass line options
@@ -490,9 +503,10 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.bassLine, function(e) {
         progressionOptions.bassLine = e.target.value;
         console.log('Bass line changed to:', progressionOptions.bassLine);
+        drawProgressionStaff();
     });
     
-    // Rhythm options
+    // Rhythm options with buttons
     const rhythmGroup = createOptionGroup('Rhythm', {
         'whole': 'Whole Notes',
         'half': 'Half Notes',
@@ -501,7 +515,55 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.rhythm, function(e) {
         progressionOptions.rhythm = e.target.value;
         console.log('Rhythm changed to:', progressionOptions.rhythm);
+        drawProgressionStaff();
     });
+    
+    // Create a container that combines the rhythm option with buttons
+    let rhythmAndButtonsContainer = document.createElement('div');
+    rhythmAndButtonsContainer.appendChild(rhythmGroup.group);
+    
+    // Add action buttons below rhythm option
+    let buttonContainer = document.createElement('div');
+    buttonContainer.style.marginTop = '10px';
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '5px';
+    buttonContainer.style.flexDirection = 'column';
+    
+    // Add to Output button
+    let addButton = document.createElement('button');
+    addButton.textContent = 'Add to Output';
+    addButton.style.padding = '6px 12px';
+    addButton.style.backgroundColor = '#4CAF50';
+    addButton.style.color = 'white';
+    addButton.style.border = 'none';
+    addButton.style.borderRadius = '4px';
+    addButton.style.cursor = 'pointer';
+    addButton.style.fontSize = '11px';
+    addButton.style.fontWeight = 'bold';
+    
+    addButton.onclick = function() {
+        addProgressionToOutput();
+    };
+    
+    // Replace Output button
+    let replaceButton = document.createElement('button');
+    replaceButton.textContent = 'Replace Output';
+    replaceButton.style.padding = '6px 12px';
+    replaceButton.style.backgroundColor = '#FF5722';
+    replaceButton.style.color = 'white';
+    replaceButton.style.border = 'none';
+    replaceButton.style.borderRadius = '4px';
+    replaceButton.style.cursor = 'pointer';
+    replaceButton.style.fontSize = '11px';
+    replaceButton.style.fontWeight = 'bold';
+    
+    replaceButton.onclick = function() {
+        replaceOutputWithProgression();
+    };
+    
+    buttonContainer.appendChild(addButton);
+    buttonContainer.appendChild(replaceButton);
+    // rhythmAndButtonsContainer.appendChild(buttonContainer);
     
     // Add all groups to the grid
     optionsGrid.appendChild(voicingGroup.group);
@@ -517,7 +579,8 @@ function createProgressionOptionsPanel() {
     optionsGrid.appendChild(velocityGroup.group);
     optionsGrid.appendChild(sustainGroup.group);
     optionsGrid.appendChild(bassLineGroup.group);
-    optionsGrid.appendChild(rhythmGroup.group);
+    optionsGrid.appendChild(rhythmAndButtonsContainer);
+    optionsGrid.appendChild(buttonContainer);
     
     optionsContainer.appendChild(optionsGrid);
     
@@ -658,6 +721,113 @@ function setupProgressionStaves(div, divisions = 1) {
 
 var noteArray = [];
 
+// Helper function to get note position in chromatic scale
+function getNotePosition(noteName) {
+    const noteMap = {
+        'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5,
+        'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+    };
+    return noteMap[noteName] || 0;
+}
+
+// Function to apply leading voice logic to chord progressions
+function applyLeadingVoice(chordProgression) {
+    if (!chordProgression || chordProgression.length === 0) {
+        return chordProgression;
+    }
+    
+    const result = [];
+    
+    for (let chordIndex = 0; chordIndex < chordProgression.length; chordIndex++) {
+        const currentChord = chordProgression[chordIndex];
+        
+        if (chordIndex === 0) {
+            // First chord - keep as is
+            result.push([...currentChord]);
+            continue;
+        }
+        
+        const previousChord = result[chordIndex - 1];
+        const adjustedChord = [];
+        
+        // Process each note in the current chord
+        for (let noteIndex = 0; noteIndex < currentChord.length; noteIndex++) {
+            let currentNote = currentChord[noteIndex];
+            
+            if (!currentNote.includes('/')) {
+                adjustedChord.push(currentNote);
+                continue;
+            }
+            
+            const [currentNoteName, currentOctaveStr] = currentNote.split('/');
+            let currentOctave = parseInt(currentOctaveStr);
+            
+            // Find the closest voice in the previous chord to follow
+            let bestMatch = null;
+            let smallestInterval = Infinity;
+            
+            for (const prevNote of previousChord) {
+                if (!prevNote.includes('/')) continue;
+                
+                const [prevNoteName, prevOctaveStr] = prevNote.split('/');
+                const prevOctave = parseInt(prevOctaveStr);
+                
+                // Calculate interval between notes
+                const currentPos = getNotePosition(currentNoteName);
+                const prevPos = getNotePosition(prevNoteName);
+                
+                // Try different octaves to find the smallest interval
+                for (let octaveOffset = -1; octaveOffset <= 2; octaveOffset++) {
+                    const testOctave = currentOctave + octaveOffset;
+                    if (testOctave < 1 || testOctave > 7) continue;
+                    
+                    const interval = Math.abs((testOctave * 12 + currentPos) - (prevOctave * 12 + prevPos));
+                    
+                    if (interval < smallestInterval) {
+                        smallestInterval = interval;
+                        bestMatch = {
+                            octave: testOctave,
+                            interval: interval
+                        };
+                    }
+                }
+            }
+            
+            // Apply the best octave found, or keep original if no good match
+            if (bestMatch && smallestInterval <= 12) { // Within an octave
+                adjustedChord.push(`${currentNoteName}/${bestMatch.octave}`);
+            } else {
+                // Fallback: apply simple ascending rule
+                // If this note is lower in pitch than the highest note in previous chord, raise octave
+                let highestPrevNote = 0;
+                for (const prevNote of previousChord) {
+                    if (!prevNote.includes('/')) continue;
+                    const [prevNoteName, prevOctaveStr] = prevNote.split('/');
+                    const prevOctave = parseInt(prevOctaveStr);
+                    const prevPos = getNotePosition(prevNoteName);
+                    const prevPitch = prevOctave * 12 + prevPos;
+                    highestPrevNote = Math.max(highestPrevNote, prevPitch);
+                }
+                
+                const currentPos = getNotePosition(currentNoteName);
+                let currentPitch = currentOctave * 12 + currentPos;
+                
+                // If current note is significantly lower than the highest previous note, raise octave
+                while (currentPitch < highestPrevNote - 6 && currentOctave < 7) { // Allow up to 6 semitones below
+                    currentOctave++;
+                    currentPitch = currentOctave * 12 + currentPos;
+                }
+                
+                adjustedChord.push(`${currentNoteName}/${currentOctave}`);
+            }
+        }
+        
+        result.push(adjustedChord);
+    }
+    
+    return result;
+}
+
 // Draw progression on staff
 function drawProgressionStaff() {
     const staffDiv = document.getElementById('progressionStaffDiv');
@@ -683,24 +853,139 @@ function drawProgressionStaff() {
 
     noteArray = []; // Reset note array for new progression
 
-    var chordSampleNotes = []
+    // Collect all chord notes first, then apply voice leading
+    var allTrebleChords = [];
+    var allBassChords = [];
+    var chordSampleNotes = [];
+    
     for (let i = 0; i < chordSymbols.length; i++) {
         const chordSymbol = chordSymbols[i];
         const notes = chordNotes[i];
 
         const currentNotes = notes.chord; // Contains an array like [C, E, G]
+        const rootNote = currentNotes[0]; // First note is always the root
 
-        // let trebleNotes = currentNotes.slice(0); // Copy all chord notes for treble
-        let trebleNotes = currentNotes.slice(0).map(note => `${note}/${progressionOptions.upperOctave}`); // Convert to VexFlow format with upper octave
-        console.log(`Chord ${i + 1} treble notes:`, trebleNotes);
-        let bassNotes = [];
+        // Apply natural voicing logic first if selected
+        let trebleNotes, bassNotes;
+        
+        if (progressionOptions.voicing === 'natural') {
+            // For natural voicing, always put root in bass and other notes in treble
+            // trebleNotes = currentNotes.slice(1).map(note => `${note}/${progressionOptions.upperOctave}`); // All notes except root go to treble
+            // bassNotes = [`${rootNote}/${progressionOptions.splitChord ? progressionOptions.lowerOctave : progressionOptions.upperOctave}`]; // Root always in bass
+            trebleNotes = currentNotes.slice(0).map(note => `${note}/${progressionOptions.upperOctave}`); // 
+            bassNotes = []
+            
+            console.log(`Chord ${i + 1} natural voicing - treble:`, trebleNotes, `bass:`, bassNotes);
+        } else {
+            // Default behavior for other voicing types
+            trebleNotes = currentNotes.slice(0).map(note => `${note}/${progressionOptions.upperOctave}`); // Convert to VexFlow format with upper octave
+            bassNotes = [];
+        }
+        
+        // Apply split chord logic only if not using natural voicing
         if (progressionOptions.splitChord) {
             console.log(`Chord ${i + 1} split chord enabled ${progressionOptions.bassLine}`);
+            let thirdNote = currentNotes[1];
+            let fifthNote = currentNotes[2];
+            let seventhNote = currentNotes[3] || null; // Optional seventh note
+
+            if(progressionOptions.third === 'lower') {
+                trebleNotes = trebleNotes.filter(note => !note.startsWith(thirdNote)); // Remove third from treble
+                bassNotes.push(`${thirdNote}/${progressionOptions.lowerOctave}`); // Add third to bass
+            }
+            if(progressionOptions.fifth === 'lower') {
+                trebleNotes = trebleNotes.filter(note => !note.startsWith(fifthNote)); // Remove fifth from treble
+                bassNotes.push(`${fifthNote}/${progressionOptions.lowerOctave}`); // Add
+                // fifth to bass
+            }
+            if(progressionOptions.seventh === 'lower' && seventhNote) {
+                trebleNotes = trebleNotes.filter(note => !note.startsWith(seventhNote)); // Remove seventh from treble
+                bassNotes.push(`${seventhNote}/${progressionOptions.lowerOctave}`); // Add seventh to bass
+            }
+            if(progressionOptions.root === 'lower') {
+                trebleNotes = trebleNotes.filter(note => !note.startsWith(currentNotes[0])); // Remove root from treble
+                bassNotes.push(`${currentNotes[0]}/${progressionOptions.lowerOctave}`); // Add root to bass
+            }
+
+            if(progressionOptions.third === 'both') {
+                bassNotes.push(`${thirdNote}/${progressionOptions.lowerOctave}`); // Add third to bass
+            }
+            if(progressionOptions.fifth === 'both') {
+                bassNotes.push(`${fifthNote}/${progressionOptions.lowerOctave}`); // Add fifth to bass
+            }
+            if(progressionOptions.seventh === 'both' && seventhNote) {
+                bassNotes.push(`${seventhNote}/${progressionOptions.lowerOctave}`); // Add seventh to bass
+            }
+
             if (progressionOptions.bassLine === 'root') {
-                bassNotes = [`${currentNotes[0]}/${progressionOptions.lowerOctave}`]; // Root note as whole note in bass
+                bassNotes.push(`${currentNotes[0]}/${progressionOptions.lowerOctave}`); // Root note as whole note in bass
                 console.log(`Chord ${i + 1} bass notes:`, bassNotes);
             }
-        } 
+        }
+        
+        console.log(`Chord ${i + 1} final - treble:`, trebleNotes, `bass:`, bassNotes);
+        
+        // Store the processed chord notes for voice leading processing
+        allTrebleChords.push([...trebleNotes]);
+        allBassChords.push([...bassNotes]);
+    }
+    if(progressionOptions.voicing === 'natural') {
+        for(let i = 0; i < allTrebleChords.length; i++) {
+            let currentTrebleNotes = allTrebleChords[i];
+            let currentBassNotes = allBassChords[i];
+
+            let currentTrebleMidi = currentTrebleNotes.map(note => {
+                return noteToMidi(note) + 12;
+            });
+            let currentBassMidi = currentBassNotes.map(note => {
+                return noteToMidi(note) + 12;
+            });
+
+            let currentTrebleNote = currentTrebleMidi[0];
+            for(let j = 1; j < currentTrebleMidi.length; j++) {
+                if(currentTrebleMidi[j] < currentTrebleNote) {
+                    currentTrebleMidi[j] += 12;
+                }
+                currentTrebleNote = currentTrebleMidi[j];
+            }
+            currentTrebleNotes = currentTrebleMidi.map(midi => noteToName(midi));
+
+            let currentBassNote = currentBassMidi[0];
+            for(let j = 1; j < currentBassMidi.length; j++) {
+                if(currentBassMidi[j] < currentBassNote) {
+                    currentBassMidi[j] += 12;
+                }   
+                currentBassNote = currentBassMidi[j];
+            }
+            currentBassNotes = currentBassMidi.map(midi => noteToName(midi));
+
+
+            console.log('Current treble notes:', currentTrebleNotes, 'MIDI:', currentTrebleMidi);
+            console.log('Current bass notes:', currentBassNotes, 'MIDI:', currentBassMidi);
+
+            allTrebleChords[i] = currentTrebleNotes;
+            allBassChords[i] = currentBassNotes;
+        }
+    }
+    
+    // Apply voicing transformations based on the selected voicing option
+    if (progressionOptions.voicing === 'leading') {
+        console.log('Applying leading voice logic...');
+        console.log('Before voice leading - treble:', allTrebleChords);
+        console.log('Before voice leading - bass:', allBassChords);
+        
+        allTrebleChords = applyLeadingVoice(allTrebleChords);
+        allBassChords = applyLeadingVoice(allBassChords);
+        
+        console.log('After voice leading - treble:', allTrebleChords);
+        console.log('After voice leading - bass:', allBassChords);
+    }
+    // Natural voicing is already handled above during chord processing
+    
+    // Now process the voice-led chords for display
+    for (let i = 0; i < chordSymbols.length; i++) {
+        const trebleNotes = allTrebleChords[i];
+        const bassNotes = allBassChords[i];
 
         let actualTrebleNotes = []
         let actualBassNotes = []
@@ -886,8 +1171,8 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
 
     let scale = HeptatonicScales[scaleFamily][scaleIndex - 1];
 
-    let identifiedChords_3 = identifySyntheticChords(scale, 3);
-    let identifiedChords_4 = identifySyntheticChords(scale, 4);
+    let identifiedChords_3 = identifySyntheticChords(scale, 3, rootNote);
+    let identifiedChords_4 = identifySyntheticChords(scale, 4, rootNote);
 
     var notes = [];
     
@@ -907,5 +1192,133 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
 
 getProgressionNotes('50s progression', selectedScales[0].split('-')[0], selectedScales[0].split('-')[1], selectedRootNote[0]);
 
+// Convert progression noteArray format to outputNoteArray format
+function convertProgressionToOutputFormat() {
+    if (noteArray.length === 0) {
+        console.log('No progression notes to convert');
+        return [[], []]; // Return empty treble and bass arrays
+    }
+    
+    const trebleBars = [];
+    const bassBars = [];
+    
+    // Process each chord in the progression - each chord becomes one bar
+    for (let i = 0; i < noteArray.length; i++) {
+        const chordNotes = noteArray[i]; // Array of note strings like ["C/4", "E/4", "G/4"]
+        
+        let trebleNotes = [];
+        let bassNotes = [];
+        
+        // Separate notes by octave into treble and bass
+        for (let noteStr of chordNotes) {
+            if (noteStr.includes('/')) {
+                const [noteName, octave] = noteStr.split('/');
+                if (parseInt(octave) >= 4) {
+                    trebleNotes.push(noteStr);
+                } else {
+                    bassNotes.push(noteStr);
+                }
+            }
+        }
+        
+        // Each chord becomes one bar with one chord/note
+        let trebleBar = [];
+        let bassBar = [];
+        
+        // Get the duration based on rhythm setting
+        const rhythmDuration = progressionOptions.rhythm === 'whole' ? 'w' : 
+                              progressionOptions.rhythm === 'half' ? 'h' : 
+                              progressionOptions.rhythm === 'quarter' ? 'q' : 
+                              progressionOptions.rhythm === 'eighth' ? '8' : 'w';
+        
+        // Create treble bar - each chord fills the entire bar
+        if (trebleNotes.length > 0) {
+            trebleBar.push({
+                "note": trebleNotes.length === 1 ? trebleNotes[0] : trebleNotes,
+                "duration": rhythmDuration
+            });
+        } else {
+            // trebleBar.push({
+            //     "note": "Pause",
+            //     "duration": rhythmDuration
+            // });
+        }
+        
+        // Create bass bar - each chord fills the entire bar
+        if (bassNotes.length > 0) {
+            bassBar.push({
+                "note": bassNotes.length === 1 ? bassNotes[0] : bassNotes,
+                "duration": rhythmDuration
+            });
+        } else {
+            // bassBar.push({
+            //     "note": "Pause",
+            //     "duration": rhythmDuration
+            // });
+        }
+        
+        trebleBars.push(trebleBar);
+        bassBars.push(bassBar);
+    }
+    
+    console.log('Converted progression to output format:', [trebleBars, bassBars]);
+    return [trebleBars, bassBars];
+}
 
-export {chord_progressions, selectedProgressions, progressionOptions, createProgressionTable, createProgressionOptionsPanel, createProgressionStaffDisplay, drawProgressionStaff}
+// Add current progression to output grid
+function addProgressionToOutput() {
+    console.log('Adding progression to output grid');
+    
+    if (!window.outputDiv) {
+        console.error('Output div not available');
+        return;
+    }
+    
+    if (!window.addDrawNotes) {
+        console.error('addDrawNotes function not available. Make sure staves.js is loaded.');
+        return;
+    }
+    
+    const convertedProgression = convertProgressionToOutputFormat();
+    if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
+        console.log('No notes to add to output');
+        return;
+    }
+    
+    // Use the addDrawNotes function from staves.js
+    window.addDrawNotes(window.outputDiv, convertedProgression, true);
+    
+    console.log('Successfully added progression to output grid');
+}
+
+// Replace output grid with current progression
+function replaceOutputWithProgression() {
+    console.log('Replacing output grid with progression');
+    
+    if (!window.outputDiv) {
+        console.error('Output div not available');
+        return;
+    }
+    
+    if (!window.clearAllNotation || !window.addDrawNotes) {
+        console.error('Notation functions not available. Make sure staves.js is loaded.');
+        return;
+    }
+    
+    // Clear existing notation
+    window.clearAllNotation(window.outputDiv);
+    
+    // Add the progression
+    const convertedProgression = convertProgressionToOutputFormat();
+    if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
+        console.log('No notes to replace output with');
+        return;
+    }
+    
+    // Use the addDrawNotes function from staves.js
+    window.addDrawNotes(window.outputDiv, convertedProgression, true);
+    
+    console.log('Successfully replaced output grid with progression');
+}
+
+export {chord_progressions, selectedProgressions, progressionOptions, createProgressionTable, createProgressionOptionsPanel, createProgressionStaffDisplay, drawProgressionStaff, addProgressionToOutput, replaceOutputWithProgression}

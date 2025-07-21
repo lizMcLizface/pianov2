@@ -552,8 +552,8 @@ function matchChord(inputChord, chords, verbose = false) {
     return candidates;
 }
 
-function generateSyntheticChords(scale, length = 3) {
-    const scaleNotes = getScaleNotes('C', scale.intervals);
+function generateSyntheticChords(scale, length = 3, root = 'C') {
+    const scaleNotes = getScaleNotes(root, scale.intervals);
     const syntheticChords = [];
     for (let i = 0; i < scaleNotes.length - 1; i++) {
         const chordNotes = [];
@@ -599,7 +599,7 @@ function generateSyntheticChords(scale, length = 3) {
 function identifySyntheticChords(scale, length = 3, root = 'C') {
     const scaleNotes = getScaleNotes(root, scale.intervals);
 
-    const syntheticChords = generateSyntheticChords(scale, length);
+    const syntheticChords = generateSyntheticChords(scale, length, root);
     const trimmedSyntheticChords = syntheticChords.map(chord =>
         chord.map(note => note.slice(0, -2))
     );
