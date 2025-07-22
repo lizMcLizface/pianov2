@@ -50,6 +50,12 @@ let gains = {
     gainSustain: 0,
     gainRelease: 0
 }
+let filterEnv = {
+    attack: 0,
+    decay: 0,
+    sustain: 0,
+    release: 0
+};
 
 const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) => {
     // Synth State
@@ -179,18 +185,30 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         gainSustain,
         gainRelease
     }
+    filterEnv = {
+        attack: filterAttack,
+        decay: filterDecay,
+        release: filterRelease,
+        amount: filterEnvAmount
+    };
 
-    const getGainEnv = (volume) => ({
-        a: gains.gainAttack * (volume || 1),
-        d: gains.gainDecay * (volume || 1),
-        s: gains.gainSustain * (volume || 1),
-        r: gains.gainRelease * (volume || 1),
-    });
+    const getGainEnv = (volume) => {
+        const v = volume || 1;
+        // Apply exponential scaling for more natural response
+        // You can tweak the exponent (e.g., 2) for desired curve
+        const exp = 1/2;
+        return {
+            a: gains.gainAttack * Math.pow(v, exp),
+            d: gains.gainDecay * Math.pow(v, exp),
+            s: gains.gainSustain * Math.pow(v, exp),
+            r: gains.gainRelease * Math.pow(v, exp),
+        };
+    };
     const getFilterEnv = () => ({
-        a: filterAttack,
-        d: filterDecay,
-        r: filterRelease,
-        amount: filterEnvAmount,
+        a: filterEnv.attack,
+        d: filterEnv.decay,
+        r: filterEnv.release,
+        amount: filterEnv.amount,
     });
 
     // Functions to pass envelope data to the synth

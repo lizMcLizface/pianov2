@@ -73,15 +73,35 @@ const Knob = ({
     };
 
     const handleMouseMove = (e) => {
-        handleUpdate(e.clientY);
+        e.preventDefault();
+        
+        // Add sensitivity modifiers - hold Shift for fine control, Ctrl for coarse control
+        let sensitivity = 1;
+        if (e.shiftKey) sensitivity = 0.1; // Fine control
+        if (e.ctrlKey) sensitivity = 3; // Coarse control
+        
+        const deltaY = (e.clientY - currentY) * sensitivity;
+        handleUpdate(currentY + deltaY);
         currentY = e.clientY;
     }
+    
     const handleMouseUp = (e) => {
+        e.preventDefault();
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = ''; // Re-enable text selection
+        document.body.style.cursor = ''; // Reset cursor
         currentY = 0;
     }
+    
     const handleMouseDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Prevent text selection while dragging
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'ns-resize'; // Show vertical resize cursor
+        
         currentY = e.clientY;
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);

@@ -53,6 +53,9 @@ export const KnobContainer = styled.div.withConfig({
     height: 5rem;
     width: 5rem;
     pointer-events: ${({ disabled }) => disabled ? 'none' : 'all'};
+    cursor: ${({ disabled }) => disabled ? 'not-allowed' : 'ns-resize'};
+    user-select: none; /* Prevent text selection */
+    touch-action: none; /* Improve touch interaction */
 `;
 
 export const KnobSvg = styled.svg`
@@ -74,6 +77,11 @@ export const ActiveMeter = styled.path.withConfig({
     shouldForwardProp: (prop) => prop !== 'disabled',
 })`
     stroke: ${({ theme, disabled }) => disabled ? theme.mid : theme.strong};
+    transition: stroke 0.2s ease;
+    
+    ${KnobContainer}:hover & {
+        stroke: ${({ theme, disabled }) => disabled ? theme.mid : theme.accent};
+    }
 `;
 
 export const KnobDial = styled.div.withConfig({
@@ -85,7 +93,7 @@ export const KnobDial = styled.div.withConfig({
     border: ${borderWidthM} solid ${({ theme, disabled }) => disabled ? theme.mid : theme.strong};
     border-radius: 100%;
     text-align: center;
-    transition: 0s, border ${defaultTransition};
+    transition: 0s, border ${defaultTransition}, transform 0.1s ease;
 
     &::after {
         content: "";
@@ -94,5 +102,13 @@ export const KnobDial = styled.div.withConfig({
         width: ${borderWidthM};
         background-color: ${({ theme, disabled }) => disabled ? theme.mid : theme.strong};
         transition: ${defaultTransition};
+    }
+    
+    ${KnobContainer}:hover & {
+        border-color: ${({ theme, disabled }) => disabled ? theme.mid : theme.accent};
+    }
+    
+    ${KnobContainer}:active & {
+        transform: translate(-50%,-50%) scale(0.98);
     }
 `;
