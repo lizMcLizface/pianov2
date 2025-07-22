@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useEffect, useState, useRef } from 'react';
+import React, { useLayoutEffect, useEffect, useState, useRef, useImperativeHandle } from 'react';
 import PropTypes from 'prop-types';
 import * as Nodes from '../../nodes';
 import MonoSynth from './../MonoSynth';
@@ -44,7 +44,7 @@ const masterBitCrush = new Nodes.BitCrusher(AC);
 const masterLimiter = new Nodes.Compressor(AC);
 const masterEQ2 = new Nodes.EQ2(AC);
 
-const PolySynth = ({ className, setTheme, currentTheme }) => {
+const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) => {
     // Synth State
     const [synthActive, setSynthActive] = useState(false);
     const [octaveMod, setOctaveMod] = useState(4);
@@ -52,6 +52,10 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     
     // Track if synth has been initialized to prevent multiple starts
     const synthInitialized = useRef(false);
+    
+    // Track active notes for programmatic control
+    const activeNotes = useRef(new Map());
+    const noteIdCounter = useRef(0);
 
     // Preset State
     const [polyphony, setPolyphony] = useState(synthArr.length);
@@ -160,11 +164,11 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
         synthInitialized.current = true;
     };
 
-    const getGainEnv = () => ({
-        a: gainAttack,
-        d: gainDecay,
-        s: gainSustain,
-        r: gainRelease,
+    const getGainEnv = (volume) => ({
+        a: gainAttack * (volume || 1),
+        d: gainDecay * (volume || 1),
+        s: gainSustain * (volume || 1),
+        r: gainRelease * (volume || 1),
     });
     const getFilterEnv = () => ({
         a: filterAttack,
@@ -174,9 +178,20 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     });
 
     // Functions to pass envelope data to the synth
-    const synthNoteOn = (synth, note) => {
-        const gainEnv = getGainEnv();
+    const synthNoteOn = (synth, note, volume) => {
+        let gainEnv = getGainEnv();
+        console.log('Gain envelope:', gainEnv);
+        let gainEnv2 = {a: gainEnv.a, d: gainEnv.d, s: gainEnv.s, r: gainEnv.r};
+        // if (volume !== undefined) {
+        //     gainEnv2 = {
+        //         a : gainEnv.a * (volume ),
+        //         d : gainEnv.d * (volume ),
+        //         s : gainEnv.s * (volume ),
+        //         r : gainEnv.r * (volume ),
+        //     };
+        // }
         const filterEnv = getFilterEnv();
+        console.log('Gain envelope modified for volume:', gainEnv2);
         synth.noteOn(
             note,
             {
@@ -191,6 +206,131 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
         const filterEnv = getFilterEnv();
         synth.noteOff({ gainEnv, filterEnv });
     }
+
+    // Programmatic note control functions
+    const playNotesProgrammatic = (notes, volume = 50, duration = null) => {
+        if (!synthActive) activateSynth();
+        console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
+        
+        const gainValue = volume / 100; // Convert percentage to gain value
+        
+        notes.forEach(noteString => {
+            // Parse note string (e.g., "C4", "D#5")
+            const note = parseNoteString(noteString);
+            if (!note) return;
+            
+            // Find available synth or reuse existing one
+            let targetSynth = null;
+            if (!synthArr[synthPos].currentNote) {
+                targetSynth = synthArr[synthPos];
+            } else {
+                const initialPos = synthPos;
+                incrementSynthPos();
+
+                while (synthPos !== initialPos) {
+                    if (!synthArr[synthPos].currentNote) break;
+                    incrementSynthPos();
+                }
+                targetSynth = synthArr[synthPos];
+            }
+
+            // Create unique ID for this note instance
+            const noteId = `${noteString}_${noteIdCounter.current++}`;
+            
+            // Store note info for tracking
+            const noteInfo = {
+                synth: targetSynth,
+                noteString: noteString,
+                volume: gainValue,
+                noteId: noteId
+            };
+            
+            activeNotes.current.set(noteId, noteInfo);
+            
+            synthNoteOn(targetSynth, note, gainValue);
+            incrementSynthPos();
+            
+            // If duration is specified, schedule note off
+            if (duration) {
+                setTimeout(() => {
+                    const noteInfo = activeNotes.current.get(noteId);
+                    if (noteInfo) {
+                        synthNoteOff(noteInfo.synth);
+                        activeNotes.current.delete(noteId);
+                    }
+                }, duration);
+            }
+        });
+    };
+
+    const stopNotesProgrammatic = (notes) => {
+        notes.forEach(noteString => {
+            // Find all active notes with this note name and stop them
+            const notesToStop = [];
+            activeNotes.current.forEach((noteInfo, noteId) => {
+                if (noteInfo.noteString === noteString) {
+                    notesToStop.push(noteId);
+                }
+            });
+            
+            notesToStop.forEach(noteId => {
+                const noteInfo = activeNotes.current.get(noteId);
+                if (noteInfo) {
+                    synthNoteOff(noteInfo.synth);
+                    activeNotes.current.delete(noteId);
+                }
+            });
+        });
+    };
+
+    const stopAllNotesProgrammatic = () => {
+        console.log('Stopping all programmatic notes, count:', activeNotes.current.size);
+        activeNotes.current.forEach((noteInfo, noteId) => {
+            synthNoteOff(noteInfo.synth);
+        });
+        activeNotes.current.clear();
+        
+        // Also force stop all synths as a backup
+        synthArr.forEach(synth => {
+            if (synth.currentNote) {
+                synthNoteOff(synth);
+            }
+        });
+    };
+
+    // Helper function to parse note strings like "C4", "D#5", etc.
+    const parseNoteString = (noteString) => {
+        const match = noteString.match(/^([A-G]#?)(\d+)$/);
+        if (!match) return null;
+        
+        const noteName = match[1];
+        const octave = parseInt(match[2]);
+        
+        // Get frequency from freqMap and calculate for the octave
+        const baseFreq = {
+            'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+            'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+            'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+        }[noteName];
+        
+        if (!baseFreq) return null;
+        
+        const freq = baseFreq * Math.pow(2, octave - 4);
+        
+        return {
+            note: noteString,
+            oct: octave,
+            freq: freq
+        };
+    };
+
+    // Expose the programmatic functions to parent components
+    useImperativeHandle(ref, () => ({
+        playNotes: playNotesProgrammatic,
+        stopNotes: stopNotesProgrammatic,
+        stopAllNotes: stopAllNotesProgrammatic,
+        isActive: () => synthActive
+    }), [synthActive]);
 
     // Function to delegate played notes to each of the synths
     const noteOn = (note) => {
@@ -215,32 +355,32 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     };
 
     // Keyboard listeners
-    const keydownFunction = e => {
-        if (e.repeat) return;
-        if (!synthActive) activateSynth();
+    // const keydownFunction = e => {
+    //     if (e.repeat) return;
+    //     if (!synthActive) activateSynth();
 
-        // Additional commands
-        switch (e.key) {
-            case 'z': return octaveDown();
-            case 'x': return octaveUp();
-        };
+    //     // Additional commands
+    //     switch (e.key) {
+    //         case 'z': return octaveDown();
+    //         case 'x': return octaveUp();
+    //     };
 
-        // Play note from keyCode
-        const note = getNoteInfo(e.key, octaveMod);
-        if (note) noteOn(note);
-    }
-    const keyupFunction = e => {
-        const note = getNoteInfo(e.key, octaveMod);
-        if (note) noteOff(note);
-    }
-    const engageKeyboard = () => {
-        window.addEventListener('keydown', keydownFunction);
-        window.addEventListener('keyup', keyupFunction);
-    }
-    const disengageKeyboard = () => {
-        window.removeEventListener('keydown', keydownFunction);
-        window.removeEventListener('keyup', keyupFunction);
-    }
+    //     // Play note from keyCode
+    //     const note = getNoteInfo(e.key, octaveMod);
+    //     if (note) noteOn(note);
+    // }
+    // const keyupFunction = e => {
+    //     const note = getNoteInfo(e.key, octaveMod);
+    //     if (note) noteOff(note);
+    // }
+    // const engageKeyboard = () => {
+    //     window.addEventListener('keydown', keydownFunction);
+    //     window.addEventListener('keyup', keyupFunction);
+    // }
+    // const disengageKeyboard = () => {
+    //     window.removeEventListener('keydown', keydownFunction);
+    //     window.removeEventListener('keyup', keyupFunction);
+    // }
 
     // Init
     useLayoutEffect(() => {
@@ -248,6 +388,10 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
         
         // Cleanup function to prevent memory leaks
         return () => {
+            // Stop all programmatic notes
+            stopAllNotesProgrammatic();
+            
+            // Clear all synth timeouts and stop notes
             synthArr.forEach(synth => {
                 synth.clearTimeouts();
                 synth.noteStop();
@@ -368,8 +512,8 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
 
     // Needed to avoid stale hook state
     useEffect(() => {
-        engageKeyboard();
-        return disengageKeyboard;
+        // engageKeyboard();
+        // return disengageKeyboard;
     });
 
     return (
@@ -779,7 +923,7 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
             </ModuleGridContainer>
         </div>
     );
-};
+});
 
 PolySynth.propTypes = {
     className: PropTypes.string,

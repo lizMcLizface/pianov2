@@ -38,11 +38,24 @@ import { THEMES } from './styles/themes';
 
 let PolySynthTabPlaceholder = document.getElementById('PolySynthTabPlaceholder');
 
+// Global reference to the PolySynth for programmatic control
+let polySynthRef = null;
+const polySynthComponentRef = React.createRef();
 
 // Render PolySynth component into the PolySynthTabPlaceholder div
 if (PolySynthTabPlaceholder) {
     const polySynthRoot = ReactDOM.createRoot(PolySynthTabPlaceholder);
-    polySynthRoot.render(<PolySynthWrapper />);
+    polySynthRoot.render(
+        React.createElement(PolySynthWrapper, { ref: polySynthComponentRef })
+    );
+    
+    // Set up the ref after a short delay to ensure component is mounted
+    setTimeout(() => {
+        polySynthRef = polySynthComponentRef.current;
+        if (polySynthRef) {
+            console.log('PolySynth ready for programmatic control');
+        }
+    }, 1000);
 }
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -1670,45 +1683,64 @@ function onKeyPress(event, up) {
 
         drawNotes(inputDiv, noteArray, true);
 
+        
 
-        if($('#synthEnableBox')[0].checked){
-            const osc = context.createOscillator();
-            const noteGain = context.createGain();
-            var startTime = context.currentTime;
-            noteGain.gain.setValueAtTime(0, 0);
-            var level = sustainLevel * 64 / 127;
-            var activeNoteCount = Object.keys(noteArray).length;
-            var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
+        // if($('#synthEnableBox')[0].checked){
+        //     const osc = context.createOscillator();
+        //     const noteGain = context.createGain();
+        //     var startTime = context.currentTime;
+        //     noteGain.gain.setValueAtTime(0, 0);
+        //     var level = sustainLevel * 64 / 127;
+        //     var activeNoteCount = Object.keys(noteArray).length;
+        //     var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
             
-            noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
+        //     noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
 
-            // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
+        //     // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
 
-            // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
-            // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
+        //     // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
+        //     // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
 
-            var lfoGain = context.createGain();
-            lfoGain.gain.setValueAtTime(vibratoAmount, 0);
-            lfoGain.connect(osc.frequency)
+        //     var lfoGain = context.createGain();
+        //     lfoGain.gain.setValueAtTime(vibratoAmount, 0);
+        //     lfoGain.connect(osc.frequency)
 
-            var lfo = context.createOscillator();
-            lfo.frequency.setValueAtTime(vibratoSpeed, 0);
-            lfo.start(0);
-            // lfo.stop(context.currentTime + noteLength);
-            lfo.connect(lfoGain); 
-            if(waveform == "custom")
-                osc.setPeriodicWave(customWaveform);
-            else
-                osc.type = waveform;
-            osc.frequency.setValueAtTime(pianoNotes[note], 0);
-            osc.start(0);
-            // osc.stop(context.currentTime + noteLength);
-            osc.connect(noteGain);
+        //     var lfo = context.createOscillator();
+        //     lfo.frequency.setValueAtTime(vibratoSpeed, 0);
+        //     lfo.start(0);
+        //     // lfo.stop(context.currentTime + noteLength);
+        //     lfo.connect(lfoGain); 
+        //     if(waveform == "custom")
+        //         osc.setPeriodicWave(customWaveform);
+        //     else
+        //         osc.type = waveform;
+        //     osc.frequency.setValueAtTime(pianoNotes[note], 0);
+        //     osc.start(0);
+        //     // osc.stop(context.currentTime + noteLength);
+        //     osc.connect(noteGain);
 
-            noteGain.connect(masterVolume);
-            noteGain.connect(delay);
+        //     noteGain.connect(masterVolume);
+        //     noteGain.connect(delay);
 
-            currentSynthNotes[note] = [noteGain, lfo, osc, startTime, dynamicLevel];
+        //     currentSynthNotes[note] = [noteGain, lfo, osc, startTime, dynamicLevel];
+        // }
+
+        let noteName = note;
+        let message = {
+            data: [144, noteToMidi(note), 127] // Note on message
+        };
+        console.log('Key Down: ', noteName, '@', message.data[2]);
+        noteArray[noteName] = message.data[2];
+        
+        // Use PolySynth for new note playing if available
+        if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            // Convert note name to format expected by PolySynth (e.g., "C4")
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                const velocity = message.data[2];
+                const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
+                playNote2([noteWithOctave], volume);
+            }
         }
 
     }
@@ -1750,18 +1782,37 @@ function onKeyPress(event, up) {
         document.getElementById("inputText").innerHTML = 'You have pressed: ' + noteString.join(',');
         // document.getElementById("outputText").innerHTML = 'You should press: ' + outputNoteArray[0]['notes'][selectedNote];
 
-        if ($('#synthEnableBox')[0].checked && note in currentSynthNotes){
-            var currentTime = context.currentTime;
-            var endTime = Math.max(currentTime, currentSynthNotes[note][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
-            // var level = sustainLevel * message.data[2] / 127;
-            currentSynthNotes[note][0].gain.setValueAtTime(currentSynthNotes[note][4], endTime - noteLength * releaseTime);
-            currentSynthNotes[note][0].gain.linearRampToValueAtTime(0, endTime);
-            currentSynthNotes[note][2].stop(endTime);
-            currentSynthNotes[note][1].stop(endTime);
-            delete currentSynthNotes[note];
-        }
+        // if ($('#synthEnableBox')[0].checked && note in currentSynthNotes){
+        //     var currentTime = context.currentTime;
+        //     var endTime = Math.max(currentTime, currentSynthNotes[note][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
+        //     // var level = sustainLevel * message.data[2] / 127;
+        //     currentSynthNotes[note][0].gain.setValueAtTime(currentSynthNotes[note][4], endTime - noteLength * releaseTime);
+        //     currentSynthNotes[note][0].gain.linearRampToValueAtTime(0, endTime);
+        //     currentSynthNotes[note][2].stop(endTime);
+        //     currentSynthNotes[note][1].stop(endTime);
+        //     delete currentSynthNotes[note];
+        // }
         drawNotes(inputDiv, noteArray, true);
 
+        let noteName = note;
+        let message = {
+            data: [144, noteToMidi(note), 127] // Note on message
+        };
+        console.log('Key Up: ', noteName);
+        if(noteArray.hasOwnProperty(noteName)){ // true
+            // console.log('...');
+            delete noteArray[noteName];
+        }
+        
+        // Stop note in PolySynth if available
+        if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                stopNotes2([noteWithOctave]);
+            }
+        }
+        // console.log('Note ', message.data[1])
+        // console.log('Velocity ', message.data[2])
 
 
     }
@@ -1801,12 +1852,31 @@ function onMIDIMessage (message) {
     if(pressed){
         console.log('Key Down: ', noteName, '@', message.data[2]);
         noteArray[noteName] = message.data[2];
+        
+        // Use PolySynth for new note playing if available
+        if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            // Convert note name to format expected by PolySynth (e.g., "C4")
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                const velocity = message.data[2];
+                const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
+                playNote2([noteWithOctave], volume);
+            }
+        }
     }
     else{
         console.log('Key Up: ', noteName);
         if(noteArray.hasOwnProperty(noteName)){ // true
             // console.log('...');
             delete noteArray[noteName];
+        }
+        
+        // Stop note in PolySynth if available
+        if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                stopNotes2([noteWithOctave]);
+            }
         }
         // console.log('Note ', message.data[1])
         // console.log('Velocity ', message.data[2])
@@ -1861,62 +1931,62 @@ function onMIDIMessage (message) {
     drawNotes(inputDiv, noteArray, true);
 
     
-    if(pressed){
-        if($('#synthEnableBox')[0].checked){
-        const osc = context.createOscillator();
-        const noteGain = context.createGain();
-        var startTime = context.currentTime;
-        noteGain.gain.setValueAtTime(0, 0);
-        var level = sustainLevel * message.data[2] / 127;
-        var activeNoteCount = Object.keys(noteArray).length;
-        var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
+    // if(pressed){
+    //     if($('#synthEnableBox')[0].checked){
+    //     const osc = context.createOscillator();
+    //     const noteGain = context.createGain();
+    //     var startTime = context.currentTime;
+    //     noteGain.gain.setValueAtTime(0, 0);
+    //     var level = sustainLevel * message.data[2] / 127;
+    //     var activeNoteCount = Object.keys(noteArray).length;
+    //     var dynamicLevel = Math.min(level, 0.8 / Math.max(1, activeNoteCount));
         
-        noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
+    //     noteGain.gain.linearRampToValueAtTime(dynamicLevel, startTime + noteLength * attackTime);
 
-        // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
+    //     // noteGain.gain.linearRampToValueAtTime(level, startTime + noteLength * attackTime);
 
-        // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
-        // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
+    //     // noteGain.gain.setValueAtTime(sustainLevel, context.currentTime + noteLength - noteLength * releaseTime);
+    //     // noteGain.gain.linearRampToValueAtTime(0, context.currentTime + noteLength);
 
-        var lfoGain = context.createGain();
-        lfoGain.gain.setValueAtTime(vibratoAmount, 0);
-        lfoGain.connect(osc.frequency)
+    //     var lfoGain = context.createGain();
+    //     lfoGain.gain.setValueAtTime(vibratoAmount, 0);
+    //     lfoGain.connect(osc.frequency)
 
-        var lfo = context.createOscillator();
-        lfo.frequency.setValueAtTime(vibratoSpeed, 0);
-        lfo.start(0);
-        // lfo.stop(context.currentTime + noteLength);
-        lfo.connect(lfoGain); 
-        if(waveform == "custom")
-            osc.setPeriodicWave(customWaveform);
-        else
-            osc.type = waveform;
-        osc.frequency.setValueAtTime(pianoNotes[noteName], 0);
-        osc.start(0);
-        // osc.stop(context.currentTime + noteLength);
-        osc.connect(noteGain);
+    //     var lfo = context.createOscillator();
+    //     lfo.frequency.setValueAtTime(vibratoSpeed, 0);
+    //     lfo.start(0);
+    //     // lfo.stop(context.currentTime + noteLength);
+    //     lfo.connect(lfoGain); 
+    //     if(waveform == "custom")
+    //         osc.setPeriodicWave(customWaveform);
+    //     else
+    //         osc.type = waveform;
+    //     osc.frequency.setValueAtTime(pianoNotes[noteName], 0);
+    //     osc.start(0);
+    //     // osc.stop(context.currentTime + noteLength);
+    //     osc.connect(noteGain);
 
-        noteGain.connect(masterVolume);
-        noteGain.connect(delay);
+    //     noteGain.connect(masterVolume);
+    //     noteGain.connect(delay);
 
-        currentSynthNotes[noteName] = [noteGain, lfo, osc, startTime, dynamicLevel];
-        }
-    }
-    else{
-        if(noteName in currentSynthNotes){
-            var currentTime = context.currentTime;
-            var endTime = Math.max(currentTime, currentSynthNotes[noteName][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
-        // var level = sustainLevel * message.data[2] / 127;
-            currentSynthNotes[noteName][0].gain.setValueAtTime(currentSynthNotes[noteName][4], endTime - noteLength * releaseTime);
-            currentSynthNotes[noteName][0].gain.linearRampToValueAtTime(0,endTime );
-            // const noteGain = context.createGain();
-            // noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
+    //     currentSynthNotes[noteName] = [noteGain, lfo, osc, startTime, dynamicLevel];
+    //     }
+    // }
+    // else{
+    //     if(noteName in currentSynthNotes){
+    //         var currentTime = context.currentTime;
+    //         var endTime = Math.max(currentTime, currentSynthNotes[noteName][3] + noteLength - noteLength * releaseTime) + noteLength* releaseTime
+    //     // var level = sustainLevel * message.data[2] / 127;
+    //         currentSynthNotes[noteName][0].gain.setValueAtTime(currentSynthNotes[noteName][4], endTime - noteLength * releaseTime);
+    //         currentSynthNotes[noteName][0].gain.linearRampToValueAtTime(0,endTime );
+    //         // const noteGain = context.createGain();
+    //         // noteGain.gain.linearRampToValueAtTime(sustainLevel, context.currentTime + noteLength * attackTime);
 
-            currentSynthNotes[noteName][1].stop(endTime);
-            currentSynthNotes[noteName][2].stop(endTime);
-            delete currentSynthNotes[noteName];
-        }
-    }
+    //         currentSynthNotes[noteName][1].stop(endTime);
+    //         currentSynthNotes[noteName][2].stop(endTime);
+    //         delete currentSynthNotes[noteName];
+    //     }
+    // }
 
 
     // drawNotes(inputDiv, noteArray);
@@ -3498,11 +3568,32 @@ function playCurrentNote() {
     // Play the notes
     if (notesToPlay.length === 1) {
         // Single note
-        playNote(notesToPlay[0]);
+        // playNote(notesToPlay[0]);
+        
+        // Also play with PolySynth if enabled
+        if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            const noteWithOctave = convertNoteNameToPolySynthFormat(notesToPlay[0]);
+            if (noteWithOctave) {
+                playNote2([noteWithOctave], 60, 1000); // 1 second duration
+            }
+        }
     } else if (notesToPlay.length > 1) {
         // Multiple notes (chord)
-        for (const note of notesToPlay) {
-            playNote(note, notesToPlay.length); // Pass chord size for volume adjustment
+        // for (const note of notesToPlay) {
+        //     playNote(note, notesToPlay.length); // Pass chord size for volume adjustment
+        // }
+        
+        // console.log('playing chord notes:', notesToPlay);
+        // console.log(polySynthRef, $('#polySynthMidiBox')[0].checked);
+        // Also play with PolySynth if enabled
+        if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            const chordNotes = notesToPlay.map(note => convertNoteNameToPolySynthFormat(note)).filter(n => n);
+
+            console.log('Converted chord notes for PolySynth:', chordNotes);
+            if (chordNotes.length > 0) {
+                console.log('Playing chord with PolySynth:', chordNotes);
+                playNote2(chordNotes, 60, 1000); // 1 second duration
+            }
         }
     }
 }
@@ -3542,6 +3633,163 @@ function playNote(note, chordSize = 1) {
     noteGain.connect(masterVolume);
     noteGain.connect(delay);
 }
+
+// New function for programmatic note playing using PolySynth
+function playNote2(notes, volume = 50, duration = null) {
+    if (!polySynthRef) {
+        console.warn('PolySynth not ready yet. Cannot play notes programmatically.');
+        return;
+    }
+    
+    // Ensure notes is an array
+    const notesArray = Array.isArray(notes) ? notes : [notes];
+    
+    console.log('Playing notes programmatically:', notesArray, 'Volume:', volume, 'Duration:', duration);
+    
+    // Convert duration from milliseconds to match expected format if provided
+    const durationMs = duration ? duration : null;
+    
+    polySynthRef.playNotes(notesArray, volume, durationMs);
+}
+
+// Helper function to convert note names from MIDI format to PolySynth format
+function convertNoteNameToPolySynthFormat(noteName) {
+    console.log('Converting note name for PolySynth:', noteName);
+    noteName = noteName.replace('/','')
+    // noteName comes in format like "C4", "D#3", etc.
+    // PolySynth expects the same format, so we can return as-is
+    // But we need to ensure it has an octave number
+    if (/^[A-G]#?\d+$/.test(noteName)) {
+        return noteName;
+    }
+    
+    // If no octave specified, default to octave 4
+    if (/^[A-G]#?$/.test(noteName)) {
+        return noteName + '4';
+
+    }
+    console.warn('Invalid note format for PolySynth:', noteName);    
+    return null; // Invalid format
+}
+
+// Function to stop specific notes
+function stopNotes2(notes) {
+    if (!polySynthRef) {
+        console.warn('PolySynth not ready yet. Cannot stop notes programmatically.');
+        return;
+    }
+    
+    const notesArray = Array.isArray(notes) ? notes : [notes];
+    polySynthRef.stopNotes(notesArray);
+}
+
+// Function to stop all notes
+function stopAllNotes2() {
+    if (!polySynthRef) {
+        console.warn('PolySynth not ready yet. Cannot stop notes programmatically.');
+        return;
+    }
+    
+    polySynthRef.stopAllNotes();
+}
+
+// Make functions globally available
+window.playNote2 = playNote2;
+window.stopNotes2 = stopNotes2;
+window.stopAllNotes2 = stopAllNotes2;
+
+// Add some test functions for debugging
+// window.testPolySynth = () => {
+//     console.log('Testing PolySynth...');
+//     console.log('PolySynth ref:', polySynthRef);
+    
+//     // Play a C major chord
+//     playNote2(['C4', 'E4', 'G4'], 70, 2000);
+    
+//     setTimeout(() => {
+//         // Play a different chord
+//         playNote2(['F4', 'A4', 'C5'], 50, 1500);
+//     }, 2500);
+    
+//     console.log('Test chords scheduled. Check audio output.');
+// };
+
+// // Add debug function to check active notes
+// window.checkActiveNotes = () => {
+//     if (polySynthRef) {
+//         console.log('PolySynth is ready');
+//         // We can't directly access the internal state, but we can check if it's working
+//         console.log('PolySynth functions available:', {
+//             playNotes: typeof polySynthRef.playNotes,
+//             stopNotes: typeof polySynthRef.stopNotes,
+//             stopAllNotes: typeof polySynthRef.stopAllNotes,
+//             isActive: typeof polySynthRef.isActive
+//         });
+//         if (polySynthRef.isActive) {
+//             console.log('PolySynth is active:', polySynthRef.isActive());
+//         }
+//     } else {
+//         console.log('PolySynth ref not available');
+//     }
+// };
+
+// // Example: Add buttons to test the functionality
+// document.addEventListener('DOMContentLoaded', () => {
+//     // Create a test section in the UI
+//     const testSection = document.createElement('div');
+//     testSection.innerHTML = `
+//         <div style="margin: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+//             <h3>PolySynth Test Controls</h3>
+//             <button id="testCMajor">Play C Major Chord</button>
+//             <button id="testScale">Play C Scale</button>
+//             <button id="testArpeggio">Play Arpeggio</button>
+//             <button id="stopAll">Stop All Notes</button>
+//             <button id="checkNotes">Check Active Notes</button>
+//         </div>
+//     `;
+    
+//     // Insert after the first element in body
+//     if (document.body.firstChild) {
+//         document.body.insertBefore(testSection, document.body.firstChild);
+//     } else {
+//         document.body.appendChild(testSection);
+//     }
+    
+//     // Add event listeners
+//     document.getElementById('testCMajor')?.addEventListener('click', () => {
+//         playNote2(['C4', 'E4', 'G4'], 60, 2000);
+//     });
+    
+//     document.getElementById('testScale')?.addEventListener('click', () => {
+//         const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
+//         scale.forEach((note, index) => {
+//             setTimeout(() => {
+//                 playNote2([note], 50, 400);
+//             }, index * 300);
+//         });
+//     });
+    
+//     document.getElementById('testArpeggio')?.addEventListener('click', () => {
+//         console.log('Starting arpeggio...');
+//         const arpeggio = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4'];
+//         arpeggio.forEach((note, index) => {
+//             console.log(`Scheduling note ${note} at ${index * 200}ms for 600ms duration`);
+//             setTimeout(() => {
+//                 playNote2([note], 70, 600);
+//             }, index * 200);
+//         });
+//         console.log('All arpeggio notes scheduled');
+//     });
+    
+//     document.getElementById('stopAll')?.addEventListener('click', () => {
+//         console.log('Stop all button clicked');
+//         stopAllNotes2();
+//     });
+    
+//     document.getElementById('checkNotes')?.addEventListener('click', () => {
+//         window.checkActiveNotes();
+//     });
+// });
 
 updateOutputText()
 
