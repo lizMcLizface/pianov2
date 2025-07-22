@@ -32,6 +32,7 @@ import { context,
     tempoControl, 
     tempo} from './synth';
 import { chord_progressions } from './progressions';
+import PolySynth from './components/PolySynth';
 
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -100,7 +101,7 @@ window.selectedBarIndex = selectedBarIndex;
 // information.innerText = `This app is using Chrome (v${process.versions.chrome()}), Node.js (v${process.versions.node()}), and Electron (v${process.versions.electron()})`
 
 const { Vex,  Formatter, Renderer, Stave, Accidental, StaveNote, BarNote, Beam, Dot, StaveConnector, Voice, GhostNote } = require("vexflow");
-const { Factory } = Vex.Flow;
+// const { Factory } = Vex.Flow;
 
 
 
