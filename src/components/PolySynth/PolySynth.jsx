@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useEffect, useState } from 'react';
+import React, { useLayoutEffect, useEffect, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
 import * as Nodes from '../../nodes';
 import MonoSynth from './../MonoSynth';
@@ -49,6 +49,9 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     const [synthActive, setSynthActive] = useState(false);
     const [octaveMod, setOctaveMod] = useState(4);
     const [currentPreset, setCurrentPreset] = useState('- INIT -');
+    
+    // Track if synth has been initialized to prevent multiple starts
+    const synthInitialized = useRef(false);
 
     // Preset State
     const [polyphony, setPolyphony] = useState(synthArr.length);
@@ -119,6 +122,9 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     };
 
     const initSynth = () => {
+        // Prevent multiple initializations
+        if (synthInitialized.current) return;
+        
         synthArr.forEach(synth => {
             synth.connect(synthMix.getNode());
             vibratoLFO.connect(synth.getNode().detune);
@@ -149,6 +155,9 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
         masterLimiter.setRatio(20);
 
         masterGain.connect(AC.destination);
+        
+        // Mark as initialized
+        synthInitialized.current = true;
     };
 
     const getGainEnv = () => ({
@@ -234,7 +243,17 @@ const PolySynth = ({ className, setTheme, currentTheme }) => {
     }
 
     // Init
-    useLayoutEffect(initSynth, []);
+    useLayoutEffect(() => {
+        initSynth();
+        
+        // Cleanup function to prevent memory leaks
+        return () => {
+            synthArr.forEach(synth => {
+                synth.clearTimeouts();
+                synth.noteStop();
+            });
+        };
+    }, []);
 
     // Load Preset
     useLayoutEffect(() => {

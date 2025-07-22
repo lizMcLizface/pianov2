@@ -1,23 +1,25 @@
 import React from 'react';
 import PolySynth from '../PolySynth';
-import { ThemeProvider, useTheme } from '../../contexts/ThemeContext';
+import { ThemeProvider as CustomThemeProvider, useTheme } from '../../contexts/ThemeContext';
+import { ThemeProvider } from 'styled-components';
 
 const PolySynthWithTheme = () => {
     const { theme, setTheme, themes } = useTheme();
     return (
-        <PolySynth 
-            theme={themes[theme]}
-            currentTheme={theme}
-            setTheme={setTheme}
-        />
+        <ThemeProvider theme={themes[theme]}>
+            <PolySynth 
+                currentTheme={theme}
+                setTheme={setTheme}
+            />
+        </ThemeProvider>
     );
 };
 
 const PolySynthWrapper = () => {
     return (
-        <ThemeProvider>
+        <CustomThemeProvider>
             <PolySynthWithTheme />
-        </ThemeProvider>
+        </CustomThemeProvider>
     );
 };
 

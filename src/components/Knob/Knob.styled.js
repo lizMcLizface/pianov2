@@ -9,7 +9,9 @@ import {
 } from '../../styles/util';
 
 
-export const Label = styled.h2`
+export const Label = styled.h2.withConfig({
+    shouldForwardProp: (prop) => prop !== 'disabled',
+})`
     ${relaBlock}
     max-width: 5rem;
     margin: -${SPACING.s} auto ${SPACING.s};
@@ -26,7 +28,9 @@ export const Label = styled.h2`
     }
 `;
 
-export const ComponentContainer = styled.div`
+export const ComponentContainer = styled.div.withConfig({
+    shouldForwardProp: (prop) => prop !== 'disabled',
+})`
     ${relaInline}
     margin: 0 ${SPACING.s};
     vertical-align: top;
@@ -42,7 +46,9 @@ export const ComponentContainer = styled.div`
     }
 `;
 
-export const KnobContainer = styled.div`
+export const KnobContainer = styled.div.withConfig({
+    shouldForwardProp: (prop) => prop !== 'disabled',
+})`
     ${relaInline}
     height: 5rem;
     width: 5rem;
@@ -64,11 +70,15 @@ export const BackgroundMeter = styled.path`
     stroke: ${({ theme }) => theme.lite};
 `;
 
-export const ActiveMeter = styled.path`
+export const ActiveMeter = styled.path.withConfig({
+    shouldForwardProp: (prop) => prop !== 'disabled',
+})`
     stroke: ${({ theme, disabled }) => disabled ? theme.mid : theme.strong};
 `;
 
-export const KnobDial = styled.div`
+export const KnobDial = styled.div.withConfig({
+    shouldForwardProp: (prop) => prop !== 'disabled',
+})`
     ${absCenter}
     height: 3rem;
     width: 3rem;
