@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/pianov2/static/css/main.e3209298.css",
-    "main.js": "/pianov2/static/js/main.77e1a2ff.js",
+    "main.js": "/pianov2/static/js/main.ede1afa8.js",
     "static/js/787.6f8579a7.chunk.js": "/pianov2/static/js/787.6f8579a7.chunk.js",
     "index.html": "/pianov2/index.html",
     "static/media/logo.svg": "/pianov2/static/media/logo.6ce24c58023cc2f8fd88fe9d219db6c6.svg",
     "main.e3209298.css.map": "/pianov2/static/css/main.e3209298.css.map",
-    "main.77e1a2ff.js.map": "/pianov2/static/js/main.77e1a2ff.js.map",
+    "main.ede1afa8.js.map": "/pianov2/static/js/main.ede1afa8.js.map",
     "787.6f8579a7.chunk.js.map": "/pianov2/static/js/787.6f8579a7.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e3209298.css",
-    "static/js/main.77e1a2ff.js"
+    "static/js/main.ede1afa8.js"
   ]
 }
