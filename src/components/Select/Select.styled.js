@@ -46,7 +46,9 @@ export const InputContainer = styled.div`
     padding-top: ${SPACING.s};
 `;
 
-export const Input = styled.div`
+export const Input = styled.div.withConfig({
+    shouldForwardProp: (prop) => prop !== 'isDropdownOpen',
+})`
     ${relaBlock}
     border-radius: ${SPACING.s};
     overflow: hidden;
@@ -73,7 +75,9 @@ export const Input = styled.div`
     }
 `;
 
-export const Dropdown = styled.div`
+export const Dropdown = styled.div.withConfig({
+    shouldForwardProp: (prop) => prop !== 'isOpen',
+})`
     ${vertCenter}
     z-index: 100;
     width: 104px;
@@ -91,7 +95,9 @@ export const Dropdown = styled.div`
     }
 `;
 
-export const DropdownSvg = styled.svg`
+export const DropdownSvg = styled.svg.withConfig({
+    shouldForwardProp: (prop) => prop !== 'selected',
+})`
     ${relaInline}
     height: 3rem;
     width: 3rem;

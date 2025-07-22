@@ -32,13 +32,25 @@ import { context,
     tempoControl, 
     tempo} from './synth';
 import { chord_progressions } from './progressions';
-import PolySynth from './components/PolySynth';
+import PolySynthWrapper from './components/PolySynthWrapper';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { THEMES } from './styles/themes';
 
+let PolySynthTabPlaceholder = document.getElementById('PolySynthTabPlaceholder');
+
+
+// Render PolySynth component into the PolySynthTabPlaceholder div
+if (PolySynthTabPlaceholder) {
+    const polySynthRoot = ReactDOM.createRoot(PolySynthTabPlaceholder);
+    polySynthRoot.render(<PolySynthWrapper />);
+}
 
 // const root = ReactDOM.createRoot(document.getElementById('root'));
 // root.render(
 //   <React.StrictMode>
-//     <App />
+//     <ThemeProvider>
+//       <App />
+//     </ThemeProvider>
 //   </React.StrictMode>
 // );
 

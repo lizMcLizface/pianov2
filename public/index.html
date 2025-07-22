@@ -94,7 +94,12 @@
         <span class="full-label">Chords</span>
       </button>
 
-      <button class="tablinks" onclick="openCity(event, 'ProgressionTab')" id="defaultOpen">
+      <button class="tablinks" onclick="openCity(event, 'ProgressionTab')">
+        <span class="short-label">P</span>
+        <span class="full-label">Progressions</span>
+      </button>
+
+      <button class="tablinks" onclick="openCity(event, 'PolySynthTab')" id="defaultOpen">
         <span class="short-label">P</span>
         <span class="full-label">Progressions</span>
       </button>
@@ -246,6 +251,11 @@
 
       <div id="ProgressionTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
         <div id ="ProgressionTabPlaceholder">
+        </div>
+      </div>
+
+      <div id="PolySynthTab" class="tabcontent" style="display:block; max-height:860px; overflow-y:auto;">
+        <div id ="PolySynthTabPlaceholder">
         </div>
       </div>
   
