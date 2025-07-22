@@ -64,6 +64,7 @@ class MonoSynth {
         this.currentNote = note;
         this.osc.setFreq(freq, portamentoSpeed);
 
+        console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
         // Gain Envelope ADS (R is in noteOff())
         if (gainEnv.a) {
             this.gain.setGain(0, 0); // Reset Volume

@@ -44,6 +44,13 @@ const masterBitCrush = new Nodes.BitCrusher(AC);
 const masterLimiter = new Nodes.Compressor(AC);
 const masterEQ2 = new Nodes.EQ2(AC);
 
+let gains = {
+    gainAttack: 0,
+    gainDecay: 0,
+    gainSustain: 0,
+    gainRelease: 0
+}
+
 const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) => {
     // Synth State
     const [synthActive, setSynthActive] = useState(false);
@@ -164,11 +171,20 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         synthInitialized.current = true;
     };
 
+    // console.log('Gain: ', gainAttack, gainDecay, gainSustain, gainRelease);
+
+    gains = {
+        gainAttack,
+        gainDecay,
+        gainSustain,
+        gainRelease
+    }
+
     const getGainEnv = (volume) => ({
-        a: gainAttack * (volume || 1),
-        d: gainDecay * (volume || 1),
-        s: gainSustain * (volume || 1),
-        r: gainRelease * (volume || 1),
+        a: gains.gainAttack * (volume || 1),
+        d: gains.gainDecay * (volume || 1),
+        s: gains.gainSustain * (volume || 1),
+        r: gains.gainRelease * (volume || 1),
     });
     const getFilterEnv = () => ({
         a: filterAttack,
@@ -179,19 +195,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
     // Functions to pass envelope data to the synth
     const synthNoteOn = (synth, note, volume) => {
-        let gainEnv = getGainEnv();
+        const gainEnv = getGainEnv(volume);
         console.log('Gain envelope:', gainEnv);
-        let gainEnv2 = {a: gainEnv.a, d: gainEnv.d, s: gainEnv.s, r: gainEnv.r};
-        // if (volume !== undefined) {
-        //     gainEnv2 = {
-        //         a : gainEnv.a * (volume ),
-        //         d : gainEnv.d * (volume ),
-        //         s : gainEnv.s * (volume ),
-        //         r : gainEnv.r * (volume ),
-        //     };
-        // }
         const filterEnv = getFilterEnv();
-        console.log('Gain envelope modified for volume:', gainEnv2);
         synth.noteOn(
             note,
             {
@@ -202,7 +208,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         );
     }
     const synthNoteOff = (synth) => {
-        const gainEnv = getGainEnv();
+        const gainEnv = getGainEnv(1); // Use default volume of 1 for note off
         const filterEnv = getFilterEnv();
         synth.noteOff({ gainEnv, filterEnv });
     }
