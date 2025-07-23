@@ -12,6 +12,7 @@ class MonoSynth {
         this.filter = new Filter(this.AC);
 
         this.currentNote = null;
+        this.currentNoteInfo = null; // Store full note info for microtonal updates
         this.timeoutIds = [];
         this.isInHoldPhase = false;
         this.holdPhaseEndTime = null;
@@ -50,6 +51,7 @@ class MonoSynth {
     getFilterFreq = () => this.filter.getFreq();
     getFilterQ = () => this.filter.getQ();
     getFilterGain = () => this.filter.getGain();
+    getCurrentNoteInfo = () => this.currentNoteInfo;
 
     // Parameter setters
     setVolume = (val) => this.volume.setGain(clamp(val, 0, 1));
@@ -59,15 +61,66 @@ class MonoSynth {
     setFilterQ = (val) => this.filter.setQ(val);
     setFilterGain = (val) => this.filter.setGain(val);
 
+    // Update frequency for microtonal adjustments
+    updateNoteFrequency = (pitchEnv) => {
+        if (!this.currentNoteInfo) return;
+        
+        const { noteName, baseFreq_, octave } = this.currentNoteInfo;
+        
+        let noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        let baseFrequency = 261.63; // Default base frequency for C4
+        let baseFrequencies = [baseFrequency]
+        for(let i = 1; i < noteNames.length; i++) {
+            baseFrequencies.push(baseFrequencies[i - 1] * Math.pow(pitchEnv.Octave, 1/12));
+        }
+        const baseFreq = {            'C': baseFrequencies[0], 'C#': baseFrequencies[1], 'D': baseFrequencies[2], 'D#': baseFrequencies[3],
+            'E': baseFrequencies[4], 'F': baseFrequencies[5], 'F#': baseFrequencies[6], 'G': baseFrequencies[7],
+            'G#': baseFrequencies[8], 'A': baseFrequencies[9], 'A#': baseFrequencies[10], 'B': baseFrequencies[11]
+        }[noteName];
+
+
+
+        // Apply microtonal pitch adjustments
+        const pitchAdjustments = {
+            'C': pitchEnv.C, 'C#': pitchEnv.CSharp, 'D': pitchEnv.D, 'D#': pitchEnv.DSharp,
+            'E': pitchEnv.E, 'F': pitchEnv.F, 'F#': pitchEnv.FSharp, 'G': pitchEnv.G,
+            'G#': pitchEnv.GSharp, 'A': pitchEnv.A, 'A#': pitchEnv.ASharp, 'B': pitchEnv.B
+        };
+        
+        const adjustedBaseFreq = baseFreq * pitchAdjustments[noteName] * pitchEnv.AllThemPitches;
+        
+        // Calculate frequency using custom octave ratio
+        const newFreq = adjustedBaseFreq * Math.pow(pitchEnv.Octave, octave - 4);
+        
+        // Update oscillator frequency
+        this.osc.setFreq(newFreq);
+    };
+
     // Note trigger methods
     noteOn = (noteInfo, synthProps) => {
         if (!noteInfo) return;
 
         this.clearTimeouts();
-        const { freq, note } = noteInfo;
+        const { freq, note, oct } = noteInfo;
         const { gainEnv, filterEnv, portamentoSpeed } = synthProps;
 
         this.currentNote = note;
+        
+        // Store note info for microtonal updates
+        // Extract note name from full note string (e.g., "C4" -> "C")
+        const noteName = note.replace(/\d+$/, '');
+        const baseFreq = {
+            'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+            'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+            'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+        }[noteName];
+        
+        this.currentNoteInfo = {
+            noteName: noteName,
+            baseFreq: baseFreq,
+            octave: oct || parseInt(note.match(/\d+$/)?.[0]) || 4
+        };
+        
         this.osc.setFreq(freq, portamentoSpeed);
 
         console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
@@ -160,6 +213,7 @@ class MonoSynth {
                     // Then release after decay completes
                     const releaseTimeoutId = setTimeout(() => {
                         this.currentNote = null;
+                        this.currentNoteInfo = null;
                         const releaseTime = Math.max(gainEnv.r, minTime);
                         this.gain.setGainCurve(gainEnv.s, 0, releaseTime, gainEnv.releaseShape, gainEnv.releaseExponent); // Release
                         this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
@@ -169,6 +223,7 @@ class MonoSynth {
                     // No decay phase - go directly to release from hold level
                     console.log('MonoSynth no decay, direct release from hold level');
                     this.currentNote = null;
+                    this.currentNoteInfo = null;
                     const releaseTime = Math.max(gainEnv.r, minTime);
                     this.gain.setGainCurve(this.currentHoldLevel, 0, releaseTime, gainEnv.releaseShape, gainEnv.releaseExponent); // Release
                     this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
@@ -179,6 +234,7 @@ class MonoSynth {
             // Normal release - not in hold phase
             this.clearTimeouts();
             this.currentNote = null;
+            this.currentNoteInfo = null;
             const releaseTime = Math.max(gainEnv.r, minTime);
             this.gain.setGainCurve(this.gain.getGain(), 0, releaseTime, gainEnv.releaseShape, gainEnv.releaseExponent); // Release
             this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
@@ -193,6 +249,7 @@ class MonoSynth {
             const holdCompleteTimeoutId = setTimeout(() => {
                 this.clearTimeouts();
                 this.currentNote = null;
+                this.currentNoteInfo = null;
                 this.gain.setGainCurve(this.gain.getGain(), 0, 0); // Immediate stop
                 this.filter.setDetune(0, minTime);
             }, remainingHoldTime);
@@ -204,6 +261,7 @@ class MonoSynth {
             // Normal immediate stop
             this.clearTimeouts();
             this.currentNote = null;
+            this.currentNoteInfo = null;
             this.gain.setGainCurve(this.gain.getGain(), 0, 0); // Immediate stop
             this.filter.setDetune(0, minTime);
         }

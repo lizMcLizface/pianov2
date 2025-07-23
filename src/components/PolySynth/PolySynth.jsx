@@ -448,12 +448,25 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         const octave = parseInt(match[2]);
         
         // Get base frequency and apply microtonal adjustments
-        const baseFreq = {
-            'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
-            'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
-            'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+        // const baseFreq = {
+        //     'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+        //     'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+        //     'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+        // }[noteName];
+
+        let noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        let baseFrequency = 261.63; // Default base frequency for C4
+        let baseFrequencies = [baseFrequency]
+        for(let i = 1; i < noteNames.length; i++) {
+            baseFrequencies.push(baseFrequencies[i - 1] * Math.pow(pitchEnv.Octave, 1/12));
+        }
+        const baseFreq = {            'C': baseFrequencies[0], 'C#': baseFrequencies[1], 'D': baseFrequencies[2], 'D#': baseFrequencies[3],
+            'E': baseFrequencies[4], 'F': baseFrequencies[5], 'F#': baseFrequencies[6], 'G': baseFrequencies[7],
+            'G#': baseFrequencies[8], 'A': baseFrequencies[9], 'A#': baseFrequencies[10], 'B': baseFrequencies[11]
         }[noteName];
-        
+
+
+
         if (!baseFreq) return null;
         
         // Apply microtonal pitch adjustments
@@ -689,6 +702,18 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
         flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
+    ]);
+
+    // Update frequencies of all playing notes when microtonal parameters change
+    useLayoutEffect(() => {
+        synthArr.forEach(synth => {
+            if (synth.getCurrentNoteInfo()) {
+                synth.updateNoteFrequency(pitchEnv);
+            }
+        });
+    }, [
+        pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF, pitchFSharp,
+        pitchG, pitchGSharp, pitchA, pitchASharp, pitchB, octaveRatio, allThemPitches
     ]);
 
     // Needed to avoid stale hook state
