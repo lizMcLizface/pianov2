@@ -7,12 +7,14 @@ class MonoSynth {
         this.AC = AC;
 
         this.osc = new Oscillator(this.AC);
-        this.gain = new Gain(this.AC); // ADSR Gain
+        this.gain = new Gain(this.AC); // AHDSR Gain
         this.volume = new Gain(this.AC); // Volume
         this.filter = new Filter(this.AC);
 
         this.currentNote = null;
         this.timeoutIds = [];
+        this.isInHoldPhase = false;
+        this.holdPhaseEndTime = null;
     }
 
     init() {
@@ -35,6 +37,9 @@ class MonoSynth {
 
     clearTimeouts() {
         this.timeoutIds.forEach((id) => clearTimeout(id));
+        this.timeoutIds = [];
+        this.isInHoldPhase = false;
+        this.holdPhaseEndTime = null;
     }
 
     // Getters
@@ -65,24 +70,51 @@ class MonoSynth {
         this.osc.setFreq(freq, portamentoSpeed);
 
         console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
-        // Gain Envelope ADS (R is in noteOff())
+        
+        // Determine hold level (use holdLevel if set and non-zero, otherwise use 1 as default attack level)
+        const hasHold = gainEnv.hold && gainEnv.hold > 0;
+        const holdLevel = hasHold ? gainEnv.holdLevel : 1;
+        
+        // Gain Envelope AHDSR (R is in noteOff())
         if (gainEnv.a) {
+            console.log('MonoSynth gainEnv.a:', gainEnv.a, 'holdLevel:', holdLevel, 'hasHold:', hasHold);
             this.gain.setGain(0, 0); // Reset Volume
             const attackTime = Math.max(gainEnv.a, minTime);
-            this.gain.setGain(1, attackTime); // Attack
+            this.gain.setGain(holdLevel, attackTime); // Attack to hold level
 
-            const timeoutId = setTimeout(() => {
-                this.gain.setGain(gainEnv.s, Math.max(gainEnv.d, minTime)); // Decay
-            }, (attackTime * 1000));
-            this.timeoutIds.push(timeoutId);
+            if (hasHold) {
+                // Attack -> Hold -> Decay -> Sustain
+                console.log('MonoSynth gainEnv.hold:', gainEnv.hold, 'gainEnv.d:', gainEnv.d);
+                const attackTimeoutId = setTimeout(() => {
+                    // Hold phase - maintain hold level
+                    this.isInHoldPhase = true;
+                    this.holdPhaseEndTime = Date.now() + (gainEnv.hold * 1000);
+                    
+                    const holdTimeoutId = setTimeout(() => {
+                        this.isInHoldPhase = false;
+                        this.holdPhaseEndTime = null;
+                        this.gain.setGain(gainEnv.s, Math.max(gainEnv.d, minTime)); // Decay from hold level to sustain
+                    }, (gainEnv.hold * 1000));
+                    this.timeoutIds.push(holdTimeoutId);
+                }, (attackTime * 1000));
+                this.timeoutIds.push(attackTimeoutId);
+            } else {
+                // Traditional ADSR: Attack -> Decay -> Sustain
+                const timeoutId = setTimeout(() => {
+                    this.gain.setGain(gainEnv.s, Math.max(gainEnv.d, minTime)); // Decay from hold level to sustain
+                }, (attackTime * 1000));
+                this.timeoutIds.push(timeoutId);
+            }
         } else if (gainEnv.d) {
-            this.gain.setGain(1, minTime); // Reset Volume
+            console.log('MonoSynth gainEnv.d:', gainEnv.d, 'holdLevel:', holdLevel);
+            this.gain.setGain(holdLevel, minTime); // Reset to hold level
 
             const timeoutId = setTimeout(() => {
                 this.gain.setGain(gainEnv.s, Math.max(gainEnv.d, minTime)); // Decay
             }, (minTime * 1000));
             this.timeoutIds.push(timeoutId);
         } else if (gainEnv.s) {
+            console.log('MonoSynth gainEnv.s:', gainEnv.s);
             this.gain.setGain(gainEnv.s, minTime); // Set Volume
         }
 
@@ -104,16 +136,68 @@ class MonoSynth {
         }
     }
     noteOff = ({ gainEnv, filterEnv }) => {
-        this.clearTimeouts();
-        this.currentNote = null;
-        this.gain.setGain(0, Math.max(gainEnv.r, minTime)); // Release
-        this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
+        if (this.isInHoldPhase && this.holdPhaseEndTime) {
+            // We're in hold phase - schedule decay->sustain->release after hold completes
+            const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
+            console.log('MonoSynth noteOff during hold phase, remaining hold time:', remainingHoldTime);
+            
+            const holdCompleteTimeoutId = setTimeout(() => {
+                // Hold phase completed, now do decay to sustain
+                this.isInHoldPhase = false;
+                this.holdPhaseEndTime = null;
+                
+                if (gainEnv.d && gainEnv.d > 0) {
+                    // Has decay phase - decay from hold level to sustain
+                    console.log('MonoSynth decay after hold, decay time:', gainEnv.d, 'sustain level:', gainEnv.s);
+                    this.gain.setGain(gainEnv.s, Math.max(gainEnv.d, minTime));
+                    
+                    // Then release after decay completes
+                    const releaseTimeoutId = setTimeout(() => {
+                        this.currentNote = null;
+                        this.gain.setGain(0, Math.max(gainEnv.r, minTime)); // Release
+                        this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
+                    }, Math.max(gainEnv.d, minTime) * 1000);
+                    this.timeoutIds.push(releaseTimeoutId);
+                } else {
+                    // No decay phase - go directly to release from hold level
+                    console.log('MonoSynth no decay, direct release from hold level');
+                    this.currentNote = null;
+                    this.gain.setGain(0, Math.max(gainEnv.r, minTime)); // Release
+                    this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
+                }
+            }, remainingHoldTime);
+            this.timeoutIds.push(holdCompleteTimeoutId);
+        } else {
+            // Normal release - not in hold phase
+            this.clearTimeouts();
+            this.currentNote = null;
+            this.gain.setGain(0, Math.max(gainEnv.r, minTime)); // Release
+            this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
+        }
     }
     noteStop = () => {
-        this.clearTimeouts();
-        this.currentNote = null;
-        this.gain.setGain(0, minTime);
-        this.filter.setDetune(0, minTime);
+        if (this.isInHoldPhase && this.holdPhaseEndTime) {
+            // Even for noteStop, respect the hold phase
+            const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
+            console.log('MonoSynth noteStop during hold phase, remaining hold time:', remainingHoldTime);
+            
+            const holdCompleteTimeoutId = setTimeout(() => {
+                this.clearTimeouts();
+                this.currentNote = null;
+                this.gain.setGain(0, minTime);
+                this.filter.setDetune(0, minTime);
+            }, remainingHoldTime);
+            
+            // Clear existing timeouts but keep the hold completion timeout
+            this.timeoutIds.forEach((id) => clearTimeout(id));
+            this.timeoutIds = [holdCompleteTimeoutId];
+        } else {
+            // Normal immediate stop
+            this.clearTimeouts();
+            this.currentNote = null;
+            this.gain.setGain(0, minTime);
+            this.filter.setDetune(0, minTime);
+        }
     }
 }
 

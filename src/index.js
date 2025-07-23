@@ -1570,6 +1570,8 @@ var currentPressed = [];
 
 var currentSynthNotes = {};
 
+let baseOctave = 4;
+
 function onKeyPress(event, up) {
     console.log(event.key, event.code, event.type);
     if(event.type == 'keydown'){
@@ -1612,8 +1614,20 @@ function onKeyPress(event, up) {
         }
     }
 
+    if (event.type == 'keydown' && event.code == 'KeyZ'){
+        console.log('Reducing Base Octave: ', baseOctave);
+        baseOctave -= 1;
+        if(baseOctave < 0) baseOctave = 0;
+    }
+    if (event.type == 'keydown' && event.code == 'KeyX'){
+        console.log('Increasing Base Octave: ', baseOctave);
+        baseOctave += 1;
+        if(baseOctave > 8) baseOctave = 8;
+    }
 
-    var note = keyToNote(event);
+    console.log('Base Octave: ', baseOctave);
+
+    var note = keyToNote(event, baseOctave);
     if (note == undefined){
         // console.log('Key not mapped: ', event.code);
         return;
@@ -3487,20 +3501,22 @@ $('#stopButton').on('click', function(e) {
 // $('#stopButton7').on('click', function(e) {isPlaying = false;})
 // $('#stopButton8').on('click', function(e) {isPlaying = false;})
 
+
+const bpmSlider = document.querySelector('#bpmSlider');
 function noteLoop() {
-    const secondsPerBeat = 60.0 / tempo;
+    const secondsPerBeat = 60.0 / bpmSlider.value;
     if (window.isPlaying) {
         // Highlight current note being played
         highlightBothPositions();
         // highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
         // highlightSelectedNotesSecondary(window.selectedBarIndex, window.selectedNoteIndex);
         
-        playCurrentNote();
+        let duration = playCurrentNote();
         nextNote();
         
         window.setTimeout(function() {
             noteLoop();
-        }, secondsPerBeat * 1000)
+        }, duration)
     } else {
         // Clear highlighting when playback stops
         clearNoteHighlighting();
@@ -3563,7 +3579,8 @@ function playCurrentNote() {
     }
     
     const notesToPlay = noteEvent.notes;
-    console.log('playing grid data notes:', notesToPlay);
+    console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
+    // const noteLength = noteEvent.noteLength || 0.5; // Default to 0.5 seconds if not specified
 
     // Play the notes
     if (notesToPlay.length === 1) {
@@ -3574,7 +3591,8 @@ function playCurrentNote() {
         if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             const noteWithOctave = convertNoteNameToPolySynthFormat(notesToPlay[0]);
             if (noteWithOctave) {
-                playNote2([noteWithOctave], 60, 1000); // 1 second duration
+                
+                playNote2([noteWithOctave], 60, 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue); // 1 second duration
             }
         }
     } else if (notesToPlay.length > 1) {
@@ -3591,11 +3609,12 @@ function playCurrentNote() {
 
             console.log('Converted chord notes for PolySynth:', chordNotes);
             if (chordNotes.length > 0) {
-                console.log('Playing chord with PolySynth:', chordNotes);
-                playNote2(chordNotes, 60, 1000); // 1 second duration
+                // console.log('Playing chord with PolySynth:', chordNotes, 'bpm:', bpmSlider.value);
+                playNote2(chordNotes, 60, 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue); // 1 second duration
             }
         }
     }
+    return 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue;
 }
 
 function playNote(note, chordSize = 1) {

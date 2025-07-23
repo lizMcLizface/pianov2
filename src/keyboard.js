@@ -26,27 +26,27 @@ import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cro
 
 
 
-function keyToNote(event){
+function keyToNote(event, octave){
     switch (event.code){
-        case 'KeyA': return 'G/3';
-        case 'KeyW': return 'G#/3';
-        case 'KeyS': return 'A/3';
-        case 'KeyE': return 'A#/3';
-        case 'KeyD': return 'B/3';
-        case 'KeyF': return 'C/4';
-        case 'KeyT': return 'C#/4';
-        case 'KeyG': return 'D/4';
-        case 'KeyY': return 'D#/4';
-        case 'KeyH': return 'E/4';
-        case 'KeyJ': return 'F/4';
-        case 'KeyI': return 'F#/4';
-        case 'KeyK': return 'G/4';
-        case 'KeyO': return 'G#/4';
-        case 'KeyL': return 'A/4';
-        case 'KeyP': return 'A#/4';
-        case 'Semicolon': return 'B/4';
-        case 'Quote': return 'C/5';
-        case 'BracketRight': return 'C#/5';
+        case 'KeyA': return 'G/' + (octave - 1);
+        case 'KeyW': return 'G#/' + (octave - 1);
+        case 'KeyS': return 'A/' + (octave - 1);
+        case 'KeyE': return 'A#/' + (octave - 1);
+        case 'KeyD': return 'B/' + (octave - 1);
+        case 'KeyF': return 'C/' + octave;
+        case 'KeyT': return 'C#/' + octave;
+        case 'KeyG': return 'D/' + octave;
+        case 'KeyY': return 'D#/' + octave;
+        case 'KeyH': return 'E/' + octave;
+        case 'KeyJ': return 'F/' + octave;
+        case 'KeyI': return 'F#/' + octave;
+        case 'KeyK': return 'G/' + octave;
+        case 'KeyO': return 'G#/' + octave;
+        case 'KeyL': return 'A/' + octave;
+        case 'KeyP': return 'A#/' + octave;
+        case 'Semicolon': return 'B/' + octave;
+        case 'Quote': return 'C/' + (octave + 1);
+        case 'BracketRight': return 'C#/' + (octave + 1);
     }
     return undefined;
 }

@@ -48,7 +48,9 @@ let gains = {
     gainAttack: 0,
     gainDecay: 0,
     gainSustain: 0,
-    gainRelease: 0
+    gainRelease: 0,
+    gainHold: 0,
+    gainHoldLevel: 0
 }
 let filterEnv = {
     attack: 0,
@@ -83,6 +85,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [gainDecay, setGainDecay] = useState(0);
     const [gainSustain, setGainSustain] = useState(0.7);
     const [gainRelease, setGainRelease] = useState(0);
+    const [gainHold, setGainHold] = useState(0);
+    const [gainHoldLevel, setGainHoldLevel] = useState(0);
     const [filterType, setFilterType] = useState('lowpass');
     const [filterFreq, setFilterFreq] = useState(11000);
     const [filterQ, setFilterQ] = useState(0);
@@ -183,7 +187,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         gainAttack,
         gainDecay,
         gainSustain,
-        gainRelease
+        gainRelease,
+        gainHold,
+        gainHoldLevel,
     }
     filterEnv = {
         attack: filterAttack,
@@ -202,6 +208,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             d: gains.gainDecay * Math.pow(v, exp),
             s: gains.gainSustain * Math.pow(v, exp),
             r: gains.gainRelease * Math.pow(v, exp),
+            hold: gains.gainHold * Math.pow(v, exp),
+            holdLevel: gains.gainHoldLevel * Math.pow(v, exp)
         };
     };
     const getFilterEnv = () => ({
@@ -437,6 +445,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setMasterFilterGain(preset.masterFilterGain);
         setGainAttack(preset.gainAttack);
         setGainDecay(preset.gainDecay);
+        // setGainHoldLevel(preset.setGainHoldLevel || 0);
+        // setGainHold(preset.gainHold || 0);
         setGainSustain(preset.gainSustain);
         setGainRelease(preset.gainRelease);
         setVcoType(preset.vcoType);
@@ -485,6 +495,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (masterFilter.getFreq() !== masterFilterFreq) masterFilter.setFreq(masterFilterFreq);
         if (masterFilter.getQ() !== masterFilterQ) masterFilter.setQ(masterFilterQ);
         if (masterFilter.getGain() !== masterFilterGain) masterFilter.setGain(masterFilterGain);
+
+
 
         const synth1 = synthArr[0];
         if (synth1.getWaveform() !== vcoType) synthArr.forEach((synth) => synth.setWaveform(vcoType));
@@ -556,7 +568,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
                 <Module label="Gain Envelope">
-                    <KnobGrid columns={4} rows={1}>
+                    <KnobGrid columns={4} rows={2}>
                         <Knob
                             label="Attack"
                             value={gainAttack}
@@ -580,6 +592,18 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             value={gainRelease}
                             modifier={3}
                             onUpdate={(val) => setGainRelease(val)}
+                        />
+                        <Knob
+                            label="Hold"
+                            value={gainHold}
+                            modifier={3}
+                            onUpdate={(val) => setGainHold(val)}
+                        />
+                        <Knob
+                            label="Hold Level"
+                            value={gainHoldLevel}
+                            modifier={3}
+                            onUpdate={(val) => setGainHoldLevel(val)}
                         />
                     </KnobGrid>
                 </Module>
