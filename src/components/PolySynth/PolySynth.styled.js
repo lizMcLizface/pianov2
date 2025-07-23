@@ -23,7 +23,7 @@ export const ModuleGridContainer = styled.div`
     display: grid;
     position: relative;
     width: fit-content;
-    grid-template-columns: 130px 418px 226px 226px 130px;
+    grid-template-columns: 130px 418px 418px  226px 226px 130px 130px 130px;
     gap: ${SPACING.m};
     justify-items: center;
     align-items: center;
@@ -44,7 +44,7 @@ export const ModuleGridContainer = styled.div`
         overflow: hidden;
 
         // Polkadot styles
-        background-image: radial-gradient(${({ theme }) => theme.strong} 2px, transparent 2px);
+        // background-image: radial-gradient(${({ theme }) => theme.strong} 2px, transparent 2px);
         background-size: 0.75rem 0.75rem;
         background-position: top;
     }
@@ -83,7 +83,7 @@ export const Lines = styled.div`
     width: 100%;
     grid-column: span 4;
     overflow: hidden;
-    background-image: linear-gradient(90deg, ${({ theme }) => theme.strong} 2px, transparent 2px);
+    // background-image: linear-gradient(90deg, ${({ theme }) => theme.strong} 2px, transparent 2px);
     background-size: 0.75rem 0.75rem;
     background-position: center;
 `;

@@ -716,24 +716,71 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
-                <Module label="Reverb">
-                    <KnobGrid columns={2} rows={1}>
-                        <Select
-                            label="Type"
-                            options={REVERB}
-                            value={reverbType}
-                            onUpdate={(val) => setReverbType(val)}
+                
+                <Module label="Delay">
+                    <KnobGrid columns={2} rows={2}>
+                        <Knob
+                            label="Time"
+                            value={delayTime}
+                            onUpdate={(val) => setDelayTime(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={delayFeedback}
+                            onUpdate={(val) => setDelayFeedback(val)}
+                        />
+                        <Knob
+                            label="Tone"
+                            value={delayTone}
+                            modifier={11000}
+                            resetValue={4400}
+                            isRounded
+                            onUpdate={(val) => setDelayTone(val)}
                         />
                         <Knob
                             label="Dry/Wet"
-                            value={reverbAmount}
-                            onUpdate={(val) => setReverbAmount(val)}
+                            value={delayAmount}
+                            onUpdate={(val) => setDelayAmount(val)}
                         />
                     </KnobGrid>
                 </Module>
 
+
+                <Module label="Master Filter">
+                    <KnobGrid columns={2} rows={2}>
+                        <Select
+                            label="Type"
+                            options={FILTER}
+                            value={masterFilterType}
+                            onUpdate={(val) => setMasterFilterType(val)}
+                        />
+                        <Knob
+                            label="Cutoff"
+                            value={masterFilterFreq}
+                            modifier={11000}
+                            resetValue={11000}
+                            isRounded
+                            onUpdate={(val) => setMasterFilterFreq(val)}
+                        />
+                        <Knob
+                            label="Q"
+                            value={masterFilterQ}
+                            modifier={20}
+                            onUpdate={(val) => setMasterFilterQ(val)}
+                        />
+                        <Knob
+                            label="Gain"
+                            type="B"
+                            value={masterFilterGain}
+                            modifier={40}
+                            onUpdate={(val) => setMasterFilterGain(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+
                 <Module label="Vibrato">
-                    <KnobGrid columns={2} rows={1}>
+                    <KnobGrid columns={1} rows={2}>
                         <Knob
                             label="Depth"
                             value={vibratoDepth}
@@ -745,16 +792,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             value={vibratoRate}
                             modifier={50}
                             onUpdate={(val) => setVibratoRate(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Master">
-                    <KnobGrid columns={1} rows={1}>
-                        <Knob
-                            label="Volume"
-                            value={masterVolume}
-                            onUpdate={(val) => setMasterVolume(val)}
                         />
                     </KnobGrid>
                 </Module>
@@ -775,6 +812,41 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label="Master">
+                    <KnobGrid columns={1} rows={1}>
+                        <Knob
+                            label="Volume"
+                            value={masterVolume}
+                            onUpdate={(val) => setMasterVolume(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+
+                <Module label="Voicing">
+                    <KnobGrid columns={1} rows={2}>
+                        <Knob
+                            label="Polyphony"
+                            value={polyphony}
+                            modifier={7}
+                            offset={1}
+                            resetValue={8}
+                            isRounded
+                            onUpdate={(val) => {
+                                setPolyphony(val);
+                                resetSynthPos();
+                            }}
+                        />
+                        <Knob
+                            label="Portamento"
+                            value={portamentoSpeed}
+                            modifier={0.5}
+                            onUpdate={(val) => setPortamentoSpeed(val)}
+                            disabled={polyphony !== 1}
+                        />
+                    </KnobGrid>
+                </Module>
+                
                 <Module label="Filter">
                     <KnobGrid columns={4} rows={2}>
                         <Select
@@ -832,110 +904,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
-                
-                <Module label="Delay">
-                    <KnobGrid columns={2} rows={2}>
-                        <Knob
-                            label="Time"
-                            value={delayTime}
-                            onUpdate={(val) => setDelayTime(val)}
-                        />
-                        <Knob
-                            label="Feedback"
-                            value={delayFeedback}
-                            onUpdate={(val) => setDelayFeedback(val)}
-                        />
-                        <Knob
-                            label="Tone"
-                            value={delayTone}
-                            modifier={11000}
-                            resetValue={4400}
-                            isRounded
-                            onUpdate={(val) => setDelayTone(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={delayAmount}
-                            onUpdate={(val) => setDelayAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Master Filter">
-                    <KnobGrid columns={2} rows={2}>
-                        <Select
-                            label="Type"
-                            options={FILTER}
-                            value={masterFilterType}
-                            onUpdate={(val) => setMasterFilterType(val)}
-                        />
-                        <Knob
-                            label="Cutoff"
-                            value={masterFilterFreq}
-                            modifier={11000}
-                            resetValue={11000}
-                            isRounded
-                            onUpdate={(val) => setMasterFilterFreq(val)}
-                        />
-                        <Knob
-                            label="Q"
-                            value={masterFilterQ}
-                            modifier={20}
-                            onUpdate={(val) => setMasterFilterQ(val)}
-                        />
-                        <Knob
-                            label="Gain"
-                            type="B"
-                            value={masterFilterGain}
-                            modifier={40}
-                            onUpdate={(val) => setMasterFilterGain(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Voicing">
-                    <KnobGrid columns={1} rows={2}>
-                        <Knob
-                            label="Polyphony"
-                            value={polyphony}
-                            modifier={7}
-                            offset={1}
-                            resetValue={8}
-                            isRounded
-                            onUpdate={(val) => {
-                                setPolyphony(val);
-                                resetSynthPos();
-                            }}
-                        />
-                        <Knob
-                            label="Portamento"
-                            value={portamentoSpeed}
-                            modifier={0.5}
-                            onUpdate={(val) => setPortamentoSpeed(val)}
-                            disabled={polyphony !== 1}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Crush">
-                    <KnobGrid columns={1} rows={2}>
-                        <Knob
-                            label="Bit Depth"
-                            value={bitCrushDepth}
-                            modifier={14}
-                            resetValue={8}
-                            offset={2}
-                            isRounded
-                            onUpdate={(val) => setBitCrushDepth(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={bitCrushAmount}
-                            onUpdate={(val) => setBitCrushAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
                 <Module label="Flanger">
                     <KnobGrid columns={4} rows={2}>
                         <Knob
@@ -1000,6 +968,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
+                
 
                 <Module label="EQ2">
                     <KnobGrid columns={2} rows={2}>
@@ -1037,6 +1006,40 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label="Reverb">
+                    <KnobGrid columns={1} rows={2}>
+                        <Select
+                            label="Type"
+                            options={REVERB}
+                            value={reverbType}
+                            onUpdate={(val) => setReverbType(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={reverbAmount}
+                            onUpdate={(val) => setReverbAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                <Module label="Crush">
+                    <KnobGrid columns={1} rows={2}>
+                        <Knob
+                            label="Bit Depth"
+                            value={bitCrushDepth}
+                            modifier={14}
+                            resetValue={8}
+                            offset={2}
+                            isRounded
+                            onUpdate={(val) => setBitCrushDepth(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={bitCrushAmount}
+                            onUpdate={(val) => setBitCrushAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
                 <InfoModule>
                     <InfoContainer>
                         <PopText>- Preset -</PopText>
@@ -1052,7 +1055,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             ))}
                         </InfoSelect>
                     </InfoContainer>
-                    <InfoContainer>
+                    {/* <InfoContainer>
                         <PopText>- Theme -</PopText>
                         <InfoSelect
                             value={currentTheme}
@@ -1066,12 +1069,11 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                 <option key={`themes_${theme}`} value={theme}>{theme}</option>
                             ))}
                         </InfoSelect>
-                    </InfoContainer>
-                    <InfoContainer>
+                    </InfoContainer> */}
+                    {/* <InfoContainer>
                         <PrimaryText>Octave: {octaveMod}<br/>(z,x)</PrimaryText>
-                    </InfoContainer>
+                    </InfoContainer> */}
                     <PeakMeter audioCtx={AC} sourceNode={masterGain} />
-                    <Tag href="https://github.com/Kyle-Shanks">- KJ</Tag>
                 </InfoModule>
 
                 <Lines />
