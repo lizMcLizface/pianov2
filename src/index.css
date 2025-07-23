@@ -428,7 +428,7 @@ input:checked + .slider:before {
   border: 1px solid #ccc;
   width: 100%;
   border-left: none;
-  height: 750px;
+  height: 820px;
   display: none;
   font-size: 18pt;
 }

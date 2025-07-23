@@ -20,6 +20,7 @@ import {
     PopText,
     Tag,
     Lines,
+    MicrotonalModule,
 } from './PolySynth.styled';
 
 const BASE_CLASS_NAME = 'PolySynth';
@@ -1146,7 +1147,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
                 {/* <Lines /> */}
 
-                <Module label="Microtonal">
+                <MicrotonalModule label="Microtonal">
                     <KnobGrid columns={15} rows={1}>
                         <Knob
                             label="C"
@@ -1300,7 +1301,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             </button>
                         </div>
                     </KnobGrid>
-                </Module>
+                </MicrotonalModule>
 
 
             </ModuleGridContainer>

@@ -54,6 +54,12 @@ export const InfoModule = styled(Module)`
     grid-row: span 2;
 `;
 
+export const MicrotonalModule = styled(Module)`
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+`;
+
 export const InfoSelect = styled.select`
     display: block;
     width: 100%;
