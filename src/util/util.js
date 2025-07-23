@@ -76,3 +76,129 @@ export const REVERB = {
     reverb5: 'M 22 20 A 4 4 0 1 1 28 20 A 6 6 0 1 1 28 30 A 4 4 0 1 1 22 30 A 6 6 0 1 1 22 20',
     reverb6: 'M 15 25 A 10 10 0 1 1 15 25.1',
 };
+
+export const ENVELOPE_SHAPE = {
+    linear: 'M 10 34 L 40 16',
+    exponential: 'M 10 34 Q 20 30 40 16',
+    logarithmic: 'M 10 34 Q 30 20 40 16',
+    sine: 'M 10 34 Q 25 20 40 16',
+    cosine: 'M 10 34 Q 25 28 40 16',
+    smooth: 'M 10 34 Q 15 32 25 25 Q 35 18 40 16',
+    sharp: 'M 10 34 L 15 32 Q 25 22 40 16',
+    curved: 'M 10 34 C 15 32 20 28 25 24 C 30 20 35 18 40 16',
+    steep: 'M 10 34 Q 12 30 15 20 Q 25 16 40 16',
+    gentle: 'M 10 34 Q 25 32 35 28 Q 38 24 40 16',
+    bounce: 'M 10 34 Q 20 28 25 30 Q 30 24 35 26 Q 38 20 40 16',
+    overshoot: 'M 10 34 Q 25 18 30 14 Q 35 16 40 16',
+};
+
+/**
+ * Generates an envelope curve based on shape and exponent
+ * @param {number} initialLevel - Starting value of the envelope
+ * @param {number} finalLevel - Ending value of the envelope
+ * @param {string} shape - Shape type from ENVELOPE_SHAPE keys
+ * @param {number} exponent - Exponential factor (0.1 to 4.0)
+ * @param {number} steps - Number of steps in the output array (default: 100)
+ * @returns {Array<number>} Array of envelope values from initial to final level
+ */
+export const generateEnvelopeCurve = (initialLevel, finalLevel, shape, exponent = 2, steps = 100) => {
+    if (steps < 2) return [initialLevel, finalLevel];
+    
+    const curve = [];
+    const range = finalLevel - initialLevel;
+    
+    for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1); // Normalized time (0 to 1)
+        let scaledT;
+        
+        switch (shape) {
+            case 'linear':
+                scaledT = t;
+                break;
+                
+            case 'exponential':
+                scaledT = Math.pow(t, exponent);
+                break;
+                
+            case 'logarithmic':
+                scaledT = 1 - Math.pow(1 - t, exponent);
+                break;
+                
+            case 'sine':
+                scaledT = Math.sin(t * Math.PI / 2);
+                if (exponent !== 1) {
+                    scaledT = Math.pow(scaledT, exponent);
+                }
+                break;
+                
+            case 'cosine':
+                scaledT = 1 - Math.cos(t * Math.PI / 2);
+                if (exponent !== 1) {
+                    scaledT = Math.pow(scaledT, exponent);
+                }
+                break;
+                
+            case 'smooth':
+                // S-curve using smoothstep
+                scaledT = t * t * (3 - 2 * t);
+                if (exponent !== 1) {
+                    scaledT = Math.pow(scaledT, exponent);
+                }
+                break;
+                
+            case 'sharp':
+                // Sharp initial transition then smooth
+                scaledT = t < 0.2 ? Math.pow(t / 0.2, exponent) * 0.6 : 0.6 + (t - 0.2) / 0.8 * 0.4;
+                break;
+                
+            case 'curved':
+                // Cubic bezier approximation
+                scaledT = t * t * t * (t * (t * 6 - 15) + 10);
+                if (exponent !== 1) {
+                    scaledT = Math.pow(scaledT, exponent);
+                }
+                break;
+                
+            case 'steep':
+                // Very steep initial curve
+                scaledT = 1 - Math.pow(1 - t, exponent * 2);
+                break;
+                
+            case 'gentle':
+                // Very gentle curve
+                scaledT = Math.pow(t, exponent * 0.5);
+                break;
+                
+            case 'bounce':
+                // Overshoot and settle
+                if (t < 0.7) {
+                    scaledT = Math.pow(t / 0.7, exponent) * 1.2;
+                } else {
+                    const overshoot = 1.2 - ((t - 0.7) / 0.3) * 0.2;
+                    scaledT = Math.max(overshoot, 1);
+                }
+                break;
+                
+            case 'overshoot':
+                // Overshoot past target then return
+                if (t < 0.6) {
+                    scaledT = Math.pow(t / 0.6, exponent) * 1.3;
+                } else {
+                    scaledT = 1.3 - ((t - 0.6) / 0.4) * 0.3;
+                }
+                break;
+                
+            default:
+                scaledT = t; // Fallback to linear
+        }
+        
+        // Clamp scaledT to reasonable bounds
+        scaledT = Math.max(0, Math.min(2, scaledT));
+        
+        // Calculate final value
+        const value = initialLevel + range * scaledT;
+        curve.push(value);
+    }
+    
+    return curve;
+};

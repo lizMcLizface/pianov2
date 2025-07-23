@@ -8,7 +8,7 @@ import Module from './../Module';
 import PeakMeter from './../PeakMeter';
 import Select from './../Select';
 import presetData from '../../util/presetData';
-import { getNoteInfo, WAVEFORM, FILTER, REVERB } from '../../util/util';
+import { getNoteInfo, WAVEFORM, FILTER, REVERB, ENVELOPE_SHAPE } from '../../util/util';
 import { THEMES } from '../../styles/themes';
 
 import {
@@ -50,7 +50,13 @@ let gains = {
     gainSustain: 0,
     gainRelease: 0,
     gainHold: 0,
-    gainHoldLevel: 0
+    gainHoldLevel: 0,
+    envelopeAttackExponent: 2,
+    envelopeDecayExponent: 2,
+    envelopeReleaseExponent: 2,
+    envelopeAttackShape: 'exponential',
+    envelopeDecayShape: 'exponential',
+    envelopeReleaseShape: 'exponential'
 }
 let filterEnv = {
     attack: 0,
@@ -121,6 +127,22 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [eqLowFreq, setEqLowFreq] = useState(320);
     const [eqHighFreq, setEqHighFreq] = useState(3200);
 
+    // Envelope Shape State
+    const [envelopeAttackShape, setEnvelopeAttackShape] = useState('exponential');
+    const [envelopeDecayShape, setEnvelopeDecayShape] = useState('exponential');
+    const [envelopeReleaseShape, setEnvelopeReleaseShape] = useState('exponential');
+    const [envelopeAttackExponent, setEnvelopeAttackExponent] = useState(2);
+    const [envelopeDecayExponent, setEnvelopeDecayExponent] = useState(2);
+    const [envelopeReleaseExponent, setEnvelopeReleaseExponent] = useState(2);
+
+    // Filter Envelope Shape State
+    const [filterEnvelopeAttackShape, setFilterEnvelopeAttackShape] = useState('exponential');
+    const [filterEnvelopeDecayShape, setFilterEnvelopeDecayShape] = useState('exponential');
+    const [filterEnvelopeReleaseShape, setFilterEnvelopeReleaseShape] = useState('exponential');
+    const [filterEnvelopeAttackExponent, setFilterEnvelopeAttackExponent] = useState(2);
+    const [filterEnvelopeDecayExponent, setFilterEnvelopeDecayExponent] = useState(2);
+    const [filterEnvelopeReleaseExponent, setFilterEnvelopeReleaseExponent] = useState(2);
+
     const octaveUp = () => {
         if (octaveMod < 7) {
             setOctaveMod(octaveMod + 1);
@@ -190,6 +212,12 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         gainRelease,
         gainHold,
         gainHoldLevel,
+        envelopeAttackExponent,
+        envelopeDecayExponent,
+        envelopeReleaseExponent,
+        envelopeAttackShape,
+        envelopeDecayShape,
+        envelopeReleaseShape
     }
     filterEnv = {
         attack: filterAttack,
@@ -209,7 +237,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             s: gains.gainSustain * Math.pow(v, exp),
             r: gains.gainRelease * Math.pow(v, exp),
             hold: gains.gainHold * Math.pow(v, exp),
-            holdLevel: gains.gainHoldLevel * Math.pow(v, exp)
+            holdLevel: gains.gainHoldLevel * Math.pow(v, exp),
+            // Envelope shape parameters
+            attackShape: gains.envelopeAttackShape,
+            decayShape: gains.envelopeDecayShape,
+            releaseShape: gains.envelopeReleaseShape,
+            attackExponent: gains.envelopeAttackExponent,
+            decayExponent: gains.envelopeDecayExponent,
+            releaseExponent: gains.envelopeReleaseExponent
         };
     };
     const getFilterEnv = () => ({
@@ -217,6 +252,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         d: filterEnv.decay,
         r: filterEnv.release,
         amount: filterEnv.amount,
+        // Filter envelope shape parameters
+        attackShape: filterEnvelopeAttackShape,
+        decayShape: filterEnvelopeDecayShape,
+        releaseShape: filterEnvelopeReleaseShape,
+        attackExponent: filterEnvelopeAttackExponent,
+        decayExponent: filterEnvelopeDecayExponent,
+        releaseExponent: filterEnvelopeReleaseExponent
     });
 
     // Functions to pass envelope data to the synth
@@ -484,6 +526,22 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setEqLowFreq(preset.eqLowFreq);
         setEqHighFreq(preset.eqHighFreq);
 
+        // Load envelope shape settings with defaults
+        setEnvelopeAttackShape(preset.envelopeAttackShape || 'exponential');
+        setEnvelopeDecayShape(preset.envelopeDecayShape || 'exponential');
+        setEnvelopeReleaseShape(preset.envelopeReleaseShape || 'exponential');
+        setEnvelopeAttackExponent(preset.envelopeAttackExponent || 2);
+        setEnvelopeDecayExponent(preset.envelopeDecayExponent || 2);
+        setEnvelopeReleaseExponent(preset.envelopeReleaseExponent || 2);
+
+        // Load filter envelope shape settings with defaults
+        setFilterEnvelopeAttackShape(preset.filterEnvelopeAttackShape || 'exponential');
+        setFilterEnvelopeDecayShape(preset.filterEnvelopeDecayShape || 'exponential');
+        setFilterEnvelopeReleaseShape(preset.filterEnvelopeReleaseShape || 'exponential');
+        setFilterEnvelopeAttackExponent(preset.filterEnvelopeAttackExponent || 2);
+        setFilterEnvelopeDecayExponent(preset.filterEnvelopeDecayExponent || 2);
+        setFilterEnvelopeReleaseExponent(preset.filterEnvelopeReleaseExponent || 2);
+
         resetSynthPos();
     }, [currentPreset]);
 
@@ -608,6 +666,56 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label="Envelope Shape">
+                    <KnobGrid columns={3} rows={2}>
+                        <Select
+                            label="Attack"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeAttackShape}
+                            onUpdate={(val) => setEnvelopeAttackShape(val)}
+                        />
+                        <Select
+                            label="Decay"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeDecayShape}
+                            onUpdate={(val) => setEnvelopeDecayShape(val)}
+                        />
+                        <Select
+                            label="Release"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeReleaseShape}
+                            onUpdate={(val) => setEnvelopeReleaseShape(val)}
+                        />
+                        <Knob
+                            label="Attack Exp"
+                            value={envelopeAttackExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeAttackExponent(val)}
+                        />
+                        <Knob
+                            label="Decay Exp"
+                            value={envelopeDecayExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeDecayExponent(val)}
+                        />
+                        <Knob
+                            label="Release Exp"
+                            value={envelopeReleaseExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeReleaseExponent(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
                 <Module label="Reverb">
                     <KnobGrid columns={2} rows={1}>
                         <Select
@@ -724,7 +832,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
-
+                
                 <Module label="Delay">
                     <KnobGrid columns={2} rows={2}>
                         <Knob
