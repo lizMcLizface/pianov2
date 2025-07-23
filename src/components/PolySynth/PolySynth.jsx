@@ -65,6 +65,23 @@ let filterEnv = {
     release: 0
 };
 
+let pitchEnv = {
+    C: 1.0,
+    CSharp: 1.0,
+    D: 1.0,
+    DSharp: 1.0,
+    E: 1.0,
+    F: 1.0,
+    FSharp: 1.0,
+    G: 1.0,
+    GSharp: 1.0,
+    A: 1.0,
+    ASharp: 1.0,
+    B: 1.0,
+    Octave: 2.0,
+    AllThemPitches: 1.0
+};
+
 const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) => {
     // Synth State
     const [synthActive, setSynthActive] = useState(false);
@@ -127,6 +144,22 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [eqLowFreq, setEqLowFreq] = useState(320);
     const [eqHighFreq, setEqHighFreq] = useState(3200);
 
+    // Microtonal/Pitch Adjustment State (default 1.0 = no adjustment)
+    const [pitchC, setPitchC] = useState(1.0);
+    const [pitchCSharp, setPitchCSharp] = useState(1.0);
+    const [pitchD, setPitchD] = useState(1.0);
+    const [pitchDSharp, setPitchDSharp] = useState(1.0);
+    const [pitchE, setPitchE] = useState(1.0);
+    const [pitchF, setPitchF] = useState(1.0);
+    const [pitchFSharp, setPitchFSharp] = useState(1.0);
+    const [pitchG, setPitchG] = useState(1.0);
+    const [pitchGSharp, setPitchGSharp] = useState(1.0);
+    const [pitchA, setPitchA] = useState(1.0);
+    const [pitchASharp, setPitchASharp] = useState(1.0);
+    const [pitchB, setPitchB] = useState(1.0);
+    const [octaveRatio, setOctaveRatio] = useState(2.0);
+    const [allThemPitches, setAllThemPitches] = useState(1.0);
+
     // Envelope Shape State
     const [envelopeAttackShape, setEnvelopeAttackShape] = useState('exponential');
     const [envelopeDecayShape, setEnvelopeDecayShape] = useState('exponential');
@@ -154,6 +187,23 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             setOctaveMod(octaveMod - 1);
             synthArr.forEach(synth => synthNoteOff(synth));
         }
+    };
+
+    const resetMicrotonalPitches = () => {
+        setPitchC(1.0);
+        setPitchCSharp(1.0);
+        setPitchD(1.0);
+        setPitchDSharp(1.0);
+        setPitchE(1.0);
+        setPitchF(1.0);
+        setPitchFSharp(1.0);
+        setPitchG(1.0);
+        setPitchGSharp(1.0);
+        setPitchA(1.0);
+        setPitchASharp(1.0);
+        setPitchB(1.0);
+        setOctaveRatio(2.0);
+        setAllThemPitches(1.0);
     };
 
     const resetSynthPos = () => synthPos = 0;
@@ -226,6 +276,22 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         amount: filterEnvAmount
     };
 
+    pitchEnv = {
+        C: pitchC,
+        CSharp: pitchCSharp,
+        D: pitchD,
+        DSharp: pitchDSharp,
+        E: pitchE,
+        F: pitchF,
+        FSharp: pitchFSharp,
+        G: pitchG,
+        GSharp: pitchGSharp,
+        A: pitchA,
+        ASharp: pitchASharp,
+        B: pitchB,
+        Octave: octaveRatio,
+        AllThemPitches: allThemPitches
+    };
     const getGainEnv = (volume) => {
         const v = volume || 1;
         // Apply exponential scaling for more natural response
@@ -380,7 +446,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         const noteName = match[1];
         const octave = parseInt(match[2]);
         
-        // Get frequency from freqMap and calculate for the octave
+        // Get base frequency and apply microtonal adjustments
         const baseFreq = {
             'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
             'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
@@ -389,8 +455,21 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         if (!baseFreq) return null;
         
-        const freq = baseFreq * Math.pow(2, octave - 4);
+        // Apply microtonal pitch adjustments
+        const pitchAdjustments = {
+            'C': pitchEnv.C, 'C#': pitchEnv.CSharp, 'D': pitchEnv.D, 'D#': pitchEnv.DSharp,
+            'E': pitchEnv.E, 'F': pitchEnv.F, 'F#': pitchEnv.FSharp, 'G': pitchEnv.G,
+            'G#': pitchEnv.GSharp, 'A': pitchEnv.A, 'A#': pitchEnv.ASharp, 'B': pitchEnv.B
+        };
         
+        const adjustedBaseFreq = baseFreq* pitchAdjustments[noteName] * pitchEnv.AllThemPitches;
+        
+        // Calculate frequency using custom octave ratio instead of fixed 2.0
+        const freq = adjustedBaseFreq * Math.pow(pitchEnv.Octave, octave - 4);
+        console.log(`Base frequency for ${noteName}: ${baseFreq}, Adjusted: ${adjustedBaseFreq}, Octave: ${octave}, Frequency: ${freq}`);
+
+
+        console.log(`Parsed note: ${noteString}, Frequency: ${freq}, Octave: ${octave},`, pitchAdjustments, pitchEnv);
         return {
             note: noteString,
             oct: octave,
@@ -439,14 +518,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     //         case 'x': return octaveUp();
     //     };
 
-    //     // Play note from keyCode
-    //     const note = getNoteInfo(e.key, octaveMod);
-    //     if (note) noteOn(note);
-    // }
-    // const keyupFunction = e => {
-    //     const note = getNoteInfo(e.key, octaveMod);
-    //     if (note) noteOff(note);
-    // }
     // const engageKeyboard = () => {
     //     window.addEventListener('keydown', keydownFunction);
     //     window.addEventListener('keyup', keyupFunction);
@@ -541,6 +612,21 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setFilterEnvelopeAttackExponent(preset.filterEnvelopeAttackExponent || 2);
         setFilterEnvelopeDecayExponent(preset.filterEnvelopeDecayExponent || 2);
         setFilterEnvelopeReleaseExponent(preset.filterEnvelopeReleaseExponent || 2);
+
+        // Load microtonal settings with defaults
+        setPitchC(preset.pitchC || 1.0);
+        setPitchCSharp(preset.pitchCSharp || 1.0);
+        setPitchD(preset.pitchD || 1.0);
+        setPitchDSharp(preset.pitchDSharp || 1.0);
+        setPitchE(preset.pitchE || 1.0);
+        setPitchF(preset.pitchF || 1.0);
+        setPitchFSharp(preset.pitchFSharp || 1.0);
+        setPitchG(preset.pitchG || 1.0);
+        setPitchGSharp(preset.pitchGSharp || 1.0);
+        setPitchA(preset.pitchA || 1.0);
+        setPitchASharp(preset.pitchASharp || 1.0);
+        setPitchB(preset.pitchB || 1.0);
+        setOctaveRatio(preset.octaveRatio || 2.0);
 
         resetSynthPos();
     }, [currentPreset]);
@@ -1042,7 +1128,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
                 <InfoModule>
                     <InfoContainer>
-                        <PopText>- Preset -</PopText>
+                        <PopText>Preset</PopText>
                         <InfoSelect
                             value={currentPreset}
                             onChange={(e) => {
@@ -1055,28 +1141,167 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             ))}
                         </InfoSelect>
                     </InfoContainer>
-                    {/* <InfoContainer>
-                        <PopText>- Theme -</PopText>
-                        <InfoSelect
-                            value={currentTheme}
-                            onChange={(e) => {
-                                setTheme(e.target.value);
-                                localStorage.setItem('PolySynth-Theme', e.target.value);
-                                e.target.blur();
-                            }}
-                        >
-                            {Object.keys(THEMES).map(theme => (
-                                <option key={`themes_${theme}`} value={theme}>{theme}</option>
-                            ))}
-                        </InfoSelect>
-                    </InfoContainer> */}
-                    {/* <InfoContainer>
-                        <PrimaryText>Octave: {octaveMod}<br/>(z,x)</PrimaryText>
-                    </InfoContainer> */}
                     <PeakMeter audioCtx={AC} sourceNode={masterGain} />
                 </InfoModule>
 
-                <Lines />
+                {/* <Lines /> */}
+
+                <Module label="Microtonal">
+                    <KnobGrid columns={15} rows={1}>
+                        <Knob
+                            label="C"
+                            value={pitchC}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchC(val)}
+                        />
+                        <Knob
+                            label="C#"
+                            value={pitchCSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchCSharp(val)}
+                        />
+                        <Knob
+                            label="D"
+                            value={pitchD}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchD(val)}
+                        />
+                        <Knob
+                            label="D#"
+                            value={pitchDSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchDSharp(val)}
+                        />
+                        <Knob
+                            label="E"
+                            value={pitchE}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchE(val)}
+                        />
+                        <Knob
+                            label="F"
+                            value={pitchF}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchF(val)}
+                        />
+                        <Knob
+                            label="F#"
+                            value={pitchFSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchFSharp(val)}
+                        />
+                        <Knob
+                            label="G"
+                            value={pitchG}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchG(val)}
+                        />
+                        <Knob
+                            label="G#"
+                            value={pitchGSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchGSharp(val)}
+                        />
+                        <Knob
+                            label="A"
+                            value={pitchA}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchA(val)}
+                        />
+                        <Knob
+                            label="A#"
+                            value={pitchASharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchASharp(val)}
+                        />
+                        <Knob
+                            label="B"
+                            value={pitchB}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setPitchB(val)}
+                        />
+                        <Knob
+                            label="Octave Ratio"
+                            value={octaveRatio}
+                            modifier={2.0}
+                            offset={1.0}
+                            resetValue={2.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setOctaveRatio(val)}
+                        />
+                        <Knob
+                            label="All Them Pitches"
+                            value={pitchEnv.AllThemPitches}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={2.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setAllThemPitches(val)}
+                        />
+                        <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: '4px'
+                        }}>
+                            <button 
+                                onClick={resetMicrotonalPitches}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    background: '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#555'}
+                                onMouseOut={(e) => e.target.style.background = '#333'}
+                            >
+                                Reset All
+                            </button>
+                        </div>
+                    </KnobGrid>
+                </Module>
+
 
             </ModuleGridContainer>
         </div>
