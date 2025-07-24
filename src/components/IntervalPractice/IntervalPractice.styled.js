@@ -21,6 +21,7 @@ export const IntervalInstructions = styled.p`
 `;
 
 export const IntervalMainContent = styled.div`
+    grid-template-columns: 130px 418px 418px  226px 226px 130px 130px 130px;
     display: flex;
     gap: ${SPACING.l};
     align-items: flex-start;

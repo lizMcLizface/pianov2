@@ -36,6 +36,8 @@ import PolySynthWrapper from './components/PolySynthWrapper';
 import IntervalPractice from './components/IntervalPractice';
 import ThemeManagerApp from './components/ThemeManagerApp';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import { useTheme } from './contexts/ThemeContext';
 import { THEMES } from './styles/themes';
 
 let PolySynthTabPlaceholder = document.getElementById('PolySynthTabPlaceholder');
@@ -47,6 +49,17 @@ const polySynthComponentRef = React.createRef();
 
 // Make polySynthRef globally accessible
 window.polySynthRef = null;
+
+// IntervalPractice wrapper component with styled-components theming
+const IntervalPracticeWithTheme = () => {
+    const { theme, themes } = useTheme();
+    
+    return (
+        <StyledThemeProvider theme={themes[theme]}>
+            <IntervalPractice />
+        </StyledThemeProvider>
+    );
+};
 
 // Comment out the main React app since this is a hybrid HTML/React application
 // The main interface is in the HTML file, and React components are embedded in specific divs
@@ -85,7 +98,7 @@ if (IntervalTabPlaceholder) {
     const intervalPracticeRoot = ReactDOM.createRoot(IntervalTabPlaceholder);
     intervalPracticeRoot.render(
         <ThemeProvider>
-            <IntervalPractice />
+            <IntervalPracticeWithTheme />
         </ThemeProvider>
     );
 }

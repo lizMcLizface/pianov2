@@ -351,7 +351,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     // Programmatic note control functions
     const playNotesProgrammatic = (notes, volume = 50, duration = null) => {
         if (!synthActive) activateSynth();
-        // console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
+        console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
         
         const gainValue = volume / 100; // Convert percentage to gain value
         
@@ -529,7 +529,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             };
         },
         setPitchValues: (values) => {
-            console.log('Setting pitch values:', values, pitchEnv);
+            // console.log('Setting pitch values:', values, pitchEnv);
             if (values.pitchC !== undefined) setPitchC(values.pitchC);
             if (values.pitchCSharp !== undefined) setPitchCSharp(values.pitchCSharp);
             if (values.pitchD !== undefined) setPitchD(values.pitchD);

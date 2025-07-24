@@ -4,6 +4,7 @@ import Knob from '../Knob';
 import KnobGrid from '../KnobGrid';
 import Module from '../Module';
 import Select from '../Select';
+import { noteToMidi, noteToName } from '../../midi';
 
 import {
     IntervalGridContainer,
@@ -22,17 +23,25 @@ import {
     GuessDisplay,
     ActionButton
 } from './IntervalPractice.styled';
-
 // Import MicrotonalModule from PolySynth
 import { MicrotonalModule } from '../PolySynth/PolySynth.styled';
+import { intervalToSemitones, midiToNote } from '../../intervals';
+
+
+let practiceSettingsGlobal = {
+    tries: 3,
+    relistens: 2,
+    infiniteRelistens: false,
+    noteDuration: 0.5,     // Duration of each note in seconds
+    noteDelay: 0.3,        // Delay between notes in seconds
+    noteCount: 2,          // Number of notes to play (1=root only, 2=root+interval, 3=root+interval+root)
+    volume: 50,            // Volume percentage
+    simultaneousPlay: false, // Play notes simultaneously vs sequentially
+    allowDuplicates: false,   // Allow duplicate notes
+    baseOctave: 4              // Base octave (1-6, default 4)
+}
 
 const BASE_CLASS_NAME = 'IntervalPractice';
-
-// Practice state
-let currentPracticeInterval = null;
-let practiceTriesRemaining = 0;
-let practiceRelistensRemaining = 0;
-let practiceStats = { correct: 0, total: 0 };
 
 const IntervalPractice = ({ className }) => {
     // Define chromatic scale notes and intervals for the 12x12 grid
@@ -43,11 +52,18 @@ const IntervalPractice = ({ className }) => {
     const [practiceSettings, setPracticeSettings] = useState({
         tries: 3,
         relistens: 2,
-        infiniteRelistens: false
+        infiniteRelistens: false,
+        noteDuration: 0.5,     // Duration of each note in seconds
+        noteDelay: 0.3,        // Delay between notes in seconds
+        noteCount: 2,          // Number of notes to play (1=root only, 2=root+interval, 3=root+interval+root)
+        volume: 50,            // Volume percentage
+        simultaneousPlay: false, // Play notes simultaneously vs sequentially
+        allowDuplicates: false,   // Allow duplicate notes
+        baseOctave: 4              // Base octave (1-6, default 4)
     });
 
-    // State for selected intervals
-    const [selectedIntervals, setSelectedIntervals] = useState(new Set());
+    // State for selected intervals - default to C-M3
+    const [selectedIntervals, setSelectedIntervals] = useState(new Set(['C-M3']));
     
     // State for guess buttons
     const [guessStates, setGuessStates] = useState(
@@ -61,6 +77,25 @@ const IntervalPractice = ({ className }) => {
         relistens: 0,
         stats: { correct: 0, total: 0 }
     });
+
+    // Individual practice state variables
+    const [currentPracticeInterval, setCurrentPracticeInterval] = useState(null);
+    const [practiceTriesRemaining, setPracticeTriesRemaining] = useState(0);
+    const [practiceRelistensRemaining, setPracticeRelistensRemaining] = useState(0);
+    const [practiceStats, setPracticeStats] = useState({ correct: 0, total: 0 });
+
+    practiceSettingsGlobal = {
+        tries: practiceSettings.tries,
+        relistens: practiceSettings.relistens,
+        infiniteRelistens: practiceSettings.infiniteRelistens,
+        noteDuration: practiceSettings.noteDuration,
+        noteDelay: practiceSettings.noteDelay,
+        noteCount: practiceSettings.noteCount,
+        volume: practiceSettings.volume,
+        simultaneousPlay: practiceSettings.simultaneousPlay,
+        allowDuplicates: practiceSettings.allowDuplicates,
+        baseOctave: practiceSettings.baseOctave
+    }
 
     // Get PolySynth reference for microtonal controls
     const getPolySynthRef = () => {
@@ -110,6 +145,85 @@ const IntervalPractice = ({ className }) => {
 
         return () => clearInterval(syncInterval);
     }, []);
+
+    // Keyboard input handling for interval practice
+    useEffect(() => {
+        // Map number row keys to chromatic notes (1-9, 0, -, =)
+        const keyToNoteMap = {
+            '1': 'C',
+            '2': 'C#',
+            '3': 'D',
+            '4': 'D#',
+            '5': 'E',
+            '6': 'F',
+            '7': 'F#',
+            '8': 'G',
+            '9': 'G#',
+            '0': 'A',
+            '-': 'A#',
+            '=': 'B'
+        };
+
+        const handleKeyDown = (event) => {
+            // Only handle keyboard input if the IntervalTab is currently visible
+            const intervalTab = document.getElementById('IntervalTab');
+            if (!intervalTab || intervalTab.style.display === 'none') {
+                return; // Don't handle keyboard shortcuts if not on interval practice page
+            }
+
+            // Prevent default behavior to avoid interfering with other inputs
+            const targetTagName = event.target.tagName.toLowerCase();
+            if (targetTagName === 'input' || targetTagName === 'textarea' || targetTagName === 'select') {
+                return; // Don't handle keyboard shortcuts when user is typing in input fields
+            }
+
+            const key = event.key;
+            
+            // Handle number row keys (1-9, 0, -, =) for note selection
+            if (keyToNoteMap[key]) {
+                event.preventDefault();
+                const note = keyToNoteMap[key];
+                cycleGuessButtonState(note);
+                return;
+            }
+
+            // Handle Backspace to clear guess
+            if (key === 'Backspace') {
+                event.preventDefault();
+                clearGuess();
+                return;
+            }
+
+            // Handle Enter to submit guess
+            if (key === 'Enter') {
+                event.preventDefault();
+                submitGuess();
+                return;
+            }
+
+            // Handle Spacebar to replay current interval
+            if (key === ' ') {
+                event.preventDefault();
+                replayCurrentInterval();
+                return;
+            }
+
+            // Handle Tab to play new random interval
+            if (key === 'Tab') {
+                event.preventDefault();
+                playRandomInterval();
+                return;
+            }
+        };
+
+        // Add event listener when component mounts
+        document.addEventListener('keydown', handleKeyDown);
+
+        // Clean up event listener when component unmounts
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [currentPracticeInterval, practiceTriesRemaining, practiceRelistensRemaining, practiceStats]); // Include dependencies that submitGuess uses
 
     // Update pitch value and sync with PolySynth
     const updatePitchValue = (pitchName, value) => {
@@ -248,24 +362,106 @@ const IntervalPractice = ({ className }) => {
             return;
         }
 
+
         const selectedArray = Array.from(selectedIntervals);
-        const randomKey = selectedArray[Math.floor(Math.random() * selectedArray.length)];
-        const [rootNote, interval] = randomKey.split('-');
+        // const randomKey = selectedArray[Math.floor(Math.random() * selectedArray.length)];
+        // let [rootNote, interval] = randomKey.split('-');
 
         // Initialize practice session
-        currentPracticeInterval = { rootNote, interval };
-        practiceTriesRemaining = practiceSettings.tries;
-        practiceRelistensRemaining = practiceSettings.infiniteRelistens ? Infinity : practiceSettings.relistens;
+        // const newInterval = { rootNote, interval };
+        const newTries = practiceSettingsGlobal.tries;
+        const newRelistens = practiceSettingsGlobal.infiniteRelistens ? Infinity : practiceSettingsGlobal.relistens;
+        
+        setPracticeTriesRemaining(newTries);
+        setPracticeRelistensRemaining(newRelistens);
 
         setPracticeStatus({
-            current: currentPracticeInterval,
-            tries: practiceTriesRemaining,
-            relistens: practiceRelistensRemaining,
+            current: null,
+            tries: newTries,
+            relistens: newRelistens,
             stats: practiceStats
         });
 
-        console.log(`Playing interval: ${rootNote} + ${interval}`);
-        alert(`Playing: ${rootNote} + ${interval}`);
+        // console.log(`Playing interval: ${rootNote} + ${interval}`);
+        // alert(`Playing: ${rootNote} + ${interval}`);
+        // if (interval === 'A4/d5') {
+            // interval = 'A4'; // Normalize to A4 for playback
+        // }
+        
+        const polySynth = getPolySynthRef();
+        let notesArray = [];
+        let rootNoteMidi = 0;
+        
+        for(let n = 0; n < practiceSettingsGlobal.noteCount; n++) {        
+            const randomKey = selectedArray[Math.floor(Math.random() * selectedArray.length)];
+            let [rootNote, interval] = randomKey.split('-');
+            if (interval === 'A4/d5') {
+                interval = 'A4'; // Normalize to A4 for playback
+            }
+            if(n == 0){
+                rootNoteMidi = noteToMidi(rootNote + '/' + practiceSettingsGlobal.baseOctave) + 12;
+                notesArray.push(noteToName(rootNoteMidi));
+                if (practiceSettingsGlobal.noteCount === 1) {
+                    // If only root note, skip interval calculation
+                    continue;
+                }
+                let semitoneInterval = intervalToSemitones(interval);
+                let targetNoteMidi = rootNoteMidi + semitoneInterval;
+                notesArray.push(noteToName(targetNoteMidi));
+                console.log(`Playing root note: ${notesArray[0]} and interval: ${notesArray[1]}`);
+            }else if (n!= practiceSettingsGlobal.noteCount - 1) {
+                let semitoneInterval = intervalToSemitones(interval);
+                let targetNoteMidi = rootNoteMidi + semitoneInterval;
+                notesArray.push(noteToName(targetNoteMidi));
+            }
+        }
+        console.log(practiceSettingsGlobal);
+        
+        // let uniqueNotes = notesArray; // Ensure unique notes
+        if (!practiceSettingsGlobal.allowDuplicates) {
+            let uniqueNotes = [...new Set(notesArray)]; // Ensure unique notes
+            console.log(`Unique notes for playback: ${uniqueNotes.join(', ')}`);
+            notesArray = uniqueNotes;
+        }
+        setCurrentPracticeInterval(notesArray);
+
+
+        // if(practiceSettingsGlobal.noteCount == 1) {
+        //     // Play root note only
+        //     let rootNoteMidi = noteToMidi(rootNote + '/' + practiceSettingsGlobal.baseOctave) + 12;
+        //     notesArray.push(noteToName(rootNoteMidi));
+        // } else {
+        //     let semitoneInterval = intervalToSemitones(interval);
+        //     let rootNoteMidi = noteToMidi(rootNote + '/' + practiceSettingsGlobal.baseOctave) + 12;
+        //     let targetNoteMidi = rootNoteMidi + semitoneInterval;
+        //     notesArray = [noteToName(rootNoteMidi), noteToName(targetNoteMidi)];
+        // }
+
+        for(let i = 0; i < notesArray.length; i++) {
+            notesArray[i] = notesArray[i].replace('/', '');
+        }
+
+        console.log(`Playing notes: ${notesArray.join(', ')}`);
+        console.log(polySynth);
+
+        const duration = practiceSettingsGlobal.noteDuration * 1000; // Convert to milliseconds
+        const delay = practiceSettingsGlobal.noteDelay * 1000;
+        const volume = practiceSettingsGlobal.volume;
+
+        if (practiceSettingsGlobal.simultaneousPlay) {
+            polySynth.playNotes(notesArray, volume, duration);
+        } else {
+            // Play notes sequentially
+
+            // Play each note with delay
+            notesArray.forEach((note, index) => {
+                setTimeout(() => {
+                    // console.log(`Playing note: ${note} at index ${index}, delay: ${index * delay}ms. Volume: ${volume}, Duration: ${duration}ms`);
+                    polySynth.playNotes([note], volume, duration);
+                }, index * (delay + duration));
+            });
+        }
+
     };
 
     // Replay current interval
@@ -281,16 +477,44 @@ const IntervalPractice = ({ className }) => {
         }
 
         if (practiceRelistensRemaining !== Infinity) {
-            practiceRelistensRemaining--;
+            const newRelistens = practiceRelistensRemaining - 1;
+            setPracticeRelistensRemaining(newRelistens);
             setPracticeStatus(prev => ({
                 ...prev,
-                relistens: practiceRelistensRemaining
+                relistens: newRelistens
             }));
         }
 
-        const { rootNote, interval } = currentPracticeInterval;
-        console.log(`Replaying interval: ${rootNote} + ${interval}`);
-        alert(`Replaying: ${rootNote} + ${interval}`);
+        let notesArray = currentPracticeInterval;
+        console.log(`Replaying interval: ${notesArray.join(' + ')}`);
+
+        // // Use the same playback logic as playRandomInterval
+        // let semitoneInterval = intervalToSemitones(interval);
+        const polySynth = getPolySynthRef();
+        // let rootNoteMidi = noteToMidi(rootNote + '/' + practiceSettingsGlobal.baseOctave) + 12;
+        // let targetNoteMidi = rootNoteMidi + semitoneInterval;
+        // let notesArray = [noteToName(rootNoteMidi), noteToName(targetNoteMidi)];
+
+        for(let i = 0; i < notesArray.length; i++) {
+            notesArray[i] = notesArray[i].replace('/', '');
+        }
+
+        const duration = practiceSettingsGlobal.noteDuration * 1000; // Convert to milliseconds
+        const delay = practiceSettingsGlobal.noteDelay * 1000;
+        const volume = practiceSettingsGlobal.volume;
+        if (practiceSettingsGlobal.simultaneousPlay) {
+            polySynth.playNotes(notesArray, volume, duration);
+        } else {
+            // Play notes sequentially
+
+            // Play each note with delay
+            notesArray.forEach((note, index) => {
+                setTimeout(() => {
+                    // console.log(`Playing note: ${note} at index ${index}, delay: ${index * delay}ms. Volume: ${volume}, Duration: ${duration}ms`);
+                    polySynth.playNotes([note], volume, duration);
+                }, index * (delay + duration));
+            });
+        }
     };
 
     // Skip to next interval
@@ -300,7 +524,7 @@ const IntervalPractice = ({ className }) => {
             return;
         }
 
-        practiceStats.total++;
+        setPracticeStats(prev => ({ ...prev, total: prev.total + 1 }));
         playRandomInterval();
     };
 
@@ -334,20 +558,27 @@ const IntervalPractice = ({ className }) => {
         const correctAnswer = calculateIntervalNotes(rootNote, interval);
         const isCorrect = arraysEqual(guessedNotes.sort(), correctAnswer.sort());
 
-        practiceTriesRemaining--;
+        const newTries = practiceTriesRemaining - 1;
+        setPracticeTriesRemaining(newTries);
+        console.log(`Tries remaining: ${newTries}`);
+        console.log(`Guessed notes: ${guessedNotes.join(', ')}`);
+        console.log(`Correct answer: ${correctAnswer.join(', ')}`);
 
+        let newStats;
         if (isCorrect) {
-            practiceStats.correct++;
-            practiceStats.total++;
+            newStats = { correct: practiceStats.correct + 1, total: practiceStats.total + 1 };
+            setPracticeStats(newStats);
             alert(`Correct! The interval was ${rootNote} + ${interval}`);
             clearGuess();
             setTimeout(() => playRandomInterval(), 1000);
         } else {
-            if (practiceTriesRemaining > 0) {
-                alert(`Incorrect. Tries remaining: ${practiceTriesRemaining}`);
+            if (newTries > 0) {
+                alert(`Incorrect. Tries remaining: ${newTries}`);
                 clearGuess();
+                newStats = practiceStats; // Keep current stats for ongoing interval
             } else {
-                practiceStats.total++;
+                newStats = { correct: practiceStats.correct, total: practiceStats.total + 1 };
+                setPracticeStats(newStats);
                 alert(`Game over! The correct answer was: ${correctAnswer.join(', ')}`);
                 clearGuess();
                 setTimeout(() => playRandomInterval(), 1000);
@@ -356,9 +587,9 @@ const IntervalPractice = ({ className }) => {
 
         setPracticeStatus({
             current: currentPracticeInterval,
-            tries: practiceTriesRemaining,
+            tries: newTries,
             relistens: practiceRelistensRemaining,
-            stats: practiceStats
+            stats: newStats
         });
     };
 
@@ -409,6 +640,8 @@ const IntervalPractice = ({ className }) => {
             <IntervalTitle>Interval Listening Practice</IntervalTitle>
             <IntervalInstructions>
                 Select root notes (rows) and intervals (columns) to practice. Click a cell to toggle it on/off.
+                <br />
+                <strong>Keyboard shortcuts:</strong> Number row (1-9,0,-,=) = C-B notes, Backspace = clear guess, Enter = submit guess, Space = replay, Tab = new interval
             </IntervalInstructions>
 
             <IntervalMainContent>
@@ -461,7 +694,7 @@ const IntervalPractice = ({ className }) => {
 
                 {/* Practice Configuration */}
                 <Module label="Practice Settings">
-                    <KnobGrid columns={1} rows={3}>
+                    <KnobGrid columns={3} rows={5}>
                         <Knob
                             label="Tries"
                             value={practiceSettings.tries}
@@ -492,6 +725,94 @@ const IntervalPractice = ({ className }) => {
                                 }))}
                                 style={{ width: '16px', height: '16px' }}
                             />
+                        </div>
+                        
+                        <Knob
+                            label="Note Duration (s)"
+                            value={practiceSettings.noteDuration}
+                            modifier={2.0}
+                            offset={0.1}
+                            resetValue={0.5}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setPracticeSettings(prev => ({ ...prev, noteDuration: val }))}
+                        />
+                        <Knob
+                            label="Note Delay (s)"
+                            value={practiceSettings.noteDelay}
+                            modifier={1.0}
+                            offset={0.0}
+                            resetValue={0.3}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setPracticeSettings(prev => ({ ...prev, noteDelay: val }))}
+                        />
+                        <Knob
+                            label="Volume (%)"
+                            value={practiceSettings.volume}
+                            modifier={100}
+                            offset={0}
+                            resetValue={50}
+                            isRounded
+                            onUpdate={(val) => setPracticeSettings(prev => ({ ...prev, volume: val }))}
+                        />
+                        
+                        <Knob
+                            label="Note Count"
+                            value={practiceSettings.noteCount}
+                            modifier={2}
+                            offset={1}
+                            resetValue={2}
+                            isRounded
+                            onUpdate={(val) => setPracticeSettings(prev => ({ ...prev, noteCount: val }))}
+                        />
+                        <Knob
+                            label="Base Octave"
+                            value={practiceSettings.baseOctave}
+                            modifier={5}
+                            offset={1}
+                            resetValue={4}
+                            isRounded
+                            onUpdate={(val) => setPracticeSettings(prev => ({ ...prev, baseOctave: val }))}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 'bold' }}>Simultaneous</label>
+                            <input
+                                type="checkbox"
+                                checked={practiceSettings.simultaneousPlay}
+                                onChange={(e) => setPracticeSettings(prev => ({ 
+                                    ...prev, 
+                                    simultaneousPlay: e.target.checked 
+                                }))}
+                                style={{ width: '16px', height: '16px' }}
+                            />
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 'bold' }}>Root First</label>
+                            <input
+                                type="checkbox"
+                                checked={practiceSettings.rootFirst}
+                                disabled={practiceSettings.simultaneousPlay}
+                                onChange={(e) => setPracticeSettings(prev => ({ 
+                                    ...prev, 
+                                    rootFirst: e.target.checked 
+                                }))}
+                                style={{ width: '16px', height: '16px', opacity: practiceSettings.simultaneousPlay ? 0.5 : 1 }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 'bold' }}>Allow Duplicates</label>
+                            <input
+                                type="checkbox"
+                                checked={practiceSettings.allowDuplicates}
+                                onChange={(e) => setPracticeSettings(prev => ({ 
+                                    ...prev, 
+                                    allowDuplicates: e.target.checked 
+                                }))}
+                                style={{ width: '16px', height: '16px', opacity: practiceSettings.simultaneousPlay ? 0.5 : 1 }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* Empty cell for layout */}
                         </div>
                     </KnobGrid>
                 </Module>
@@ -668,6 +989,8 @@ const IntervalPractice = ({ className }) => {
                 <Module label="Make Your Guess">
                     <div style={{ textAlign: 'center', marginBottom: '15px', fontSize: '12px', color: '#666' }}>
                         Click notes you hear. Colors cycle: Gray (off) → Green (1x) → Blue (2x) → Gray (off)
+                        <br />
+                        <strong>Keyboard:</strong> 1=C, 2=C#, 3=D, 4=D#, 5=E, 6=F, 7=F#, 8=G, 9=G#, 0=A, -=A#, ==B | Backspace=Clear | Enter=Submit | Space=Replay | Tab=New
                     </div>
                     
                     <GuessButtonsContainer>
