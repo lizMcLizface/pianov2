@@ -1613,45 +1613,45 @@ let baseOctave = 4;
 
 function onKeyPress(event, up) {
     // console.log(event.key, event.code, event.type);
-    if(event.type == 'keydown'){
-        if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
-            modifiers['LeftShift'] = true;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
-            modifiers['RightShift'] = true;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
-            modifiers['LeftControl'] = true;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){
-            modifiers['RightControl'] = true;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
-            modifiers['LeftAlt'] = true;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
-            modifiers['RightAlt'] = true;
-        }
-    }else if(event.type == 'keyup'){
-        if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
-            modifiers['LeftShift'] = false;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
-            modifiers['RightShift'] = false;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
-            modifiers['LeftControl'] = false;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){  
-            modifiers['RightControl'] = false;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
-            modifiers['LeftAlt'] = false;
-        }
-        else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
-            modifiers['RightAlt'] = false;
-        }
-    }
+    // if(event.type == 'keydown'){
+    //     if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
+    //         modifiers['LeftShift'] = true;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
+    //         modifiers['RightShift'] = true;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
+    //         modifiers['LeftControl'] = true;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){
+    //         modifiers['RightControl'] = true;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
+    //         modifiers['LeftAlt'] = true;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
+    //         modifiers['RightAlt'] = true;
+    //     }
+    // }else if(event.type == 'keyup'){
+    //     if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
+    //         modifiers['LeftShift'] = false;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Shift')){
+    //         modifiers['RightShift'] = false;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Control')){
+    //         modifiers['LeftControl'] = false;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Control')){  
+    //         modifiers['RightControl'] = false;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Alt')){
+    //         modifiers['LeftAlt'] = false;
+    //     }
+    //     else if(event.location == KeyboardEvent.DOM_KEY_LOCATION_RIGHT && event.code.includes('Alt')){
+    //         modifiers['RightAlt'] = false;
+    //     }
+    // }
 
     if (event.type == 'keydown' && event.code == 'KeyZ'){
         console.log('Reducing Base Octave: ', baseOctave);
@@ -1890,6 +1890,49 @@ function onKeyPress(event, up) {
 
 document.addEventListener('keydown', onKeyPress);
 document.addEventListener('keyup', onKeyPress);
+
+// Handle window focus/blur to prevent stuck keys
+function releaseAllKeys() {
+    console.log('Releasing all pressed keys due to focus loss');
+    
+    // Create a copy of currentPressed to avoid modifying array while iterating
+    const keysToRelease = [...currentPressed];
+    
+    // Release all currently pressed keys
+    for (const note of keysToRelease) {
+        // Remove from noteArray
+        if (noteArray.hasOwnProperty(note)) {
+            delete noteArray[note];
+        }
+        
+        // Remove visual highlighting
+        const midi = noteToMidi(note) + 12;
+        if (keys[midi] && keys[midi].element) {
+            keys[midi].element.classList.remove('pressedKey');
+        }
+        
+        // Stop note in PolySynth if available
+        if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
+            const noteWithOctave = convertNoteNameToPolySynthFormat(note);
+            if (noteWithOctave) {
+                stopNotes2([noteWithOctave]);
+            }
+        }
+    }
+    
+    // Clear the arrays
+    currentPressed = [];
+    
+    // Update the UI
+    document.getElementById("inputText").innerHTML = 'You have pressed: ';
+    drawNotes(inputDiv, noteArray, true);
+}
+
+// Add event listeners for window focus/blur
+window.addEventListener('blur', releaseAllKeys);
+window.addEventListener('focus', function() {
+    console.log('Window regained focus');
+});
 
 function onMIDIMessage (message) {
     let pressed = message.data[0] == 144 ? true : false;
