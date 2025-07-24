@@ -23,6 +23,9 @@ import {
     ActionButton
 } from './IntervalPractice.styled';
 
+// Import MicrotonalModule from PolySynth
+import { MicrotonalModule } from '../PolySynth/PolySynth.styled';
+
 const BASE_CLASS_NAME = 'IntervalPractice';
 
 // Practice state
@@ -58,6 +61,100 @@ const IntervalPractice = ({ className }) => {
         relistens: 0,
         stats: { correct: 0, total: 0 }
     });
+
+    // Get PolySynth reference for microtonal controls
+    const getPolySynthRef = () => {
+        // Access the global PolySynth reference from index.js
+        if (window.polySynthRef) {
+            return window.polySynthRef;
+        }
+        return null;
+    };
+
+    // Get current pitch values from PolySynth
+    const getPitchValues = () => {
+        const polySynth = getPolySynthRef();
+        if (polySynth && polySynth.getPitchValues) {
+            return polySynth.getPitchValues();
+        }
+        return {
+            pitchC: 1.0,
+            pitchCSharp: 1.0,
+            pitchD: 1.0,
+            pitchDSharp: 1.0,
+            pitchE: 1.0,
+            pitchF: 1.0,
+            pitchFSharp: 1.0,
+            pitchG: 1.0,
+            pitchGSharp: 1.0,
+            pitchA: 1.0,
+            pitchASharp: 1.0,
+            pitchB: 1.0,
+            octaveRatio: 2.0,
+            allThemPitches: 1.0
+        };
+    };
+
+    const [pitchValues, setPitchValues] = useState(getPitchValues());
+
+    // Sync with PolySynth state periodically
+    useEffect(() => {
+        const syncInterval = setInterval(() => {
+            const polySynth = getPolySynthRef();
+            if (polySynth && polySynth.getPitchValues) {
+                const currentValues = polySynth.getPitchValues();
+                // console.log('Syncing pitch values:', currentValues);
+                setPitchValues(currentValues);
+            }
+        }, 100); // Sync every 100ms
+
+        return () => clearInterval(syncInterval);
+    }, []);
+
+    // Update pitch value and sync with PolySynth
+    const updatePitchValue = (pitchName, value) => {
+        // console.log(`Updating ${pitchName} to ${value}`);
+        // console.log(`Current pitch values before update:`, pitchValues);
+        const polySynth = getPolySynthRef();
+        if (polySynth && polySynth.setPitchValues) {
+            // Update PolySynth's state
+            polySynth.setPitchValues({ [pitchName]: value });
+        }
+        
+        // Update local state for immediate UI feedback
+        setPitchValues(prev => ({
+            ...prev,
+            [pitchName]: value
+        }));
+
+    };
+
+    // Reset microtonal pitches to default values
+    const resetMicrotonalPitches = () => {
+        const polySynth = getPolySynthRef();
+        if (polySynth && polySynth.resetMicrotonalPitches) {
+            // Reset PolySynth's pitch values
+            polySynth.resetMicrotonalPitches();
+        }
+        
+        // Reset local state
+        setPitchValues({
+            pitchC: 1.0,
+            pitchCSharp: 1.0,
+            pitchD: 1.0,
+            pitchDSharp: 1.0,
+            pitchE: 1.0,
+            pitchF: 1.0,
+            pitchFSharp: 1.0,
+            pitchG: 1.0,
+            pitchGSharp: 1.0,
+            pitchA: 1.0,
+            pitchASharp: 1.0,
+            pitchB: 1.0,
+            octaveRatio: 2.0,
+            allThemPitches: 1.0
+        });
+    };
 
     // Toggle interval cell selection
     const toggleIntervalCell = (note, interval) => {
@@ -398,6 +495,163 @@ const IntervalPractice = ({ className }) => {
                         </div>
                     </KnobGrid>
                 </Module>
+
+                {/* Microtonal Pitch Control */}
+                <MicrotonalModule label="Microtonal">
+                    <KnobGrid columns={15} rows={1}>
+                        <Knob
+                            label="C"
+                            value={pitchValues.pitchC}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchC', val)}
+                        />
+                        <Knob
+                            label="C#"
+                            value={pitchValues.pitchCSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchCSharp', val)}
+                        />
+                        <Knob
+                            label="D"
+                            value={pitchValues.pitchD}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchD', val)}
+                        />
+                        <Knob
+                            label="D#"
+                            value={pitchValues.pitchDSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchDSharp', val)}
+                        />
+                        <Knob
+                            label="E"
+                            value={pitchValues.pitchE}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchE', val)}
+                        />
+                        <Knob
+                            label="F"
+                            value={pitchValues.pitchF}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchF', val)}
+                        />
+                        <Knob
+                            label="F#"
+                            value={pitchValues.pitchFSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchFSharp', val)}
+                        />
+                        <Knob
+                            label="G"
+                            value={pitchValues.pitchG}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchG', val)}
+                        />
+                        <Knob
+                            label="G#"
+                            value={pitchValues.pitchGSharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchGSharp', val)}
+                        />
+                        <Knob
+                            label="A"
+                            value={pitchValues.pitchA}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchA', val)}
+                        />
+                        <Knob
+                            label="A#"
+                            value={pitchValues.pitchASharp}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchASharp', val)}
+                        />
+                        <Knob
+                            label="B"
+                            value={pitchValues.pitchB}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('pitchB', val)}
+                        />
+                        <Knob
+                            label="Octave Ratio"
+                            value={pitchValues.octaveRatio}
+                            modifier={2.0}
+                            offset={1.0}
+                            resetValue={2.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('octaveRatio', val)}
+                        />
+                        <Knob
+                            label="All Them Pitches"
+                            value={pitchValues.allThemPitches}
+                            modifier={1.5}
+                            offset={0.5}
+                            resetValue={1.0}
+                            decimalPlaces={3}
+                            onUpdate={(val) => updatePitchValue('allThemPitches', val)}
+                        />
+                        <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: '4px'
+                        }}>
+                            <button 
+                                onClick={resetMicrotonalPitches}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    background: '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#555'}
+                                onMouseOut={(e) => e.target.style.background = '#333'}
+                            >
+                                Reset All
+                            </button>
+                        </div>
+                    </KnobGrid>
+                </MicrotonalModule>
             </IntervalMainContent>
 
             {/* Control Buttons */}
@@ -468,8 +722,6 @@ const IntervalPractice = ({ className }) => {
 
 IntervalPractice.propTypes = {
     className: PropTypes.string,
-        currentTheme: PropTypes.string.isRequired,
-        setTheme: PropTypes.func.isRequired,
 };
 
 IntervalPractice.defaultProps = {

@@ -496,8 +496,92 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         playNotes: playNotesProgrammatic,
         stopNotes: stopNotesProgrammatic,
         stopAllNotes: stopAllNotesProgrammatic,
-        isActive: () => synthActive
-    }), [synthActive]);
+        isActive: () => synthActive,
+        // Expose pitch controls for IntervalPractice synchronization
+        getPitchValues: () => {
+            // console.log('Getting pitch values:', pitchEnv);
+            return {
+                pitchC: pitchEnv.C,
+                pitchCSharp: pitchEnv.CSharp,
+                pitchD: pitchEnv.D,
+                pitchDSharp: pitchEnv.DSharp,
+                pitchE: pitchEnv.E,
+                pitchF: pitchEnv.F, 
+                pitchFSharp: pitchEnv.FSharp,
+                pitchG: pitchEnv.G,
+                pitchGSharp: pitchEnv.GSharp,
+                pitchA: pitchEnv.A,
+                pitchASharp: pitchEnv.ASharp,
+                pitchB: pitchEnv.B,
+                octaveRatio: pitchEnv.Octave,
+                allThemPitches: pitchEnv.AllThemPitches
+            };
+
+            // console.log('Getting pitch values:', {
+            //     pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
+            //     pitchFSharp, pitchG, pitchGSharp, pitchA, pitchASharp, pitchB,
+            //     octaveRatio, allThemPitches
+            // });
+            return {
+                pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
+                pitchFSharp, pitchG, pitchGSharp, pitchA, pitchASharp, pitchB,
+                octaveRatio, allThemPitches
+            };
+        },
+        setPitchValues: (values) => {
+            console.log('Setting pitch values:', values, pitchEnv);
+            if (values.pitchC !== undefined) setPitchC(values.pitchC);
+            if (values.pitchCSharp !== undefined) setPitchCSharp(values.pitchCSharp);
+            if (values.pitchD !== undefined) setPitchD(values.pitchD);
+            if (values.pitchDSharp !== undefined) setPitchDSharp(values.pitchDSharp);
+            if (values.pitchE !== undefined) setPitchE(values.pitchE);
+            if (values.pitchF !== undefined) setPitchF(values.pitchF);
+            if (values.pitchFSharp !== undefined) setPitchFSharp(values.pitchFSharp);
+            if (values.pitchG !== undefined) setPitchG(values.pitchG);
+            if (values.pitchGSharp !== undefined) setPitchGSharp(values.pitchGSharp);
+            if (values.pitchA !== undefined) setPitchA(values.pitchA);
+            if (values.pitchASharp !== undefined) setPitchASharp(values.pitchASharp);
+            if (values.pitchB !== undefined) setPitchB(values.pitchB);
+            if (values.octaveRatio !== undefined) setOctaveRatio(values.octaveRatio);
+            if (values.allThemPitches !== undefined) setAllThemPitches(values.allThemPitches);
+            return pitchEnv;
+        },
+        resetMicrotonalPitches: () => {
+            setPitchC(1.0);
+            setPitchCSharp(1.0);
+            setPitchD(1.0);
+            setPitchDSharp(1.0);
+            setPitchE(1.0);
+            setPitchF(1.0);
+            setPitchFSharp(1.0);
+            setPitchG(1.0);
+            setPitchGSharp(1.0);
+            setPitchA(1.0);
+            setPitchASharp(1.0);
+            setPitchB(1.0);
+            setOctaveRatio(2.0);
+            setAllThemPitches(1.0);
+        }
+    }), [synthActive, pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
+        pitchFSharp, pitchG, pitchGSharp, pitchA, pitchASharp, pitchB,
+        octaveRatio, allThemPitches]);
+
+    pitchEnv = {
+        C: pitchC,
+        CSharp: pitchCSharp,
+        D: pitchD,      
+        DSharp: pitchDSharp,
+        E: pitchE,
+        F: pitchF,
+        FSharp: pitchFSharp,
+        G: pitchG,
+        GSharp: pitchGSharp,
+        A: pitchA,
+        ASharp: pitchASharp,
+        B: pitchB,
+        Octave: octaveRatio,
+        AllThemPitches: allThemPitches
+    };
 
     // Function to delegate played notes to each of the synths
     const noteOn = (note) => {

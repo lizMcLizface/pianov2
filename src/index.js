@@ -45,6 +45,9 @@ let IntervalTabPlaceholder = document.getElementById('IntervalTabPlaceholder');
 let polySynthRef = null;
 const polySynthComponentRef = React.createRef();
 
+// Make polySynthRef globally accessible
+window.polySynthRef = null;
+
 // Comment out the main React app since this is a hybrid HTML/React application
 // The main interface is in the HTML file, and React components are embedded in specific divs
 // However, we'll render a minimal theme manager for global theming
@@ -70,6 +73,7 @@ if (PolySynthTabPlaceholder) {
     // Set up the ref after a short delay to ensure component is mounted
     setTimeout(() => {
         polySynthRef = polySynthComponentRef.current;
+        window.polySynthRef = polySynthRef; // Make globally accessible
         if (polySynthRef) {
             console.log('PolySynth ready for programmatic control');
         }
