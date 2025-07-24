@@ -7,6 +7,7 @@ const Spectrogram = ({ audioCtx, sourceNode, className = '' }) => {
     const canvasRef = useRef(null);
     const animationRef = useRef(null);
     const analyserRef = useRef(null);
+    const spectrogramDataRef = useRef([]); // Store historical spectrogram data
     const [isActive, setIsActive] = useState(false);
     const [peakFrequency, setPeakFrequency] = useState(0);
 
@@ -38,6 +39,9 @@ const Spectrogram = ({ audioCtx, sourceNode, className = '' }) => {
                 // Clear the canvas after resize
                 canvasCtx.fillStyle = 'rgba(5, 5, 10, 1)';
                 canvasCtx.fillRect(0, 0, rect.width, rect.height);
+                
+                // Reset spectrogram data on resize to prevent artifacts
+                spectrogramDataRef.current = [];
             }
         };
 
@@ -68,10 +72,10 @@ const Spectrogram = ({ audioCtx, sourceNode, className = '' }) => {
             analyser.getByteFrequencyData(dataArray);
 
             // Debug: Log the first few frequency values to see if we're getting data
-            if (Math.random() < 0.01) { // Log occasionally
-                console.log('Spectrogram data sample:', dataArray.slice(0, 10));
-                console.log('Max value:', Math.max(...dataArray));
-            }
+            // if (Math.random() < 0.01) { // Log occasionally
+                // console.log('Spectrogram data sample:', dataArray.slice(0, 10));
+                // console.log('Max value:', Math.max(...dataArray));
+            // }
 
             // Check if there's signal
             const maxValue = Math.max(...dataArray);
@@ -92,76 +96,78 @@ const Spectrogram = ({ audioCtx, sourceNode, className = '' }) => {
                 setPeakFrequency(freq);
             }
 
-            // Shift existing spectrogram data to the left for real-time scrolling
-            // Only do this if we have valid dimensions
-            if (width > 4 && height > 0) {
-                try {
-                    const imageData = canvasCtx.getImageData(4, 0, width - 4, height);
-                    canvasCtx.putImageData(imageData, 0, 0);
-                } catch (e) {
-                    // If getImageData fails, just clear and continue
-                    console.warn('getImageData failed, clearing canvas:', e);
-                }
-            }
+            // Time-based scrolling that maintains history
+            const spectrogramData = spectrogramDataRef.current;
+            const maxColumns = Math.floor(width / 4); // 4 pixels per column
             
-            // Clear the rightmost column for new data
-            canvasCtx.fillStyle = 'rgba(5, 5, 10, 1)';
-            canvasCtx.fillRect(width - 4, 0, 4, height);
-
-            // Draw new frequency data column on the right edge
-            const x = width - 4; // Draw at the right edge
-            
-            // Only process frequencies up to 8kHz for better musical visualization
+            // Add new frequency data as a column
+            const newColumn = [];
             const maxFreqIndex = Math.floor((8000 * bufferLength * 2) / audioCtx.sampleRate);
             const processedLength = Math.min(bufferLength, maxFreqIndex);
             
-            for (let i = 1; i < processedLength; i++) { // Start from 1 to skip DC
+            for (let i = 1; i < processedLength; i++) {
                 const intensity = dataArray[i] / 255.0;
-                
-                if (intensity > 0.01) { // Only draw if there's meaningful data
-                    // Convert frequency bin to y position 
-                    const frequency = (i * audioCtx.sampleRate) / (2 * bufferLength);
-                    
-                    // Use a better logarithmic scale that uses more of the display height
-                    // Map 20Hz to 8kHz across the full height
-                    const minFreq = 20;
-                    const maxFreq = 8000;
-                    const logFreq = (Math.log(Math.max(frequency, minFreq)) - Math.log(minFreq)) / 
-                                   (Math.log(maxFreq) - Math.log(minFreq));
-                    const y = height - (logFreq * height);
-                    
-                    // Color mapping: blue (low) -> cyan (mid-low) -> green (mid) -> yellow (mid-high) -> red (high)
-                    let r, g, b;
-                    if (intensity < 0.25) {
-                        // Blue to cyan
-                        r = 0;
-                        g = Math.floor(intensity * 4 * 150);
-                        b = 255;
-                    } else if (intensity < 0.5) {
-                        // Cyan to green
-                        r = 0;
-                        g = 255;
-                        b = Math.floor((0.5 - intensity) * 4 * 255);
-                    } else if (intensity < 0.75) {
-                        // Green to yellow
-                        r = Math.floor((intensity - 0.5) * 4 * 255);
-                        g = 255;
-                        b = 0;
-                    } else {
-                        // Yellow to red
-                        r = 255;
-                        g = Math.floor((1 - intensity) * 4 * 255);
-                        b = 0;
-                    }
-                    
-                    canvasCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${Math.min(intensity * 0.9 + 0.1, 1.0)})`;
-                    
-                    // Draw a small rectangle for each frequency bin
-                    if (y >= 0 && y <= height) {
-                        canvasCtx.fillRect(x, y - 2, 4, 4);
-                    }
-                }
+                const frequency = (i * audioCtx.sampleRate) / (2 * bufferLength);
+                newColumn.push({ intensity, frequency });
             }
+            
+            // Add new column and remove old ones to maintain scroll effect
+            spectrogramData.push(newColumn);
+            if (spectrogramData.length > maxColumns) {
+                spectrogramData.shift(); // Remove oldest column
+            }
+            
+            // Clear canvas
+            canvasCtx.fillStyle = 'rgba(5, 5, 10, 1)';
+            canvasCtx.fillRect(0, 0, width, height);
+            
+            // Draw all columns from left to right (oldest to newest)
+            spectrogramData.forEach((column, columnIndex) => {
+                const x = columnIndex * 4; // 4 pixels per column
+                
+                column.forEach(({ intensity, frequency }) => {
+                    if (intensity > 0.01) { // Only draw if there's meaningful data
+                        // Use a better logarithmic scale that uses more of the display height
+                        // Map 20Hz to 8kHz across the full height
+                        const minFreq = 20;
+                        const maxFreq = 8000;
+                        const logFreq = (Math.log(Math.max(frequency, minFreq)) - Math.log(minFreq)) / 
+                                       (Math.log(maxFreq) - Math.log(minFreq));
+                        const y = height - (logFreq * height);
+                        
+                        // Color mapping: blue (low) -> cyan (mid-low) -> green (mid) -> yellow (mid-high) -> red (high)
+                        let r, g, b;
+                        if (intensity < 0.25) {
+                            // Blue to cyan
+                            r = 0;
+                            g = Math.floor(intensity * 4 * 150);
+                            b = 255;
+                        } else if (intensity < 0.5) {
+                            // Cyan to green
+                            r = 0;
+                            g = 255;
+                            b = Math.floor((0.5 - intensity) * 4 * 255);
+                        } else if (intensity < 0.75) {
+                            // Green to yellow
+                            r = Math.floor((intensity - 0.5) * 4 * 255);
+                            g = 255;
+                            b = 0;
+                        } else {
+                            // Yellow to red
+                            r = 255;
+                            g = Math.floor((1 - intensity) * 4 * 255);
+                            b = 0;
+                        }
+                        
+                        canvasCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${Math.min(intensity * 0.9 + 0.1, 1.0)})`;
+                        
+                        // Draw a small rectangle for each frequency bin
+                        if (y >= 0 && y <= height) {
+                            canvasCtx.fillRect(x, y - 2, 4, 4);
+                        }
+                    }
+                });
+            });
 
             // Draw frequency scale lines
             canvasCtx.strokeStyle = 'rgba(150, 150, 150, 0.15)';

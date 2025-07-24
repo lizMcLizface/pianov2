@@ -57,10 +57,10 @@ const Oscilloscope = ({ audioCtx, sourceNode, className = '' }) => {
 
             // Debug: Log the first few waveform values to see if we're getting data
             if (Math.random() < 0.01) { // Log occasionally
-                console.log('Oscilloscope data sample:', dataArray.slice(0, 10));
+                // console.log('Oscilloscope data sample:', dataArray.slice(0, 10));
                 const maxVal = Math.max(...dataArray);
                 const minVal = Math.min(...dataArray);
-                console.log('Waveform range:', minVal, 'to', maxVal);
+                // console.log('Waveform range:', minVal, 'to', maxVal);
             }
 
             // Clear canvas with dark background

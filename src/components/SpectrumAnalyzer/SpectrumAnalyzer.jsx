@@ -16,7 +16,7 @@ const SpectrumAnalyzer = ({ audioCtx, sourceNode, className = '' }) => {
         // Create analyser node
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = Math.pow(2, 15); // 4096 points for better frequency resolution
-        analyser.smoothingTimeConstant = 0.0; // Higher smoothing for cleaner line plot
+        analyser.smoothingTimeConstant = 0.5; // Higher smoothing for cleaner line plot
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
