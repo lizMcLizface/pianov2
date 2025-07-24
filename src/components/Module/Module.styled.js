@@ -7,19 +7,25 @@ export const ComponentContainer = styled.div`
     height: 100%;
     width: 100%;
     padding: ${SPACING.m};
+    padding-top: calc(${SPACING.m} + ${SPACING.s}); /* Extra top padding for label space */
     border: ${borderWidthS} solid ${({ theme }) => theme.strong};
     border-radius: ${borderRadiusM};
     background-color: ${({ theme }) => theme.background};
 `;
 
 export const Label = styled.h4`
-    ${absCenter}
-    top: 0;
+    position: absolute;
+    top: -0.5em; /* Position label outside the border */
+    left: 50%;
+    transform: translateX(-50%);
     width: fit-content;
     color: ${({ theme }) => theme.pop};
-    padding: 0 ${SPACING.s} ${SPACING.xs};
+    padding: 0 ${SPACING.s};
     background-color: ${({theme}) => theme.background};
     letter-spacing: 0.5px;
+    font-size: 1.25rem; /* Slightly smaller font to reduce space usage */
+    margin: 0; /* Remove default margins */
+    white-space: nowrap; /* Prevent label text wrapping */
 `;
 
 export const Bolt = styled.div`

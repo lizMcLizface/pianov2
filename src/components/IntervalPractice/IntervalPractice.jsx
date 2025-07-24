@@ -22,7 +22,14 @@ import {
     SelectedDisplay,
     StatusDisplay,
     GuessDisplay,
-    ActionButton
+    ActionButton,
+    IntervalGuideContainer,
+    GuideSection,
+    GuideTitle,
+    GuideText,
+    GuideKeyboard,
+    GuideList,
+    GuideCode
 } from './IntervalPractice.styled';
 // Import MicrotonalModule from PolySynth
 import { MicrotonalModule } from '../PolySynth/PolySynth.styled';
@@ -883,9 +890,17 @@ const IntervalPractice = ({ className }) => {
             <GuessSection>
                 <Module label="Make Your Guess">
                     <div style={{ textAlign: 'center', marginBottom: '15px', fontSize: '12px', color: '#666' }}>
-                        Click notes you hear. Colors cycle: Gray (off) → Green (1x) → Blue (2x) → Gray (off)
-                        <br />
-                        <strong>Keyboard:</strong> 1=C, 2=C#, 3=D, 4=D#, 5=E, 6=F, 7=F#, 8=G, 9=G#, 0=A, -=A#, ==B | Backspace=Clear | Enter=Submit | Space=Replay | Tab=New
+                        <div style={{ marginBottom: '8px' }}>
+                            <strong>Listen carefully and select the notes you hear!</strong>
+                        </div>
+                        <div style={{ marginBottom: '4px' }}>
+                            Click notes to cycle colors: <span style={{color: '#666'}}>Gray (off)</span> → <span style={{color: '#4CAF50'}}>Green (1×)</span> → <span style={{color: '#2196F3'}}>Blue (2×)</span> → Gray
+                        </div>
+                        <div style={{ fontSize: '11px', opacity: 0.8 }}>
+                            <strong>Quick Keys:</strong> 1=C, 2=C#, 3=D, 4=D#, 5=E, 6=F, 7=F#, 8=G, 9=G#, 0=A, -=A#, ==B
+                            <br />
+                            <strong>Actions:</strong> Backspace=Clear | Enter=Submit | Space=Replay | Tab=New Interval
+                        </div>
                     </div>
                     
                     <GuessButtonsContainer>
@@ -954,6 +969,117 @@ const IntervalPractice = ({ className }) => {
                 </StatusDisplay>
             )}
             </GuessSection>
+                {/* User Guide */}
+                <IntervalGuideContainer>
+                    <GuideSection>
+                        <GuideTitle>🎵 How to Use Interval Practice</GuideTitle>
+                        <GuideText>
+                            This tool helps you train your ear to recognize musical intervals through listening exercises.
+                        </GuideText>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>📋 Step-by-Step Guide</GuideTitle>
+                        <GuideList>
+                            <li><strong>1. Select Intervals:</strong> Click cells in the grid to choose which intervals to practice</li>
+                            <li><strong>2. Configure Settings:</strong> Adjust tries, volume, note duration, etc.</li>
+                            <li><strong>3. Start Practice:</strong> Click "Play Random Interval" to begin</li>
+                            <li><strong>4. Make Guess:</strong> Click notes you think you heard</li>
+                            <li><strong>5. Submit:</strong> Press "Submit Guess" or <GuideCode>Enter</GuideCode></li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>🎹 Piano Keyboard Input</GuideTitle>
+                        <GuideText>Use your computer keyboard to play notes:</GuideText>
+                        <GuideKeyboard>
+White Keys (Home Row):
+A S D F G H J K L ; '
+C D E F G A B C D E F
+
+Black Keys (Row Above):
+W E   T Y U   O P
+C# D#  F# G# A#  C# D#
+                        </GuideKeyboard>
+                        <GuideList>
+                            <li><GuideCode>Z</GuideCode> / <GuideCode>X</GuideCode> - Change octave down/up</li>
+                            <li><GuideCode>Shift</GuideCode> - Transpose octave up/down</li>
+                            <li><GuideCode>Alt</GuideCode> - Transpose 2 octaves up/down</li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>🎯 Interval Selection Grid</GuideTitle>
+                        <GuideList>
+                            <li><strong>Rows:</strong> Root notes (C through B)</li>
+                            <li><strong>Columns:</strong> Interval types (P1=unison, M2=major 2nd, etc.)</li>
+                            <li><strong>Click cell:</strong> Toggle interval on/off</li>
+                            <li><strong>Click row/column header:</strong> Select/deselect entire row/column</li>
+                            <li><strong>Green cells:</strong> Selected for practice</li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>⚙️ Practice Settings</GuideTitle>
+                        <GuideList>
+                            <li><strong>Tries:</strong> How many guesses per interval</li>
+                            <li><strong>Relistens:</strong> How many times you can replay</li>
+                            <li><strong>Note Duration:</strong> How long each note plays</li>
+                            <li><strong>Note Delay:</strong> Gap between sequential notes</li>
+                            <li><strong>Volume:</strong> Playback volume (0-100%)</li>
+                            <li><strong>Note Count:</strong> Number of notes to play</li>
+                            <li><strong>Base Octave:</strong> Starting octave (1-6)</li>
+                            <li><strong>Simultaneous:</strong> Play notes together vs. in sequence</li>
+                            <li><strong>Allow Duplicates:</strong> Permit repeated notes</li>
+                            <li><strong>Preselect Root:</strong> Auto-select root note in guesses</li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>🎮 Guess Controls</GuideTitle>
+                        <GuideText>
+                            Click note buttons to build your guess. Buttons cycle through:
+                        </GuideText>
+                        <GuideList>
+                            <li><strong>Gray:</strong> Note not selected</li>
+                            <li><strong>Green:</strong> Note selected once</li>
+                            <li><strong>Blue:</strong> Note selected twice (for duplicates)</li>
+                        </GuideList>
+                        <GuideText><strong>Keyboard Shortcuts for Guessing:</strong></GuideText>
+                        <GuideList>
+                            <li><GuideCode>1-9, 0, -, =</GuideCode> - Select notes C through B</li>
+                            <li><GuideCode>Backspace</GuideCode> - Clear all selections</li>
+                            <li><GuideCode>Enter</GuideCode> - Submit your guess</li>
+                            <li><GuideCode>Space</GuideCode> - Replay current interval</li>
+                            <li><GuideCode>Tab</GuideCode> - Play new random interval</li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>🎨 Microtonal Controls</GuideTitle>
+                        <GuideText>
+                            Adjust individual note pitches for microtonal exploration:
+                        </GuideText>
+                        <GuideList>
+                            <li><strong>Individual Knobs:</strong> Fine-tune each note's pitch</li>
+                            <li><strong>Octave Ratio:</strong> Change the octave size (default 2.0)</li>
+                            <li><strong>All Them Pitches:</strong> Global pitch multiplier</li>
+                            <li><strong>Reset All:</strong> Return to standard 12-tone equal temperament</li>
+                        </GuideList>
+                    </GuideSection>
+
+                    <GuideSection>
+                        <GuideTitle>💡 Tips for Success</GuideTitle>
+                        <GuideList>
+                            <li>Start with simple intervals (unison, octave, perfect fifth)</li>
+                            <li>Practice one root note at a time initially</li>
+                            <li>Use "Simultaneous" mode for harmonic intervals</li>
+                            <li>Use sequential mode to hear melodic motion</li>
+                            <li>Increase tries/relistens while learning</li>
+                            <li>Track your accuracy percentage to monitor progress</li>
+                        </GuideList>
+                    </GuideSection>
+                </IntervalGuideContainer>
             {/* Control Buttons */}
 
                 {/* Microtonal Pitch Control */}
@@ -1112,6 +1238,7 @@ const IntervalPractice = ({ className }) => {
                         </div>
                     </KnobGrid>
                 </MicrotonalModule>
+
             </IntervalMainContent>
 
         </IntervalContainer>

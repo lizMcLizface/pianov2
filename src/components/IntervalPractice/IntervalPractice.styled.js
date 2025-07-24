@@ -22,12 +22,78 @@ export const IntervalInstructions = styled.p`
 
 export const IntervalMainContent = styled.div`
     display: grid;
-    grid-template-columns: 800px 418px 418px 120px;
+    grid-template-columns: 800px 418px 418px 300px;
     gap: ${SPACING.m};
-    align-items: center;
+    align-items: start;
     justify-items: center;
     justify-content: center;
     margin-bottom: ${SPACING.m};
+`;
+
+export const IntervalGuideContainer = styled.div`
+    background-color: ${({ theme }) => theme.background};
+    border: ${borderWidthS} solid ${({ theme }) => theme.strong};
+    border-radius: ${borderRadiusM};
+    padding: ${SPACING.m};
+    font-size: 12px;
+    line-height: 1.4;
+    color: ${({ theme }) => theme.strong};
+    max-height: 600px;
+    overflow-y: auto;
+    position: sticky;
+    top: ${SPACING.m};
+`;
+
+export const GuideSection = styled.div`
+    margin-bottom: ${SPACING.m};
+    
+    &:last-child {
+        margin-bottom: 0;
+    }
+`;
+
+export const GuideTitle = styled.h4`
+    color: ${({ theme }) => theme.pop};
+    margin: 0 0 ${SPACING.s} 0;
+    font-size: 13px;
+    font-weight: bold;
+    border-bottom: 1px solid ${({ theme }) => theme.mid};
+    padding-bottom: 2px;
+`;
+
+export const GuideText = styled.p`
+    margin: 0 0 ${SPACING.xs} 0;
+    
+    &:last-child {
+        margin-bottom: 0;
+    }
+`;
+
+export const GuideKeyboard = styled.div`
+    font-family: 'Courier New', monospace;
+    background-color: ${({ theme }) => theme.lite};
+    padding: ${SPACING.s};
+    border-radius: ${borderRadiusS};
+    margin: ${SPACING.xs} 0;
+    font-size: 10px;
+    line-height: 1.2;
+`;
+
+export const GuideList = styled.ul`
+    margin: ${SPACING.xs} 0;
+    padding-left: ${SPACING.m};
+    
+    li {
+        margin-bottom: 2px;
+    }
+`;
+
+export const GuideCode = styled.code`
+    background-color: ${({ theme }) => theme.lite};
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
 `;
 
 export const IntervalGridContainer = styled.div`
