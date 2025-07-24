@@ -331,7 +331,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     // Functions to pass envelope data to the synth
     const synthNoteOn = (synth, note, volume) => {
         const gainEnv = getGainEnv(volume);
-        console.log('Gain envelope:', gainEnv);
+        // console.log('Gain envelope:', gainEnv);
         const filterEnv = getFilterEnv();
         synth.noteOn(
             note,
@@ -351,7 +351,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     // Programmatic note control functions
     const playNotesProgrammatic = (notes, volume = 50, duration = null) => {
         if (!synthActive) activateSynth();
-        console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
+        // console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
         
         const gainValue = volume / 100; // Convert percentage to gain value
         
@@ -480,10 +480,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         // Calculate frequency using custom octave ratio instead of fixed 2.0
         const freq = adjustedBaseFreq * Math.pow(pitchEnv.Octave, octave - 4);
-        console.log(`Base frequency for ${noteName}: ${baseFreq}, Adjusted: ${adjustedBaseFreq}, Octave: ${octave}, Frequency: ${freq}`);
+        // console.log(`Base frequency for ${noteName}: ${baseFreq}, Adjusted: ${adjustedBaseFreq}, Octave: ${octave}, Frequency: ${freq}`);
 
 
-        console.log(`Parsed note: ${noteString}, Frequency: ${freq}, Octave: ${octave},`, pitchAdjustments, pitchEnv);
+        // console.log(`Parsed note: ${noteString}, Frequency: ${freq}, Octave: ${octave},`, pitchAdjustments, pitchEnv);
         return {
             note: noteString,
             oct: octave,

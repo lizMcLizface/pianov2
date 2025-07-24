@@ -54,7 +54,7 @@ class Gain {
         const steps = Math.max(10, Math.min(512, Math.floor(duration * 100)));
 
         const curve = generateEnvelopeCurve(actualCurrentLevel, finalLevel, shape, exponent, steps);
-        console.log(`Generated envelope curve: ${curve}`);
+        // console.log(`Generated envelope curve: ${curve}`);
 
 
         // Convert to Float32Array as required by setValueCurveAtTime

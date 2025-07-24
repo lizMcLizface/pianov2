@@ -19,7 +19,7 @@ window.gridData = window.gridData || [];
  * @param {boolean} updatePlaybackIfNeeded - Whether to handle playback updates (default: true)
  */
 function addDrawNotes(div, newNoteArray, updatePlaybackIfNeeded = true) {
-    console.log('Adding new bars to existing notation:', newNoteArray);
+    // console.log('Adding new bars to existing notation:', newNoteArray);
     
     // newNoteArray format: [[trebleNotes], [bassNotes]] - same as outputNoteArray
     if (!newNoteArray || newNoteArray.length < 2) {
@@ -48,12 +48,12 @@ function addDrawNotes(div, newNoteArray, updatePlaybackIfNeeded = true) {
         return;
     }
     
-    console.log('Updated grid data after adding bars:', window.gridData);
+    // console.log('Updated grid data after adding bars:', window.gridData);
     
     // Update any ongoing playback to recognize the new bars
     if (updatePlaybackIfNeeded && typeof window.isPlaying !== 'undefined' && window.isPlaying) {
         // If currently playing, the playback system will automatically handle the extended gridData
-        console.log('Playback system will recognize new bars on next iteration');
+        // console.log('Playback system will recognize new bars on next iteration');
     }
 }
 
@@ -124,12 +124,12 @@ function removeLastBar(div, updatePlaybackIfNeeded = true) {
     // Remove the last bar from both treble and bass
     if (trebleBars.length > 0) {
         const removedTrebleBar = trebleBars.pop();
-        console.log('Removed treble bar:', removedTrebleBar);
+        // console.log('Removed treble bar:', removedTrebleBar);
     }
     
     if (bassBars.length > 0) {
         const removedBassBar = bassBars.pop();
-        console.log('Removed bass bar:', removedBassBar);
+        // console.log('Removed bass bar:', removedBassBar);
     }
     
     // Redraw all notation with the updated data
@@ -140,7 +140,7 @@ function removeLastBar(div, updatePlaybackIfNeeded = true) {
         return;
     }
     
-    console.log('Updated grid data after removing last bar:', window.gridData);
+    // console.log('Updated grid data after removing last bar:', window.gridData);
     
     // Update playback position if it's beyond the new bounds
     if (updatePlaybackIfNeeded) {
@@ -153,12 +153,12 @@ function removeLastBar(div, updatePlaybackIfNeeded = true) {
                 // Reset to last bar if current position is beyond bounds
                 window.currentBarIndex = Math.max(0, window.gridData.length - 1);
                 window.currentNoteIndex = 0;
-                console.log('Adjusted playback position to bounds:', window.currentBarIndex, window.currentNoteIndex);
+                // console.log('Adjusted playback position to bounds:', window.currentBarIndex, window.currentNoteIndex);
             }
         }
         
         if (typeof window.isPlaying !== 'undefined' && window.isPlaying) {
-            console.log('Playback system will recognize updated bars on next iteration');
+            // console.log('Playback system will recognize updated bars on next iteration');
         }
     }
 }

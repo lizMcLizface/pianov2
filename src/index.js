@@ -80,7 +80,7 @@ if (PolySynthTabPlaceholder) {
 reportWebVitals();
 
 
-console.log(processChord('Cmaj7'));
+// console.log(processChord('Cmaj7'));
 
 window.$ = window.jQuery = require('jquery');
 
@@ -142,7 +142,7 @@ if (navigator.requestMIDIAccess) {
 }
 
 if (navigator.requestMIDIAccess) {
-    console.log('Browser still supports MIDI!');
+    // console.log('Browser still supports MIDI!');
     navigator.requestMIDIAccess()
         .then(success, failure);
 }
@@ -164,7 +164,7 @@ function listInputsAndOutputs(midiAccess) {
   }
 
 function success (midi) {
-    console.log('Got midi!', midi);
+    // console.log('Got midi!', midi);
 
     listInputsAndOutputs(midi);
     var inputs = midi.inputs.values();
@@ -493,7 +493,7 @@ function drawIndividualNotes(noteArray, inputContext, inputTrebleStave, inputBas
 }
 
 function drawNotes(div, noteArray, stacked = false){
-    console.log('Current Note State:', noteArray);
+    // console.log('Current Note State:', noteArray);
 
     var noteString = [];
     for (const [key, value] of Object.entries(noteArray)) {
@@ -855,7 +855,7 @@ window.initializeSelectionSystem = initializeSelectionSystem;
 
 // Global variable to store grid-aligned note data (accessible from other JS files)
 window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
-console.log('Grid-aligned notes:', window.gridData);
+// console.log('Grid-aligned notes:', window.gridData);
 
 // Initialize the selection system to highlight first note and update outputText
 initializeSelectionSystem();
@@ -935,7 +935,7 @@ function highlightSelectedNotes(barIndex, beatIndex) {
 
 // Enhanced helper function to highlight selected notes with separate tracking
 function highlightSelectedNotesSecondary(barIndex, beatIndex) {
-    console.log('Highlighting selected notes at Bar:', barIndex, 'Beat:', beatIndex);
+    // console.log('Highlighting selected notes at Bar:', barIndex, 'Beat:', beatIndex);
     // Update the selected position
     selectedBarIndex = barIndex;
     selectedNoteIndex = beatIndex;
@@ -1059,7 +1059,7 @@ function setSelectedPosition(barIndex, noteIndex) {
     // Update the output text
     updateOutputText();
     
-    console.log('Selected position set to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    // console.log('Selected position set to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
 }
 
 // Helper function to advance selected position
@@ -1084,7 +1084,7 @@ function advanceSelectedPosition() {
             selectedBarIndex++;
             selectedNoteIndex = 0;
         } else {
-            console.log('At end of notation');
+            // console.log('At end of notation');
             selectedBarIndex = 0;
             selectedNoteIndex = 0; // Reset to start if at end
             // return false;
@@ -1098,7 +1098,7 @@ function advanceSelectedPosition() {
     // Update the output text
     updateOutputText();
     
-    console.log('Selected position advanced to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    // console.log('Selected position advanced to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
     return true;
 }
 
@@ -1118,7 +1118,7 @@ function retreatSelectedPosition() {
                 selectedNoteIndex = 0;
             }
         } else {
-            console.log('At beginning of notation');
+            // console.log('At beginning of notation');
             return false;
         }
     }
@@ -1130,7 +1130,7 @@ function retreatSelectedPosition() {
     // Update the output text
     updateOutputText();
     
-    console.log('Selected position retreated to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    // console.log('Selected position retreated to - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
     return true;
 }
 
@@ -1202,7 +1202,7 @@ function getCompleteStatus() {
 }
 
 function drawNotes2(div, noteArray, stacked = false){
-    console.log('Current Note State:', noteArray);
+    // console.log('Current Note State:', noteArray);
 
     // noteArray format: [[trebleNotes], [bassNotes]]
     // Each contains bars: [[bar1], [bar2], ...]
@@ -1580,7 +1580,7 @@ var currentSynthNotes = {};
 let baseOctave = 4;
 
 function onKeyPress(event, up) {
-    console.log(event.key, event.code, event.type);
+    // console.log(event.key, event.code, event.type);
     if(event.type == 'keydown'){
         if(event.location == KeyboardEvent.DOM_KEY_LOCATION_LEFT && event.code.includes('Shift')){
             modifiers['LeftShift'] = true;
@@ -1632,17 +1632,17 @@ function onKeyPress(event, up) {
         if(baseOctave > 8) baseOctave = 8;
     }
 
-    console.log('Base Octave: ', baseOctave);
+    // console.log('Base Octave: ', baseOctave);
 
     var note = keyToNote(event, baseOctave);
     if (note == undefined){
         // console.log('Key not mapped: ', event.code);
         return;
     }
-    console.log('Modifiers: ', modifiers);
-    console.log('Note: ', note);
+    // console.log('Modifiers: ', modifiers);
+    // console.log('Note: ', note);
     var midiNote = noteToMidi(note) + 12;
-    console.log('Midi Note: ', midiNote);
+    // console.log('Midi Note: ', midiNote);
     if(modifiers['LeftShift']) midiNote -= 12;
     if(modifiers['RightShift']) midiNote += 12;
     // if (modifiers['LeftControl']) midiNote -= 24;
@@ -1651,7 +1651,7 @@ function onKeyPress(event, up) {
     if (modifiers['RightAlt']) midiNote += 24;
     note = noteToName(midiNote);
 
-    console.log('Note: ', note, ' Midi Note: ', midiNote);
+    // console.log('Note: ', note, ' Midi Note: ', midiNote);
 
     if(event.type == 'keydown' && note != undefined && !currentPressed.includes(note)){
         noteArray[note] = 127; // Set velocity to 127 for keydown
@@ -1750,7 +1750,7 @@ function onKeyPress(event, up) {
         let message = {
             data: [144, noteToMidi(note), 127] // Note on message
         };
-        console.log('Key Down: ', noteName, '@', message.data[2]);
+        // console.log('Key Down: ', noteName, '@', message.data[2]);
         noteArray[noteName] = message.data[2];
         
         // Use PolySynth for new note playing if available
@@ -1819,7 +1819,7 @@ function onKeyPress(event, up) {
         let message = {
             data: [144, noteToMidi(note), 127] // Note on message
         };
-        console.log('Key Up: ', noteName);
+        // console.log('Key Up: ', noteName);
         if(noteArray.hasOwnProperty(noteName)){ // true
             // console.log('...');
             delete noteArray[noteName];
@@ -1838,14 +1838,14 @@ function onKeyPress(event, up) {
 
     }
 
-    console.log('Input: ', noteArray);  
-    console.log('Current Grid Data: ', window.gridData);
-    console.log('Selected Bar Index: ', selectedBarIndex);
-    console.log('Selected Note Index: ', selectedNoteIndex);
-    console.log('Current Output: ', window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
+    // console.log('Input: ', noteArray);  
+    // console.log('Current Grid Data: ', window.gridData);
+    // console.log('Selected Bar Index: ', selectedBarIndex);
+    // console.log('Selected Note Index: ', selectedNoteIndex);
+    // console.log('Current Output: ', window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
 
     let matching = compareStates(noteArray, window.gridData[selectedBarIndex].notes[selectedNoteIndex].notes);
-    console.log('Matching: ', matching);
+    // console.log('Matching: ', matching);
     if(matching){
         advanceSelectedPosition();
         highlightBothPositions();
@@ -2067,8 +2067,8 @@ function compareStates(inputState, targetState){
         let uniqueInputMod = [...new Set(inputMod)];
         let uniqueReferenceMod = [...new Set(referenceMod)];
 
-        console.log('Unique Input MIDI: ', uniqueInputMod);
-        console.log('Unique Reference MIDI: ', uniqueReferenceMod);
+        // console.log('Unique Input MIDI: ', uniqueInputMod);
+        // console.log('Unique Reference MIDI: ', uniqueReferenceMod);
 
         if (uniqueInputMod.length !== uniqueReferenceMod.length) {
             // console.log('Input and reference states do not match in YOLO mode.');
@@ -2080,12 +2080,12 @@ function compareStates(inputState, targetState){
                 return false;
             }
         }
-        console.log('Input and reference states match in YOLO mode.');
+        // console.log('Input and reference states match in YOLO mode.');
         return true;        
     }
 
-    console.log('Input State MIDI: ', inputStateMidi);
-    console.log('Reference State MIDI: ', referenceStateMidi);
+    // console.log('Input State MIDI: ', inputStateMidi);
+    // console.log('Reference State MIDI: ', referenceStateMidi);
 
     let uniqueInputs = [...new Set(inputStateMidi)];
     let uniqueReferences = [...new Set(referenceStateMidi)];
@@ -2102,7 +2102,7 @@ function compareStates(inputState, targetState){
             return false;
         }
     }
-    console.log('Input and reference states match.');
+    // console.log('Input and reference states match.');
     return true;
 
 
@@ -3537,16 +3537,16 @@ function nextNote() {
     // Check bounds using global grid data
     if (window.gridData && currentBarIndex < window.gridData.length) {
         if (currentNoteIndex >= window.gridData[currentBarIndex].notes.length) {
-            console.log('Moving to next bar from bar', currentBarIndex, 'to bar', currentBarIndex + 1);
+            // console.log('Moving to next bar from bar', currentBarIndex, 'to bar', currentBarIndex + 1);
             currentNoteIndex = 0;
             currentBarIndex = currentBarIndex + 1;
             if (currentBarIndex >= window.gridData.length) {
-                console.log('Wrapping around to start - total bars was', window.gridData.length);
+                // console.log('Wrapping around to start - total bars was', window.gridData.length);
                 currentBarIndex = 0;
             }
         }
     } else {
-        console.log('Warning: no gridData available in global scope');
+        // console.log('Warning: no gridData available in global scope');
     }
     
     // Keep global variables in sync
@@ -3581,12 +3581,12 @@ function playCurrentNote() {
     const noteEvent = window.gridData[currentBarIndex].notes[currentNoteIndex];
     
     if (noteEvent.isPause) {
-        console.log('playing pause/rest');
+        // console.log('playing pause/rest');
         return; // Don't play anything for pauses
     }
     
     const notesToPlay = noteEvent.notes;
-    console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
+    // console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
     // const noteLength = noteEvent.noteLength || 0.5; // Default to 0.5 seconds if not specified
 
     // Play the notes
@@ -3614,7 +3614,7 @@ function playCurrentNote() {
         if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             const chordNotes = notesToPlay.map(note => convertNoteNameToPolySynthFormat(note)).filter(n => n);
 
-            console.log('Converted chord notes for PolySynth:', chordNotes);
+            // console.log('Converted chord notes for PolySynth:', chordNotes);
             if (chordNotes.length > 0) {
                 // console.log('Playing chord with PolySynth:', chordNotes, 'bpm:', bpmSlider.value);
                 playNote2(chordNotes, 60, 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue); // 1 second duration
@@ -3670,7 +3670,7 @@ function playNote2(notes, volume = 50, duration = null) {
     // Ensure notes is an array
     const notesArray = Array.isArray(notes) ? notes : [notes];
     
-    console.log('Playing notes programmatically:', notesArray, 'Volume:', volume, 'Duration:', duration);
+    // console.log('Playing notes programmatically:', notesArray, 'Volume:', volume, 'Duration:', duration);
     
     // Convert duration from milliseconds to match expected format if provided
     const durationMs = duration ? duration : null;
@@ -3680,7 +3680,7 @@ function playNote2(notes, volume = 50, duration = null) {
 
 // Helper function to convert note names from MIDI format to PolySynth format
 function convertNoteNameToPolySynthFormat(noteName) {
-    console.log('Converting note name for PolySynth:', noteName);
+    // console.log('Converting note name for PolySynth:', noteName);
     noteName = noteName.replace('/','')
     // noteName comes in format like "C4", "D#3", etc.
     // PolySynth expects the same format, so we can return as-is

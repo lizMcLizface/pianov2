@@ -51,7 +51,7 @@ function toggleSelectionMode() {
         selectedRootNote = selectedRootNote[0];
     }
     
-    console.log(`Selection mode: ${exclusiveMode ? 'Exclusive' : 'Multiple'}`);
+    // console.log(`Selection mode: ${exclusiveMode ? 'Exclusive' : 'Multiple'}`);
     // Don't call createHeptatonicScaleTable here - let the event listener handle it
 }
 
@@ -135,7 +135,7 @@ function createRootNoteTable() {
             }
         }
         
-        console.log('Selected root note(s):', selectedRootNote);
+        // console.log('Selected root note(s):', selectedRootNote);
         // Refresh both tables to update visual state
         createHeptatonicScaleTable();
     };
@@ -265,7 +265,7 @@ function createRootNoteTable() {
                 }
             }
             
-            console.log('Selected root note(s):', selectedRootNote);
+            // console.log('Selected root note(s):', selectedRootNote);
             // Refresh both tables to update visual state
             createHeptatonicScaleTable();
         };
@@ -298,7 +298,7 @@ function createRootNoteTable() {
             let firstScaleId = selectedScales[0];
             let [family, mode] = firstScaleId.split('-');
     let scales = HeptatonicScales;
-            console.log('note: ', note, 'family: ', family, 'mode: ', mode);
+            // console.log('note: ', note, 'family: ', family, 'mode: ', mode);
             let intervals = scales[family][parseInt(mode, 10) - 1].intervals;
             let scaleNotes = getScaleNotes(note, intervals);
 
@@ -441,7 +441,7 @@ function createHeptatonicScaleTable() {
     let scales = HeptatonicScales;
 
     let scaleNames = Object.keys(scales);
-    console.log('scaleNames:', scaleNames);
+    // console.log('scaleNames:', scaleNames);
 
     // Calculate the maximum number of modes in any scale family
     let maxModes = 0;
@@ -528,7 +528,7 @@ function createHeptatonicScaleTable() {
                             }
                         }
                         
-                        console.log('Selected scales:', selectedScales);
+                        // console.log('Selected scales:', selectedScales);
                         
                         // Refresh the table to update visual state
                         createHeptatonicScaleTable();
@@ -646,7 +646,7 @@ function createHeptatonicScaleTable() {
                             }
                         }
                         
-                        console.log('Selected scales:', selectedScales);
+                        // console.log('Selected scales:', selectedScales);
                     };
                     
                     cell.onmouseover = function() {
@@ -668,7 +668,7 @@ function createHeptatonicScaleTable() {
                             <em>Click to ${selectedScales.includes(scaleId) ? 'deselect' : 'select'}</em>
                         `;
                         let scaleNotes = getScaleNotes(selectedRootNote[0], currentScale[j-1].intervals);
-                        console.log("Scale Notes for", scaleName, ":", scaleNotes);
+                        // console.log("Scale Notes for", scaleName, ":", scaleNotes);
                         highlightKeysForScales(scaleNotes);
                         if (scales[scaleNames[i-1]][j-1].intervals.length === 7) {
                             let identifiedChords_3 = identifySyntheticChords(scales[scaleNames[i-1]][j-1], 3);
@@ -700,7 +700,7 @@ function createHeptatonicScaleTable() {
                             let [family, mode] = firstScaleId.split('-');
                             let intervals = scales[family][parseInt(mode, 10) - 1].intervals;
                             let scaleNotes = getScaleNotes(selectedRootNote[0], intervals);
-                            console.log("Scale Notes for", scaleName, ":", scaleNotes);
+                            // console.log("Scale Notes for", scaleName, ":", scaleNotes);
                             highlightKeysForScales(scaleNotes);
                         };
                     };

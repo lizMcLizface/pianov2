@@ -413,21 +413,21 @@ function highlightKeysForScales(notes){
             keys_chords[key].element.classList.remove('highlightedKey');
         }
     }
-    console.log("Highlighting keys for notes:", notes);
+    // console.log("Highlighting keys for notes:", notes);
     if (notes && notes.length > 0) {
         notes.forEach(note => {
             var n = noteToMidi(note) + 12;
             let key = keys_chords[n];
-            console.log("Key for note:", note, "is", key, "MIDI:", n);
+            // console.log("Key for note:", note, "is", key, "MIDI:", n);
             if (key && key.element) {
-                console.log("Highlighting key:", key.note, "Octave:", key.octave);
+                // console.log("Highlighting key:", key.note, "Octave:", key.octave);
                 key.element.classList.add('highlightedKey');
             }
         });
     }
 }
 function getScaleNotes(rootNote, intervals) {
-    console.log("Generating scale notes for root:", rootNote, "with intervals:", intervals);
+    // console.log("Generating scale notes for root:", rootNote, "with intervals:", intervals);
     let rootNoteMidi = noteToMidi(rootNote + "/5");
     let notes = [rootNoteMidi];
     for (let i = 0; i < intervals.length; i++) {

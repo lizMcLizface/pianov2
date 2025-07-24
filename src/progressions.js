@@ -70,7 +70,7 @@ chord_csv.split('\n').forEach(line => {
     };
 });
 
-console.log(chord_progressions);
+// console.log(chord_progressions);
 
 let placeholder = document.getElementById('ProgressionTabPlaceholder');
 
@@ -380,7 +380,7 @@ function createProgressionOptionsPanel() {
         'leading': 'Leading Voice'
     }, progressionOptions.voicing, function(e) {
         progressionOptions.voicing = e.target.value;
-        console.log('Voicing changed to:', progressionOptions.voicing);
+        // console.log('Voicing changed to:', progressionOptions.voicing);
         drawProgressionStaff();
     });
     
@@ -390,7 +390,7 @@ function createProgressionOptionsPanel() {
         'false': 'No'
     }, progressionOptions.splitChord.toString(), function(e) {
         progressionOptions.splitChord = e.target.value === 'true';
-        console.log('Split chord changed to:', progressionOptions.splitChord);
+        // console.log('Split chord changed to:', progressionOptions.splitChord);
         // Refresh options to enable/disable lower octave
         createProgressionOptionsPanel();
         drawProgressionStaff();
@@ -399,14 +399,14 @@ function createProgressionOptionsPanel() {
     // Lower octave (only enabled if split chord is yes)
     const lowerOctaveGroup = createNumberInput('Lower Octave', 1, 7, progressionOptions.lowerOctave, function(e) {
         progressionOptions.lowerOctave = parseInt(e.target.value);
-        console.log('Lower octave changed to:', progressionOptions.lowerOctave);
+        // console.log('Lower octave changed to:', progressionOptions.lowerOctave);
         drawProgressionStaff();
     }, !progressionOptions.splitChord);
     
     // Upper octave (always enabled)
     const upperOctaveGroup = createNumberInput('Upper Octave', 1, 7, progressionOptions.upperOctave, function(e) {
         progressionOptions.upperOctave = parseInt(e.target.value);
-        console.log('Upper octave changed to:', progressionOptions.upperOctave);
+        // console.log('Upper octave changed to:', progressionOptions.upperOctave);
         drawProgressionStaff();
     });
     
@@ -417,7 +417,7 @@ function createProgressionOptionsPanel() {
         'both': 'Both'
     }, progressionOptions.root, function(e) {
         progressionOptions.root = e.target.value;
-        console.log('Root distribution changed to:', progressionOptions.root);
+        // console.log('Root distribution changed to:', progressionOptions.root);
         drawProgressionStaff();
     });
     
@@ -427,7 +427,7 @@ function createProgressionOptionsPanel() {
         'both': 'Both'
     }, progressionOptions.third, function(e) {
         progressionOptions.third = e.target.value;
-        console.log('Third distribution changed to:', progressionOptions.third);
+        // console.log('Third distribution changed to:', progressionOptions.third);
         drawProgressionStaff();
     });
     
@@ -437,7 +437,7 @@ function createProgressionOptionsPanel() {
         'both': 'Both'
     }, progressionOptions.fifth, function(e) {
         progressionOptions.fifth = e.target.value;
-        console.log('Fifth distribution changed to:', progressionOptions.fifth);
+        // console.log('Fifth distribution changed to:', progressionOptions.fifth);
         drawProgressionStaff();
     });
     
@@ -447,7 +447,7 @@ function createProgressionOptionsPanel() {
         'both': 'Both'
     }, progressionOptions.seventh, function(e) {
         progressionOptions.seventh = e.target.value;
-        console.log('Seventh distribution changed to:', progressionOptions.seventh);
+        // console.log('Seventh distribution changed to:', progressionOptions.seventh);
         drawProgressionStaff();
     });
     
@@ -458,7 +458,7 @@ function createProgressionOptionsPanel() {
         'broken': 'Broken Chords'
     }, progressionOptions.playStyle, function(e) {
         progressionOptions.playStyle = e.target.value;
-        console.log('Play style changed to:', progressionOptions.playStyle);
+        // console.log('Play style changed to:', progressionOptions.playStyle);
         drawProgressionStaff();
     });
     
@@ -469,7 +469,7 @@ function createProgressionOptionsPanel() {
         'rubato': 'Rubato'
     }, progressionOptions.timing, function(e) {
         progressionOptions.timing = e.target.value;
-        console.log('Timing changed to:', progressionOptions.timing);
+        // console.log('Timing changed to:', progressionOptions.timing);
         drawProgressionStaff();
     });
     
@@ -481,7 +481,7 @@ function createProgressionOptionsPanel() {
         'dynamic': 'Dynamic'
     }, progressionOptions.velocity, function(e) {
         progressionOptions.velocity = e.target.value;
-        console.log('Velocity changed to:', progressionOptions.velocity);
+        // console.log('Velocity changed to:', progressionOptions.velocity);
         drawProgressionStaff();
     });
     
@@ -491,7 +491,7 @@ function createProgressionOptionsPanel() {
         'false': 'No'
     }, progressionOptions.sustain.toString(), function(e) {
         progressionOptions.sustain = e.target.value === 'true';
-        console.log('Sustain changed to:', progressionOptions.sustain);
+        // console.log('Sustain changed to:', progressionOptions.sustain);
         drawProgressionStaff();
     });
     
@@ -503,7 +503,7 @@ function createProgressionOptionsPanel() {
         'none': 'No Bass'
     }, progressionOptions.bassLine, function(e) {
         progressionOptions.bassLine = e.target.value;
-        console.log('Bass line changed to:', progressionOptions.bassLine);
+        // console.log('Bass line changed to:', progressionOptions.bassLine);
         drawProgressionStaff();
     });
     
@@ -515,7 +515,7 @@ function createProgressionOptionsPanel() {
         'eighth': 'Eighth Notes'
     }, progressionOptions.rhythm, function(e) {
         progressionOptions.rhythm = e.target.value;
-        console.log('Rhythm changed to:', progressionOptions.rhythm);
+        // console.log('Rhythm changed to:', progressionOptions.rhythm);
         drawProgressionStaff();
     });
     
@@ -876,7 +876,7 @@ function drawProgressionStaff() {
             trebleNotes = currentNotes.slice(0).map(note => `${note}/${progressionOptions.upperOctave}`); // 
             bassNotes = []
             
-            console.log(`Chord ${i + 1} natural voicing - treble:`, trebleNotes, `bass:`, bassNotes);
+            // console.log(`Chord ${i + 1} natural voicing - treble:`, trebleNotes, `bass:`, bassNotes);
         } else {
             // Default behavior for other voicing types
             trebleNotes = currentNotes.slice(0).map(note => `${note}/${progressionOptions.upperOctave}`); // Convert to VexFlow format with upper octave
@@ -885,7 +885,7 @@ function drawProgressionStaff() {
         
         // Apply split chord logic only if not using natural voicing
         if (progressionOptions.splitChord) {
-            console.log(`Chord ${i + 1} split chord enabled ${progressionOptions.bassLine}`);
+            // console.log(`Chord ${i + 1} split chord enabled ${progressionOptions.bassLine}`);
             let thirdNote = currentNotes[1];
             let fifthNote = currentNotes[2];
             let seventhNote = currentNotes[3] || null; // Optional seventh note
@@ -920,11 +920,11 @@ function drawProgressionStaff() {
 
             if (progressionOptions.bassLine === 'root') {
                 bassNotes.push(`${currentNotes[0]}/${progressionOptions.lowerOctave}`); // Root note as whole note in bass
-                console.log(`Chord ${i + 1} bass notes:`, bassNotes);
+                // console.log(`Chord ${i + 1} bass notes:`, bassNotes);
             }
         }
         
-        console.log(`Chord ${i + 1} final - treble:`, trebleNotes, `bass:`, bassNotes);
+        // console.log(`Chord ${i + 1} final - treble:`, trebleNotes, `bass:`, bassNotes);
         
         // Store the processed chord notes for voice leading processing
         allTrebleChords.push([...trebleNotes]);
@@ -961,8 +961,8 @@ function drawProgressionStaff() {
             currentBassNotes = currentBassMidi.map(midi => noteToName(midi));
 
 
-            console.log('Current treble notes:', currentTrebleNotes, 'MIDI:', currentTrebleMidi);
-            console.log('Current bass notes:', currentBassNotes, 'MIDI:', currentBassMidi);
+            // console.log('Current treble notes:', currentTrebleNotes, 'MIDI:', currentTrebleMidi);
+            // console.log('Current bass notes:', currentBassNotes, 'MIDI:', currentBassMidi);
 
             allTrebleChords[i] = currentTrebleNotes;
             allBassChords[i] = currentBassNotes;
@@ -971,15 +971,15 @@ function drawProgressionStaff() {
     
     // Apply voicing transformations based on the selected voicing option
     if (progressionOptions.voicing === 'leading') {
-        console.log('Applying leading voice logic...');
-        console.log('Before voice leading - treble:', allTrebleChords);
-        console.log('Before voice leading - bass:', allBassChords);
+        // console.log('Applying leading voice logic...');
+        // console.log('Before voice leading - treble:', allTrebleChords);
+        // console.log('Before voice leading - bass:', allBassChords);
         
         allTrebleChords = applyLeadingVoice(allTrebleChords);
         allBassChords = applyLeadingVoice(allBassChords);
         
-        console.log('After voice leading - treble:', allTrebleChords);
-        console.log('After voice leading - bass:', allBassChords);
+        // console.log('After voice leading - treble:', allTrebleChords);
+        // console.log('After voice leading - bass:', allBassChords);
     }
     // Natural voicing is already handled above during chord processing
     
@@ -1020,8 +1020,8 @@ function drawProgressionStaff() {
             bass: actualBassNotes
         });
         console.log(`Chord ${i + 1} notes:`, chordSampleNotes[i]);
-        console.log(`Chord ${i + 1} treble notes:`, chordSampleNotes[i].treble);
-        console.log(`Chord ${i + 1} bass notes:`, chordSampleNotes[i].bass);
+        // console.log(`Chord ${i + 1} treble notes:`, chordSampleNotes[i].treble);
+        // console.log(`Chord ${i + 1} bass notes:`, chordSampleNotes[i].bass);
     }
 
     // Create sample notes for each chord (this is a simplified example)
@@ -1153,7 +1153,7 @@ function numeralToChord(numeral, rootNote, scaleFamily, scaleIndex, scaleRoot, t
 
 
 function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote){
-    console.log('getProgressionNotes called with:', progressionName, scaleFamily, scaleIndex, rootNote);
+    // console.log('getProgressionNotes called with:', progressionName, scaleFamily, scaleIndex, rootNote);
 
     progressionName = progressionName.trim();
     if (!chord_progressions[progressionName]) {
@@ -1162,13 +1162,13 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
     }
     let progression = chord_progressions[progressionName].progression;
     progression = progression.replace('-', ' ')
-    console.log('Parsed progression:', progression);
+    // console.log('Parsed progression:', progression);
 
     let progressionNotes = [];
     let chords = progression.split(' ').filter(chord => chord.trim() !== '');
-    console.log('Chords in progression:', chords);
+    // console.log('Chords in progression:', chords);
 
-    console.log(HeptatonicScales)
+    // console.log(HeptatonicScales)
 
     let scale = HeptatonicScales[scaleFamily][scaleIndex - 1];
 
@@ -1180,7 +1180,7 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
     for (let c = 0; c < chords.length; c++) {
         let chord = chords[c];
         chord = chord.trim();
-        console.log('Processing chord:', chord);
+        // console.log('Processing chord:', chord);
         
         // Raise an error if the chord contains a '/'
         if (chord.includes('/')) {
@@ -1262,13 +1262,13 @@ function convertProgressionToOutputFormat() {
         bassBars.push(bassBar);
     }
     
-    console.log('Converted progression to output format:', [trebleBars, bassBars]);
+    // console.log('Converted progression to output format:', [trebleBars, bassBars]);
     return [trebleBars, bassBars];
 }
 
 // Add current progression to output grid
 function addProgressionToOutput() {
-    console.log('Adding progression to output grid');
+    // console.log('Adding progression to output grid');
     
     if (!window.outputDiv) {
         console.error('Output div not available');
@@ -1282,19 +1282,19 @@ function addProgressionToOutput() {
     
     const convertedProgression = convertProgressionToOutputFormat();
     if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
-        console.log('No notes to add to output');
+        // console.log('No notes to add to output');
         return;
     }
     
     // Use the addDrawNotes function from staves.js
     window.addDrawNotes(window.outputDiv, convertedProgression, true);
     
-    console.log('Successfully added progression to output grid');
+    // console.log('Successfully added progression to output grid');
 }
 
 // Replace output grid with current progression
 function replaceOutputWithProgression() {
-    console.log('Replacing output grid with progression');
+    // console.log('Replacing output grid with progression');
     
     if (!window.outputDiv) {
         console.error('Output div not available');
@@ -1312,14 +1312,14 @@ function replaceOutputWithProgression() {
     // Add the progression
     const convertedProgression = convertProgressionToOutputFormat();
     if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
-        console.log('No notes to replace output with');
+        // console.log('No notes to replace output with');
         return;
     }
     
     // Use the addDrawNotes function from staves.js
     window.addDrawNotes(window.outputDiv, convertedProgression, true);
     
-    console.log('Successfully replaced output grid with progression');
+    // console.log('Successfully replaced output grid with progression');
     highlightBothPositions();
     updateOutputText();
 }

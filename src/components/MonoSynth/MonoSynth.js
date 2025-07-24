@@ -123,7 +123,7 @@ class MonoSynth {
         
         this.osc.setFreq(freq, portamentoSpeed);
 
-        console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
+        // console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
         
         // Determine hold level (use holdLevel if set and non-zero, otherwise use 1 as default attack level)
         const hasHold = gainEnv.hold && gainEnv.hold > 0;
@@ -132,14 +132,14 @@ class MonoSynth {
         
         // Gain Envelope AHDSR (R is in noteOff())
         if (gainEnv.a) {
-            console.log('MonoSynth gainEnv.a:', gainEnv.a, 'holdLevel:', holdLevel, 'hasHold:', hasHold);
+            // console.log('MonoSynth gainEnv.a:', gainEnv.a, 'holdLevel:', holdLevel, 'hasHold:', hasHold);
             this.gain.setGainCurve(this.gain.getGain(), 0, 0); // Reset Volume immediately
             const attackTime = Math.max(gainEnv.a, minTime);
             this.gain.setGainCurve(0, holdLevel, attackTime, gainEnv.attackShape, gainEnv.attackExponent); // Attack to hold level
 
             if (hasHold) {
                 // Attack -> Hold -> Decay -> Sustain
-                console.log('MonoSynth gainEnv.hold:', gainEnv.hold, 'gainEnv.d:', gainEnv.d);
+                // console.log('MonoSynth gainEnv.hold:', gainEnv.hold, 'gainEnv.d:', gainEnv.d);
                 const attackTimeoutId = setTimeout(() => {
                     // Hold phase - maintain hold level
                     this.isInHoldPhase = true;
@@ -163,7 +163,7 @@ class MonoSynth {
                 this.timeoutIds.push(timeoutId);
             }
         } else if (gainEnv.d) {
-            console.log('MonoSynth gainEnv.d:', gainEnv.d, 'holdLevel:', holdLevel);
+            // console.log('MonoSynth gainEnv.d:', gainEnv.d, 'holdLevel:', holdLevel);
             this.gain.setGainCurve(this.gain.getGain(), holdLevel, 0); // Reset to hold level immediately
 
             const timeoutId = setTimeout(() => {
@@ -172,7 +172,7 @@ class MonoSynth {
             }, (minTime * 1000));
             this.timeoutIds.push(timeoutId);
         } else if (gainEnv.s) {
-            console.log('MonoSynth gainEnv.s:', gainEnv.s);
+            // console.log('MonoSynth gainEnv.s:', gainEnv.s);
             this.gain.setGainCurve(this.gain.getGain(), gainEnv.s, 0); // Set Volume immediately
         }
 
@@ -197,7 +197,7 @@ class MonoSynth {
         if (this.isInHoldPhase && this.holdPhaseEndTime) {
             // We're in hold phase - schedule decay->sustain->release after hold completes
             const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
-            console.log('MonoSynth noteOff during hold phase, remaining hold time:', remainingHoldTime);
+            // console.log('MonoSynth noteOff during hold phase, remaining hold time:', remainingHoldTime);
             
             const holdCompleteTimeoutId = setTimeout(() => {
                 // Hold phase completed, now do decay to sustain
@@ -206,7 +206,7 @@ class MonoSynth {
                 
                 if (gainEnv.d && gainEnv.d > 0) {
                     // Has decay phase - decay from hold level to sustain
-                    console.log('MonoSynth decay after hold, decay time:', gainEnv.d, 'sustain level:', gainEnv.s);
+                    // console.log('MonoSynth decay after hold, decay time:', gainEnv.d, 'sustain level:', gainEnv.s);
                     const decayTime = Math.max(gainEnv.d, minTime);
                     this.gain.setGainCurve(this.currentHoldLevel, gainEnv.s, decayTime, gainEnv.decayShape, gainEnv.decayExponent);
                     
@@ -221,7 +221,7 @@ class MonoSynth {
                     this.timeoutIds.push(releaseTimeoutId);
                 } else {
                     // No decay phase - go directly to release from hold level
-                    console.log('MonoSynth no decay, direct release from hold level');
+                    // console.log('MonoSynth no decay, direct release from hold level');
                     this.currentNote = null;
                     this.currentNoteInfo = null;
                     const releaseTime = Math.max(gainEnv.r, minTime);
@@ -244,7 +244,7 @@ class MonoSynth {
         if (this.isInHoldPhase && this.holdPhaseEndTime) {
             // Even for noteStop, respect the hold phase
             const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
-            console.log('MonoSynth noteStop during hold phase, remaining hold time:', remainingHoldTime);
+            // console.log('MonoSynth noteStop during hold phase, remaining hold time:', remainingHoldTime);
             
             const holdCompleteTimeoutId = setTimeout(() => {
                 this.clearTimeouts();

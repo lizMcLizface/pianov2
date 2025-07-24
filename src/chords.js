@@ -28,7 +28,7 @@ for (let key in chords) {
     });
 }
 
-console.log("Processed Chords:", processedChords);
+// console.log("Processed Chords:", processedChords);
 
 
 
@@ -71,14 +71,14 @@ function highlightKeysForChords(notes){
             keys_chords[key].element.classList.remove('highlightedKey');
         }
     }
-    console.log("Highlighting keys for notes:", notes);
+    // console.log("Highlighting keys for notes:", notes);
     if (notes && notes.length > 0) {
         notes.forEach(note => {
             var n = noteToMidi(note) + 12;
             let key = keys_chords[n];
-            console.log("Key for note:", note, "is", key, "MIDI:", n);
+            // console.log("Key for note:", note, "is", key, "MIDI:", n);
             if (key && key.element) {
-                console.log("Highlighting key:", key.note, "Octave:", key.octave);
+                // console.log("Highlighting key:", key.note, "Octave:", key.octave);
                 key.element.classList.add('highlightedKey');
             }
         });
@@ -148,8 +148,8 @@ function createChordRootNoteTable() {
             // Select the clicked note (single selection only)
             selectedChordRootNote = note;
             
-            console.log('Selected chord root note:', selectedChordRootNote);
-            console.log('Current chord combinations:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
+            // console.log('Selected chord root note:', selectedChordRootNote);
+            // console.log('Current chord combinations:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
             // Refresh both tables to update visual state
             createChordRootNoteTable();
             createChordSuffixTable();
@@ -307,8 +307,8 @@ function createChordSuffixTable() {
                 });
             }
             
-            console.log('Selected chord suffixes:', selectedChordSuffixes);
-            console.log('Full chords would be:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
+            // console.log('Selected chord suffixes:', selectedChordSuffixes);
+            // console.log('Full chords would be:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
             
             // Refresh the table to update visual state
             createChordSuffixTable();
@@ -425,8 +425,8 @@ function createChordSuffixTable() {
                     selectedChordSuffixes.push(suffix);
                 }
                 
-                console.log('Selected chord suffixes:', selectedChordSuffixes);
-                console.log('Full chords would be:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
+                // console.log('Selected chord suffixes:', selectedChordSuffixes);
+                // console.log('Full chords would be:', selectedChordSuffixes.map(suffix => selectedChordRootNote + suffix));
                 
                 // Refresh the table to update visual state
                 createChordSuffixTable();
