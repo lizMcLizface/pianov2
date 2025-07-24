@@ -1168,6 +1168,21 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         </InfoSelect>
                     </InfoContainer>
                     <PeakMeter audioCtx={AC} sourceNode={masterGain} />
+                    <InfoContainer>
+                        <PopText>- Theme -</PopText>
+                        <InfoSelect
+                            value={currentTheme}
+                            onChange={(e) => {
+                                setTheme(e.target.value);
+                                localStorage.setItem('PolySynth-Theme', e.target.value);
+                                e.target.blur();
+                            }}
+                        >
+                            {Object.keys(THEMES).map(theme => (
+                                <option key={`themes_${theme}`} value={theme}>{theme}</option>
+                            ))}
+                        </InfoSelect>
+                    </InfoContainer>
                 </InfoModule>
 
                 {/* <Lines /> */}

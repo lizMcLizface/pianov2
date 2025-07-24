@@ -129,7 +129,7 @@ export const GlobalStyles = createGlobalStyle`
     input:not([class*="Knob"]):not([class*="Select"]), 
     select:not([class*="Knob"]):not([class*="Select"]), 
     textarea:not([class*="Knob"]):not([class*="Select"]),
-    button:not([class*="Knob"]):not([class*="Select"]) {
+    button:not([class*="Knob"]):not([class*="Select"]):not(.btn) {
         background-color: ${({ theme }) => theme.background};
         color: ${({ theme }) => theme.strong};
         border: 1px solid ${({ theme }) => theme.mid};
@@ -143,6 +143,123 @@ export const GlobalStyles = createGlobalStyle`
         &:focus {
             border-color: ${({ theme }) => theme.pop};
             box-shadow: 0 0 0 2px ${({ theme }) => theme.pop}33;
+        }
+    }
+
+    /* Theme Bootstrap buttons with proper colors */
+    .btn {
+        border-radius: 4px !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+        border: 1px solid transparent !important;
+        
+        &.info {
+            background-color: ${({ theme }) => theme.pop} !important;
+            color: ${({ theme }) => theme.background} !important;
+            border-color: ${({ theme }) => theme.pop} !important;
+            
+            &:hover {
+                background-color: ${({ theme }) => theme.strong} !important;
+                border-color: ${({ theme }) => theme.strong} !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px ${({ theme }) => theme.pop}44 !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px ${({ theme }) => theme.pop}44 !important;
+            }
+        }
+        
+        &.danger {
+            background-color: #dc3545 !important;
+            color: white !important;
+            border-color: #dc3545 !important;
+            
+            &:hover {
+                background-color: #c82333 !important;
+                border-color: #bd2130 !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3) !important;
+            }
+        }
+        
+        &.warning {
+            background-color: #ffc107 !important;
+            color: #212529 !important;
+            border-color: #ffc107 !important;
+            
+            &:hover {
+                background-color: #e0a800 !important;
+                border-color: #d39e00 !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3) !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3) !important;
+            }
+        }
+        
+        &.success {
+            background-color: #28a745 !important;
+            color: white !important;
+            border-color: #28a745 !important;
+            
+            &:hover {
+                background-color: #218838 !important;
+                border-color: #1e7e34 !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3) !important;
+            }
+        }
+        
+        &.primary {
+            background-color: ${({ theme }) => theme.pop} !important;
+            color: ${({ theme }) => theme.background} !important;
+            border-color: ${({ theme }) => theme.pop} !important;
+            
+            &:hover {
+                background-color: ${({ theme }) => theme.strong} !important;
+                border-color: ${({ theme }) => theme.strong} !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px ${({ theme }) => theme.pop}44 !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px ${({ theme }) => theme.pop}44 !important;
+            }
+        }
+        
+        &.secondary {
+            background-color: ${({ theme }) => theme.mid} !important;
+            color: ${({ theme }) => theme.strong} !important;
+            border-color: ${({ theme }) => theme.mid} !important;
+            
+            &:hover {
+                background-color: ${({ theme }) => theme.strong} !important;
+                color: ${({ theme }) => theme.background} !important;
+                border-color: ${({ theme }) => theme.strong} !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px ${({ theme }) => theme.mid}44 !important;
+            }
+            
+            &:active {
+                transform: translateY(0px);
+                box-shadow: 0 2px 4px ${({ theme }) => theme.mid}44 !important;
+            }
         }
     }
 `;
