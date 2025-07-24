@@ -57,6 +57,9 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
       }
       .tab:not(.expanded) button.tablinks .full-label {
         display: none;
@@ -82,10 +85,15 @@
         border-right: 1px solid #ccc;
       }
       .tab-icon {
-        width: 16px;
-        height: 16px;
+        width: 32px;
+        height: 32px;
         display: inline-block;
         vertical-align: middle;
+        flex-shrink: 0;
+      }
+      .tab button.tablinks .full-label {
+        margin-left: 8px;
+        line-height: 32px;
       }
     </style>
     <div class="tab" id="mainTabBar"
