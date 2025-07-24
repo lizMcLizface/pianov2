@@ -21,12 +21,12 @@ export const IntervalInstructions = styled.p`
 `;
 
 export const IntervalMainContent = styled.div`
-    grid-template-columns: 130px 418px 418px  226px 226px 130px 130px 130px;
-    display: flex;
-    gap: ${SPACING.l};
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 800px 418px 418px 120px;
+    gap: ${SPACING.m};
+    align-items: center;
+    justify-items: center;
     justify-content: center;
-    flex-wrap: wrap;
     margin-bottom: ${SPACING.m};
 `;
 

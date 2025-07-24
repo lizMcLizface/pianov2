@@ -554,8 +554,12 @@ const IntervalPractice = ({ className }) => {
         }
 
         // Calculate correct answer (simplified)
-        const { rootNote, interval } = currentPracticeInterval;
-        const correctAnswer = calculateIntervalNotes(rootNote, interval);
+        const noteArray = currentPracticeInterval;
+        let correctAnswer = [];
+        noteArray.forEach(note => {
+            correctAnswer.push(note.replace(/[0-9]/g, ''));
+        });
+        // const correctAnswer = calculateIntervalNotes(rootNote, interval);
         const isCorrect = arraysEqual(guessedNotes.sort(), correctAnswer.sort());
 
         const newTries = practiceTriesRemaining - 1;
@@ -568,7 +572,7 @@ const IntervalPractice = ({ className }) => {
         if (isCorrect) {
             newStats = { correct: practiceStats.correct + 1, total: practiceStats.total + 1 };
             setPracticeStats(newStats);
-            alert(`Correct! The interval was ${rootNote} + ${interval}`);
+            // alert(`Correct! The interval was ${rootNote} + ${interval}`);
             clearGuess();
             setTimeout(() => playRandomInterval(), 1000);
         } else {
@@ -579,7 +583,7 @@ const IntervalPractice = ({ className }) => {
             } else {
                 newStats = { correct: practiceStats.correct, total: practiceStats.total + 1 };
                 setPracticeStats(newStats);
-                alert(`Game over! The correct answer was: ${correctAnswer.join(', ')}`);
+                // alert(`Game over! The correct answer was: ${correctAnswer.join(', ')}`);
                 clearGuess();
                 setTimeout(() => playRandomInterval(), 1000);
             }
@@ -637,12 +641,12 @@ const IntervalPractice = ({ className }) => {
 
     return (
         <IntervalContainer className={`${BASE_CLASS_NAME} ${className}`.trim()}>
-            <IntervalTitle>Interval Listening Practice</IntervalTitle>
+            {/* <IntervalTitle>Interval Listening Practice</IntervalTitle>
             <IntervalInstructions>
                 Select root notes (rows) and intervals (columns) to practice. Click a cell to toggle it on/off.
                 <br />
                 <strong>Keyboard shortcuts:</strong> Number row (1-9,0,-,=) = C-B notes, Backspace = clear guess, Enter = submit guess, Space = replay, Tab = new interval
-            </IntervalInstructions>
+            </IntervalInstructions> */}
 
             <IntervalMainContent>
                 {/* Interval Selection Grid */}
@@ -817,6 +821,71 @@ const IntervalPractice = ({ className }) => {
                     </KnobGrid>
                 </Module>
 
+            {/* Guess Section */}
+            <GuessSection>
+                <Module label="Make Your Guess">
+                    <div style={{ textAlign: 'center', marginBottom: '15px', fontSize: '12px', color: '#666' }}>
+                        Click notes you hear. Colors cycle: Gray (off) → Green (1x) → Blue (2x) → Gray (off)
+                        <br />
+                        <strong>Keyboard:</strong> 1=C, 2=C#, 3=D, 4=D#, 5=E, 6=F, 7=F#, 8=G, 9=G#, 0=A, -=A#, ==B | Backspace=Clear | Enter=Submit | Space=Replay | Tab=New
+                    </div>
+                    
+                    <GuessButtonsContainer>
+                        {chromaticNotes.map(note => (
+                            <IntervalGuessButton
+                                key={note}
+                                state={guessStates[note]}
+                                onClick={() => cycleGuessButtonState(note)}
+                            >
+                                {note}
+                            </IntervalGuessButton>
+                        ))}
+                    </GuessButtonsContainer>
+                    
+                    <GuessActionsContainer>
+                        <ActionButton primary onClick={submitGuess}>✓ Submit Guess</ActionButton>
+                        <ActionButton onClick={clearGuess}>✗ Clear Guess</ActionButton>
+                    </GuessActionsContainer>
+                    
+                    <GuessDisplay>
+                        <strong>Your guess:</strong> {getCurrentGuess()}
+                    </GuessDisplay>
+                </Module>
+            <IntervalControlsContainer>
+                <ActionButton onClick={selectAllIntervals}>Select All</ActionButton>
+                <ActionButton onClick={clearAllIntervals}>Clear All</ActionButton>
+                <ActionButton primary onClick={playRandomInterval}>Play Random Interval</ActionButton>
+                <ActionButton onClick={replayCurrentInterval}>🔊 Replay</ActionButton>
+                <ActionButton onClick={skipToNextInterval}>⏭️ Skip</ActionButton>
+            </IntervalControlsContainer>
+            
+            {/* Status Displays */}
+            <SelectedDisplay>
+                <strong>Selected Intervals ({selectedIntervals.size}):</strong><br />
+                {selectedIntervals.size === 0 
+                    ? 'No intervals selected' 
+                    : Array.from(selectedIntervals).map(key => key.replace('-', ' + ')).join(', ')
+                }
+            </SelectedDisplay>
+            </GuessSection>
+            {/* Control Buttons */}
+
+
+            {practiceStatus.current && (
+                <div style={{ 
+                    marginTop: '15px', 
+                    padding: '10px', 
+                    backgroundColor: '#e3f2fd', 
+                    borderRadius: '4px',
+                    textAlign: 'center'
+                }}>
+                    <strong>Current:</strong> {practiceStatus.current.rootNote} + {practiceStatus.current.interval}<br />
+                    <strong>Tries left:</strong> {practiceStatus.tries} | 
+                    <strong>Relistens:</strong> {practiceStatus.relistens === Infinity ? '∞' : practiceStatus.relistens}<br />
+                    <strong>Score:</strong> {practiceStatus.stats.correct}/{practiceStatus.stats.total}
+                </div>
+            )}
+
                 {/* Microtonal Pitch Control */}
                 <MicrotonalModule label="Microtonal">
                     <KnobGrid columns={15} rows={1}>
@@ -975,70 +1044,6 @@ const IntervalPractice = ({ className }) => {
                 </MicrotonalModule>
             </IntervalMainContent>
 
-            {/* Control Buttons */}
-            <IntervalControlsContainer>
-                <ActionButton onClick={selectAllIntervals}>Select All</ActionButton>
-                <ActionButton onClick={clearAllIntervals}>Clear All</ActionButton>
-                <ActionButton primary onClick={playRandomInterval}>Play Random Interval</ActionButton>
-                <ActionButton onClick={replayCurrentInterval}>🔊 Replay</ActionButton>
-                <ActionButton onClick={skipToNextInterval}>⏭️ Skip</ActionButton>
-            </IntervalControlsContainer>
-
-            {/* Guess Section */}
-            <GuessSection>
-                <Module label="Make Your Guess">
-                    <div style={{ textAlign: 'center', marginBottom: '15px', fontSize: '12px', color: '#666' }}>
-                        Click notes you hear. Colors cycle: Gray (off) → Green (1x) → Blue (2x) → Gray (off)
-                        <br />
-                        <strong>Keyboard:</strong> 1=C, 2=C#, 3=D, 4=D#, 5=E, 6=F, 7=F#, 8=G, 9=G#, 0=A, -=A#, ==B | Backspace=Clear | Enter=Submit | Space=Replay | Tab=New
-                    </div>
-                    
-                    <GuessButtonsContainer>
-                        {chromaticNotes.map(note => (
-                            <IntervalGuessButton
-                                key={note}
-                                state={guessStates[note]}
-                                onClick={() => cycleGuessButtonState(note)}
-                            >
-                                {note}
-                            </IntervalGuessButton>
-                        ))}
-                    </GuessButtonsContainer>
-                    
-                    <GuessActionsContainer>
-                        <ActionButton primary onClick={submitGuess}>✓ Submit Guess</ActionButton>
-                        <ActionButton onClick={clearGuess}>✗ Clear Guess</ActionButton>
-                    </GuessActionsContainer>
-                    
-                    <GuessDisplay>
-                        <strong>Your guess:</strong> {getCurrentGuess()}
-                    </GuessDisplay>
-                </Module>
-            </GuessSection>
-
-            {/* Status Displays */}
-            <SelectedDisplay>
-                <strong>Selected Intervals ({selectedIntervals.size}):</strong><br />
-                {selectedIntervals.size === 0 
-                    ? 'No intervals selected' 
-                    : Array.from(selectedIntervals).map(key => key.replace('-', ' + ')).join(', ')
-                }
-            </SelectedDisplay>
-
-            {practiceStatus.current && (
-                <div style={{ 
-                    marginTop: '15px', 
-                    padding: '10px', 
-                    backgroundColor: '#e3f2fd', 
-                    borderRadius: '4px',
-                    textAlign: 'center'
-                }}>
-                    <strong>Current:</strong> {practiceStatus.current.rootNote} + {practiceStatus.current.interval}<br />
-                    <strong>Tries left:</strong> {practiceStatus.tries} | 
-                    <strong>Relistens:</strong> {practiceStatus.relistens === Infinity ? '∞' : practiceStatus.relistens}<br />
-                    <strong>Score:</strong> {practiceStatus.stats.correct}/{practiceStatus.stats.total}
-                </div>
-            )}
         </IntervalContainer>
     );
 };
