@@ -9,7 +9,7 @@ import {processChord} from './intervals';
 import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from './scales';
 import {createHeptatonicScaleTable, selectedRootNote, selectedScales} from './scaleGenerator';
 import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
-import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from './midi';
+import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
 import {modifiers, keyToNote} from './keyboard';
 import './staves'; // Import stave functions - functions will be available on window object
@@ -89,6 +89,9 @@ if (PolySynthTabPlaceholder) {
         window.polySynthRef = polySynthRef; // Make globally accessible
         if (polySynthRef) {
             console.log('PolySynth ready for programmatic control');
+            // Initialize mouse input for piano keys now that PolySynth is ready
+            initializeMouseInput(playNote2, stopNotes2);
+            console.log('Mouse input initialized for piano keys');
         }
     }, 1000);
 }
@@ -3147,6 +3150,11 @@ $(document).ready(function() {
 
         }
     });
+    if ($('#promptCheckBox')[0].checked){
+        $('#outputContainer')[0].style.display = "flex"
+    }else{
+        $('#outputContainer')[0].style.display = "none"
+    }
 });
 $(document).ready(function() {
     $('#stavesCheckBox').on('change', function (e) {
@@ -3160,6 +3168,11 @@ $(document).ready(function() {
             $('#staveContainerBox')[0].style.display = "none"
         }
     });
+    if ($('#stavesCheckBox')[0].checked){
+        $('#staveContainerBox')[0].style.display = "flex"
+    }else{
+        $('#staveContainerBox')[0].style.display = "none"
+    }
 });
 
 

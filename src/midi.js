@@ -82,6 +82,230 @@ const getElementByNote = (note) =>
 const getElementByMIDI = (note) =>
   note && document.querySelector(`[midi="${note}"]`);
 
+// Function to initialize mouse input for piano keys
+const initializeMouseInput = (playNote2Callback, stopNotes2Callback) => {
+  console.log('Initializing mouse input for piano keys...');
+  let initializedCount = 0;
+  
+  // Keep track of currently pressed notes for proper cleanup
+  const pressedNotes = new Set();
+  // Track mouse button state
+  let isMouseDown = false;
+  let currentMouseNote = null;
+  
+  // Add click event listeners to all piano keys
+  for (let midiNote = 21; midiNote <= 108; midiNote++) {
+    const element = getElementByMIDI(midiNote.toString());
+    if (element) {
+      initializedCount++;
+      // Prevent text selection on the piano key elements
+      element.style.userSelect = 'none';
+      element.style.webkitUserSelect = 'none';
+      element.style.msUserSelect = 'none';
+      
+      // Mouse down event (note on)
+      element.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        console.log('Mouse press on key:', noteWithOctave, 'MIDI:', midiNote);
+        
+        isMouseDown = true;
+        currentMouseNote = noteWithOctave;
+        
+        // Only play if PolySynth is enabled and note isn't already pressed
+        if (playNote2Callback && typeof playNote2Callback === 'function' && 
+            document.getElementById('polySynthMidiBox') && 
+            document.getElementById('polySynthMidiBox').checked &&
+            !pressedNotes.has(noteWithOctave)) {
+          console.log('Playing note via mouse press:', noteWithOctave);
+          playNote2Callback([noteWithOctave], 70); // Default volume of 70
+          pressedNotes.add(noteWithOctave);
+        } else if (pressedNotes.has(noteWithOctave)) {
+          console.log('Note already pressed, ignoring:', noteWithOctave);
+        } else {
+          console.log('PolySynth not enabled or callback not available');
+        }
+        
+        // Add visual feedback
+        element.classList.add('pressedKey');
+      });
+      
+      // Mouse enter event (for gliding between keys while pressed)
+      element.addEventListener('mouseenter', (event) => {
+        if (isMouseDown) {
+          const noteName = noteToName(midiNote);
+          const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+          console.log('Mouse enter on key while pressed:', noteWithOctave, 'MIDI:', midiNote);
+          
+          // Stop the current note if different from the new one
+          if (currentMouseNote && currentMouseNote !== noteWithOctave && pressedNotes.has(currentMouseNote)) {
+            console.log('Stopping previous note via mouse glide:', currentMouseNote);
+            if (stopNotes2Callback && typeof stopNotes2Callback === 'function') {
+              stopNotes2Callback([currentMouseNote]);
+            }
+            pressedNotes.delete(currentMouseNote);
+            
+            // Remove visual feedback from previous key
+            const prevMidiNote = Object.keys(keys).find(key => {
+              const keyData = keys[key];
+              return keyData.note === currentMouseNote.slice(0, -1) && keyData.octave === parseInt(currentMouseNote.slice(-1));
+            });
+            if (prevMidiNote) {
+              const prevElement = getElementByMIDI(prevMidiNote);
+              if (prevElement) {
+                prevElement.classList.remove('pressedKey');
+              }
+            }
+          }
+          
+          // Play the new note if not already playing
+          if (playNote2Callback && typeof playNote2Callback === 'function' && 
+              document.getElementById('polySynthMidiBox') && 
+              document.getElementById('polySynthMidiBox').checked &&
+              !pressedNotes.has(noteWithOctave)) {
+            console.log('Playing new note via mouse glide:', noteWithOctave);
+            playNote2Callback([noteWithOctave], 70); // Default volume of 70
+            pressedNotes.add(noteWithOctave);
+          }
+          
+          currentMouseNote = noteWithOctave;
+          // Add visual feedback
+          element.classList.add('pressedKey');
+        }
+      });
+      
+      // Mouse up event (note off) - stop note and remove visual feedback
+      element.addEventListener('mouseup', (event) => {
+        event.preventDefault();
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        console.log('Mouse release on key:', noteWithOctave, 'MIDI:', midiNote);
+        
+        isMouseDown = false;
+        
+        // Stop the note if it was playing
+        if (stopNotes2Callback && typeof stopNotes2Callback === 'function' && 
+            pressedNotes.has(noteWithOctave)) {
+          console.log('Stopping note via mouse release:', noteWithOctave);
+          stopNotes2Callback([noteWithOctave]);
+          pressedNotes.delete(noteWithOctave);
+        }
+        
+        currentMouseNote = null;
+        element.classList.remove('pressedKey');
+      });
+      
+      // Mouse leave event (in case user drags mouse away while holding down)
+      element.addEventListener('mouseleave', (event) => {
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        
+        // Only remove visual feedback, don't stop the note if mouse is still down
+        // The note will be stopped when mouse enters another key or when mouse is released
+        if (!isMouseDown) {
+          element.classList.remove('pressedKey');
+          
+          // Stop the note if it was playing and mouse is not down
+          if (stopNotes2Callback && typeof stopNotes2Callback === 'function' && 
+              pressedNotes.has(noteWithOctave)) {
+            console.log('Stopping note via mouse leave:', noteWithOctave);
+            stopNotes2Callback([noteWithOctave]);
+            pressedNotes.delete(noteWithOctave);
+          }
+        }
+      });
+      
+      // Prevent context menu on right click
+      element.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+      });
+      
+      // Add touch support for mobile devices (simplified for touch)
+      element.addEventListener('touchstart', (event) => {
+        event.preventDefault();
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        console.log('Touch start on key:', noteWithOctave, 'MIDI:', midiNote);
+        
+        // Only play if PolySynth is enabled and note isn't already pressed
+        if (playNote2Callback && typeof playNote2Callback === 'function' && 
+            document.getElementById('polySynthMidiBox') && 
+            document.getElementById('polySynthMidiBox').checked &&
+            !pressedNotes.has(noteWithOctave)) {
+          playNote2Callback([noteWithOctave], 70); // Default volume of 70
+          pressedNotes.add(noteWithOctave);
+        }
+        
+        // Add visual feedback
+        element.classList.add('pressedKey');
+      });
+      
+      element.addEventListener('touchend', (event) => {
+        event.preventDefault();
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        
+        // Stop the note if it was playing
+        if (stopNotes2Callback && typeof stopNotes2Callback === 'function' && 
+            pressedNotes.has(noteWithOctave)) {
+          stopNotes2Callback([noteWithOctave]);
+          pressedNotes.delete(noteWithOctave);
+        }
+        
+        element.classList.remove('pressedKey');
+      });
+      
+      element.addEventListener('touchcancel', (event) => {
+        event.preventDefault();
+        const noteName = noteToName(midiNote);
+        const noteWithOctave = noteName.replace('/', ''); // Convert "C/4" to "C4"
+        
+        // Stop the note if it was playing
+        if (stopNotes2Callback && typeof stopNotes2Callback === 'function' && 
+            pressedNotes.has(noteWithOctave)) {
+          stopNotes2Callback([noteWithOctave]);
+          pressedNotes.delete(noteWithOctave);
+        }
+        
+        element.classList.remove('pressedKey');
+      });
+    }
+  }
+  
+  // Add global mouse up listener to handle mouse release outside of piano keys
+  document.addEventListener('mouseup', (event) => {
+    if (isMouseDown) {
+      console.log('Global mouse up detected - cleaning up');
+      isMouseDown = false;
+      
+      // Stop current note if playing
+      if (currentMouseNote && stopNotes2Callback && typeof stopNotes2Callback === 'function' && 
+          pressedNotes.has(currentMouseNote)) {
+        console.log('Stopping note via global mouse up:', currentMouseNote);
+        stopNotes2Callback([currentMouseNote]);
+        pressedNotes.delete(currentMouseNote);
+        
+        // Remove visual feedback
+        const midiNoteForCleanup = Object.keys(keys).find(key => {
+          const keyData = keys[key];
+          return keyData.note === currentMouseNote.slice(0, -1) && keyData.octave === parseInt(currentMouseNote.slice(-1));
+        });
+        if (midiNoteForCleanup) {
+          const elementForCleanup = getElementByMIDI(midiNoteForCleanup);
+          if (elementForCleanup) {
+            elementForCleanup.classList.remove('pressedKey');
+          }
+        }
+      }
+      
+      currentMouseNote = null;
+    }
+  });
+  
+  console.log(`Mouse input initialized for ${initializedCount} piano keys (MIDI ${21}-${108})`);
+};
+
 const keys = {
     21 : { element: getElementByMIDI("21"), note: "A",  octave: 0 },
     22 : { element: getElementByMIDI("22"), note: "A#", octave: 0 },
@@ -174,4 +398,4 @@ const keys = {
 };
 
 
-export { noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI };
+export { noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput };
