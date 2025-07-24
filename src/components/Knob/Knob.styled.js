@@ -80,7 +80,7 @@ export const ActiveMeter = styled.path.withConfig({
     transition: stroke 0.2s ease;
     
     ${KnobContainer}:hover & {
-        stroke: ${({ theme, disabled }) => disabled ? theme.mid : theme.accent};
+        stroke: ${({ theme, disabled }) => disabled ? theme.mid : theme.pop};
     }
 `;
 

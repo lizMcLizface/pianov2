@@ -33,11 +33,13 @@ import { context,
     tempo} from './synth';
 import { chord_progressions } from './progressions';
 import PolySynthWrapper from './components/PolySynthWrapper';
+import IntervalPractice from './components/IntervalPractice';
 import ThemeManagerApp from './components/ThemeManagerApp';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { THEMES } from './styles/themes';
 
 let PolySynthTabPlaceholder = document.getElementById('PolySynthTabPlaceholder');
+let IntervalTabPlaceholder = document.getElementById('IntervalTabPlaceholder');
 
 // Global reference to the PolySynth for programmatic control
 let polySynthRef = null;
@@ -72,6 +74,16 @@ if (PolySynthTabPlaceholder) {
             console.log('PolySynth ready for programmatic control');
         }
     }, 1000);
+}
+
+// Render IntervalPractice component into the IntervalTabPlaceholder div
+if (IntervalTabPlaceholder) {
+    const intervalPracticeRoot = ReactDOM.createRoot(IntervalTabPlaceholder);
+    intervalPracticeRoot.render(
+        <ThemeProvider>
+            <IntervalPractice />
+        </ThemeProvider>
+    );
 }
 
 // If you want to start measuring performance in your app, pass a function
@@ -110,6 +122,9 @@ updateCrossReferenceDisplay();
 // Export the update function so other modules can call it when selections change
 window.updateCrossReferenceDisplay = updateCrossReferenceDisplay;
 window.createScaleChordCrossReference = createScaleChordCrossReference;
+
+// Initialize Interval Practice Interface - now handled by React component
+// initializeIntervalPractice();
 
 let currentNoteIndex = 0;
 let currentBarIndex = 0;
@@ -3821,6 +3836,979 @@ updateOutputText()
 
 
 // drawNotes(outputDiv, outputNoteArray, false);
+
+
+// Interval Practice Interface Initialization
+function initializeIntervalPractice() {
+    const intervalTabPlaceholder = document.getElementById('IntervalTabPlaceholder');
+    if (!intervalTabPlaceholder) {
+        console.error('IntervalTabPlaceholder not found');
+        return;
+    }
+
+    // Define chromatic scale notes and intervals for the 12x12 grid
+    const chromaticNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const intervals = ['P1', 'm2', 'M2', 'm3', 'M3', 'P4', 'A4/d5', 'P5', 'm6', 'M6', 'm7', 'M7'];
+
+    // Create the main container
+    const container = document.createElement('div');
+    container.style.cssText = `
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+        font-family: Arial, sans-serif;
+    `;
+
+    // Create title
+    const title = document.createElement('h2');
+    title.textContent = 'Interval Listening Practice';
+    title.style.cssText = `
+        text-align: center;
+        margin-bottom: 20px;
+        color: #333;
+    `;
+    container.appendChild(title);
+
+    // Create instruction text
+    const instructions = document.createElement('p');
+    instructions.textContent = 'Select root notes (rows) and intervals (columns) to practice. Click a cell to toggle it on/off.';
+    instructions.style.cssText = `
+        text-align: center;
+        margin-bottom: 20px;
+        color: #666;
+        font-size: 14px;
+    `;
+    container.appendChild(instructions);
+
+    // Create main content container (grid + controls side by side)
+    const mainContent = document.createElement('div');
+    mainContent.style.cssText = `
+        display: flex;
+        gap: 30px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+    `;
+
+    // Create the grid container
+    const gridContainer = document.createElement('div');
+    gridContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: 60px repeat(12, 1fr);
+        grid-template-rows: 30px repeat(12, 1fr);
+        gap: 2px;
+        max-width: 600px;
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+
+    // Create top-left corner cell (empty)
+    const cornerCell = document.createElement('div');
+    cornerCell.style.cssText = `
+        background-color: #e0e0e0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    `;
+    gridContainer.appendChild(cornerCell);
+
+    // Create interval header row
+    intervals.forEach((interval, colIndex) => {
+        const headerCell = document.createElement('div');
+        headerCell.textContent = interval;
+        headerCell.dataset.colIndex = colIndex;
+        headerCell.style.cssText = `
+            background-color: #d0d0d0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        `;
+        
+        // Add hover effect for column headers
+        headerCell.addEventListener('mouseenter', () => {
+            headerCell.style.backgroundColor = '#c0c0c0';
+        });
+        
+        headerCell.addEventListener('mouseleave', () => {
+            headerCell.style.backgroundColor = '#d0d0d0';
+        });
+        
+        // Add click handler for column selection
+        headerCell.addEventListener('click', () => {
+            toggleColumn(colIndex);
+        });
+        
+        gridContainer.appendChild(headerCell);
+    });
+
+    // Create rows for each chromatic note
+    chromaticNotes.forEach((note, rowIndex) => {
+        // Create note label (row header)
+        const noteLabel = document.createElement('div');
+        noteLabel.textContent = note;
+        noteLabel.dataset.rowIndex = rowIndex;
+        noteLabel.style.cssText = `
+            background-color: #d0d0d0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        `;
+        
+        // Add hover effect for row headers
+        noteLabel.addEventListener('mouseenter', () => {
+            noteLabel.style.backgroundColor = '#c0c0c0';
+        });
+        
+        noteLabel.addEventListener('mouseleave', () => {
+            noteLabel.style.backgroundColor = '#d0d0d0';
+        });
+        
+        // Add click handler for row selection
+        noteLabel.addEventListener('click', () => {
+            toggleRow(rowIndex);
+        });
+        
+        gridContainer.appendChild(noteLabel);
+
+        // Create interval cells for this note
+        intervals.forEach((interval, colIndex) => {
+            const cell = document.createElement('div');
+            cell.dataset.note = note;
+            cell.dataset.interval = interval;
+            cell.dataset.row = rowIndex;
+            cell.dataset.col = colIndex;
+            
+            cell.style.cssText = `
+                background-color: #ffffff;
+                border: 2px solid #ccc;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                min-height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                position: relative;
+            `;
+
+            // Add hover effect
+            cell.addEventListener('mouseenter', () => {
+                if (!cell.classList.contains('selected')) {
+                    cell.style.backgroundColor = '#f0f0f0';
+                }
+            });
+
+            cell.addEventListener('mouseleave', () => {
+                if (!cell.classList.contains('selected')) {
+                    cell.style.backgroundColor = '#ffffff';
+                }
+            });
+
+            // Add click handler to toggle selection
+            cell.addEventListener('click', () => {
+                cell.classList.toggle('selected');
+                if (cell.classList.contains('selected')) {
+                    cell.style.backgroundColor = '#4CAF50';
+                    cell.style.borderColor = '#45a049';
+                    cell.style.color = 'white';
+                    cell.textContent = '✓';
+                } else {
+                    cell.style.backgroundColor = '#ffffff';
+                    cell.style.borderColor = '#ccc';
+                    cell.style.color = 'black';
+                    cell.textContent = '';
+                }
+                updateSelectedIntervals();
+            });
+
+            gridContainer.appendChild(cell);
+        });
+    });
+
+    // Add grid to main content
+    mainContent.appendChild(gridContainer);
+
+    // Create practice configuration panel
+    const configPanel = document.createElement('div');
+    configPanel.style.cssText = `
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        min-width: 280px;
+        max-width: 300px;
+    `;
+
+    // Practice Configuration Title
+    const configTitle = document.createElement('h3');
+    configTitle.textContent = 'Practice Settings';
+    configTitle.style.cssText = `
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 16px;
+        text-align: center;
+    `;
+    configPanel.appendChild(configTitle);
+
+    // Number of tries setting
+    const triesContainer = document.createElement('div');
+    triesContainer.style.cssText = `margin-bottom: 15px;`;
+    
+    const triesLabel = document.createElement('label');
+    triesLabel.textContent = 'Number of tries: ';
+    triesLabel.style.cssText = `
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        font-size: 14px;
+    `;
+    
+    const triesInput = document.createElement('input');
+    triesInput.type = 'number';
+    triesInput.id = 'practiceTriesInput';
+    triesInput.min = '1';
+    triesInput.max = '12';
+    triesInput.value = '3';
+    triesInput.style.cssText = `
+        width: 100%;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+    `;
+    
+    triesContainer.appendChild(triesLabel);
+    triesContainer.appendChild(triesInput);
+    configPanel.appendChild(triesContainer);
+
+    // Number of relistens setting
+    const relistensContainer = document.createElement('div');
+    relistensContainer.style.cssText = `margin-bottom: 15px;`;
+    
+    const relistensLabel = document.createElement('label');
+    relistensLabel.textContent = 'Number of relistens: ';
+    relistensLabel.style.cssText = `
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        font-size: 14px;
+    `;
+    
+    const relistensInput = document.createElement('input');
+    relistensInput.type = 'number';
+    relistensInput.id = 'practiceRelistensInput';
+    relistensInput.min = '0';
+    relistensInput.max = '6';
+    relistensInput.value = '2';
+    relistensInput.style.cssText = `
+        width: 100%;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+    `;
+    
+    relistensContainer.appendChild(relistensLabel);
+    relistensContainer.appendChild(relistensInput);
+    configPanel.appendChild(relistensContainer);
+
+    // Infinite relistens checkbox
+    const infiniteContainer = document.createElement('div');
+    infiniteContainer.style.cssText = `
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    
+    const infiniteCheckbox = document.createElement('input');
+    infiniteCheckbox.type = 'checkbox';
+    infiniteCheckbox.id = 'infiniteRelistensCheckbox';
+    infiniteCheckbox.style.cssText = `
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    `;
+    
+    const infiniteLabel = document.createElement('label');
+    infiniteLabel.textContent = 'Infinite relistens';
+    infiniteLabel.htmlFor = 'infiniteRelistensCheckbox';
+    infiniteLabel.style.cssText = `
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+    `;
+    
+    // Handle infinite checkbox logic
+    infiniteCheckbox.addEventListener('change', () => {
+        relistensInput.disabled = infiniteCheckbox.checked;
+        relistensInput.style.opacity = infiniteCheckbox.checked ? '0.5' : '1';
+    });
+    
+    infiniteContainer.appendChild(infiniteCheckbox);
+    infiniteContainer.appendChild(infiniteLabel);
+    configPanel.appendChild(infiniteContainer);
+
+    // Practice control buttons
+    const controlButtonsContainer = document.createElement('div');
+    controlButtonsContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    `;
+
+    // Replay button
+    const replayBtn = document.createElement('button');
+    replayBtn.textContent = '🔊 Replay Interval';
+    replayBtn.id = 'replayIntervalBtn';
+    replayBtn.style.cssText = `
+        padding: 10px 15px;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.2s ease;
+    `;
+    replayBtn.addEventListener('mouseenter', () => {
+        replayBtn.style.backgroundColor = '#1976D2';
+    });
+    replayBtn.addEventListener('mouseleave', () => {
+        replayBtn.style.backgroundColor = '#2196F3';
+    });
+    replayBtn.addEventListener('click', replayCurrentInterval);
+
+    // Skip button
+    const skipBtn = document.createElement('button');
+    skipBtn.textContent = '⏭️ Skip to Next';
+    skipBtn.id = 'skipIntervalBtn';
+    skipBtn.style.cssText = `
+        padding: 10px 15px;
+        background-color: #FF9800;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.2s ease;
+    `;
+    skipBtn.addEventListener('mouseenter', () => {
+        skipBtn.style.backgroundColor = '#F57C00';
+    });
+    skipBtn.addEventListener('mouseleave', () => {
+        skipBtn.style.backgroundColor = '#FF9800';
+    });
+    skipBtn.addEventListener('click', skipToNextInterval);
+
+    controlButtonsContainer.appendChild(replayBtn);
+    controlButtonsContainer.appendChild(skipBtn);
+    configPanel.appendChild(controlButtonsContainer);
+
+    // Practice status display
+    const statusDisplay = document.createElement('div');
+    statusDisplay.id = 'practiceStatusDisplay';
+    statusDisplay.style.cssText = `
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #e3f2fd;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #333;
+        text-align: center;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    statusDisplay.textContent = 'Select intervals and click "Play Random Interval" to start practicing!';
+    configPanel.appendChild(statusDisplay);
+
+    // Add config panel to main content
+    mainContent.appendChild(configPanel);
+
+    container.appendChild(mainContent);
+
+    // Create control buttons
+    const controlsContainer = document.createElement('div');
+    controlsContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    `;
+
+    // Select All button
+    const selectAllBtn = document.createElement('button');
+    selectAllBtn.textContent = 'Select All';
+    selectAllBtn.style.cssText = `
+        padding: 8px 16px;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    selectAllBtn.addEventListener('click', () => {
+        const cells = gridContainer.querySelectorAll('[data-note]');
+        cells.forEach(cell => {
+            if (!cell.classList.contains('selected')) {
+                cell.click();
+            }
+        });
+    });
+
+    // Clear All button
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.textContent = 'Clear All';
+    clearAllBtn.style.cssText = `
+        padding: 8px 16px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    clearAllBtn.addEventListener('click', () => {
+        const cells = gridContainer.querySelectorAll('[data-note].selected');
+        cells.forEach(cell => cell.click());
+    });
+
+    // Play Random button
+    const playRandomBtn = document.createElement('button');
+    playRandomBtn.textContent = 'Play Random Interval';
+    playRandomBtn.style.cssText = `
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    playRandomBtn.addEventListener('click', playRandomInterval);
+
+    controlsContainer.appendChild(selectAllBtn);
+    controlsContainer.appendChild(clearAllBtn);
+    controlsContainer.appendChild(playRandomBtn);
+    container.appendChild(controlsContainer);
+
+    // Create guess input section
+    const guessSection = document.createElement('div');
+    guessSection.style.cssText = `
+        margin-top: 30px;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+
+    // Guess section title
+    const guessTitle = document.createElement('h3');
+    guessTitle.textContent = 'Make Your Guess';
+    guessTitle.style.cssText = `
+        text-align: center;
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 18px;
+    `;
+    guessSection.appendChild(guessTitle);
+
+    // Guess instruction
+    const guessInstruction = document.createElement('p');
+    guessInstruction.textContent = 'Click the notes you hear in the interval. Click multiple times to cycle: Off → 1 → 2 → Off';
+    guessInstruction.style.cssText = `
+        text-align: center;
+        margin-bottom: 20px;
+        color: #666;
+        font-size: 12px;
+    `;
+    guessSection.appendChild(guessInstruction);
+
+    // Create guess buttons container
+    const guessButtonsContainer = document.createElement('div');
+    guessButtonsContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+    `;
+
+    // Create guess buttons for each chromatic note
+    chromaticNotes.forEach(note => {
+        const guessBtn = document.createElement('button');
+        guessBtn.textContent = note;
+        guessBtn.dataset.note = note;
+        guessBtn.dataset.state = '0'; // 0 = off, 1 = once, 2 = twice
+        guessBtn.style.cssText = `
+            width: 45px;
+            height: 45px;
+            border: 2px solid #ccc;
+            border-radius: 50%;
+            background-color: #ffffff;
+            color: #333;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        `;
+
+        // Add click handler for cycling through states
+        guessBtn.addEventListener('click', () => {
+            cycleGuessButtonState(guessBtn);
+            updateGuessDisplay();
+        });
+
+        guessButtonsContainer.appendChild(guessBtn);
+    });
+
+    guessSection.appendChild(guessButtonsContainer);
+
+    // Create guess action buttons
+    const guessActionsContainer = document.createElement('div');
+    guessActionsContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    `;
+
+    // Submit guess button
+    const submitGuessBtn = document.createElement('button');
+    submitGuessBtn.textContent = '✓ Submit Guess';
+    submitGuessBtn.style.cssText = `
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    `;
+    submitGuessBtn.addEventListener('click', submitGuess);
+
+    // Clear guess button
+    const clearGuessBtn = document.createElement('button');
+    clearGuessBtn.textContent = '✗ Clear Guess';
+    clearGuessBtn.style.cssText = `
+        padding: 10px 20px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    `;
+    clearGuessBtn.addEventListener('click', clearGuess);
+
+    guessActionsContainer.appendChild(submitGuessBtn);
+    guessActionsContainer.appendChild(clearGuessBtn);
+    guessSection.appendChild(guessActionsContainer);
+
+    // Create guess display
+    const guessDisplay = document.createElement('div');
+    guessDisplay.id = 'guessDisplay';
+    guessDisplay.style.cssText = `
+        text-align: center;
+        padding: 10px;
+        background-color: #e3f2fd;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #333;
+        min-height: 20px;
+    `;
+    guessDisplay.textContent = 'No notes selected';
+    guessSection.appendChild(guessDisplay);
+
+    container.appendChild(guessSection);
+
+    // Add selected intervals display
+    const selectedDisplay = document.createElement('div');
+    selectedDisplay.id = 'selectedIntervalsDisplay';
+    selectedDisplay.style.cssText = `
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+        min-height: 40px;
+        font-size: 12px;
+        color: #333;
+    `;
+    container.appendChild(selectedDisplay);
+
+    // Append to the placeholder
+    intervalTabPlaceholder.appendChild(container);
+
+    // Initialize with some default selections (optional)
+    updateSelectedIntervals();
+}
+
+// Practice state variables
+let currentPracticeInterval = null;
+let practiceTriesRemaining = 0;
+let practiceRelistensRemaining = 0;
+let practiceStats = { correct: 0, total: 0 };
+
+// Function to update the display of selected intervals
+function updateSelectedIntervals() {
+    const selectedCells = document.querySelectorAll('[data-note].selected');
+    const display = document.getElementById('selectedIntervalsDisplay');
+    
+    if (selectedCells.length === 0) {
+        display.textContent = 'No intervals selected. Click on grid cells to select intervals for practice.';
+        return;
+    }
+
+    const intervals = [];
+    selectedCells.forEach(cell => {
+        const note = cell.dataset.note;
+        const interval = cell.dataset.interval;
+        intervals.push(`${note} + ${interval}`);
+    });
+
+    display.innerHTML = `
+        <strong>Selected Intervals (${intervals.length}):</strong><br>
+        ${intervals.join(', ')}
+    `;
+}
+
+// Function to play a random interval from selected ones
+function playRandomInterval() {
+    const selectedCells = document.querySelectorAll('[data-note].selected');
+    
+    if (selectedCells.length === 0) {
+        alert('Please select some intervals first!');
+        return;
+    }
+
+    // Pick a random selected interval
+    const randomCell = selectedCells[Math.floor(Math.random() * selectedCells.length)];
+    const rootNote = randomCell.dataset.note;
+    const interval = randomCell.dataset.interval;
+
+    // Initialize practice session
+    currentPracticeInterval = { rootNote, interval, cell: randomCell };
+    practiceTriesRemaining = parseInt(document.getElementById('practiceTriesInput').value);
+    
+    const infiniteRelistens = document.getElementById('infiniteRelistensCheckbox').checked;
+    practiceRelistensRemaining = infiniteRelistens ? Infinity : parseInt(document.getElementById('practiceRelistensInput').value);
+
+    console.log(`Playing interval: ${rootNote} + ${interval}`);
+    
+    // Update status display
+    updatePracticeStatus();
+    
+    // Here you would implement the actual audio playback
+    // For now, just log what would be played
+    // You can integrate with your existing synth system
+    alert(`Playing: ${rootNote} + ${interval}`);
+    
+    // TODO: Integrate with PolySynth to actually play the interval
+    // Example: playInterval(rootNote, interval);
+}
+
+// Function to replay the current interval
+function replayCurrentInterval() {
+    console.log('Replaying current interval...');
+    if (!currentPracticeInterval) {
+        alert('No interval is currently being practiced. Click "Play Random Interval" first!');
+        return;
+    }
+
+    if (practiceRelistensRemaining <= 0) {
+        alert('No relistens remaining for this interval!');
+        return;
+    }
+
+    const { rootNote, interval } = currentPracticeInterval;
+    
+    if (practiceRelistensRemaining !== Infinity) {
+        practiceRelistensRemaining--;
+    }
+    
+    console.log(`Replaying interval: ${rootNote} + ${interval}`);
+    updatePracticeStatus();
+    
+    // Here you would implement the actual audio playback
+    alert(`Replaying: ${rootNote} + ${interval}`);
+    
+    // TODO: Integrate with PolySynth to actually play the interval
+}
+
+// Function to skip to the next interval
+function skipToNextInterval() {
+    if (!currentPracticeInterval) {
+        alert('No interval is currently being practiced. Click "Play Random Interval" first!');
+        return;
+    }
+
+    practiceStats.total++;
+    updatePracticeStatus();
+    
+    // Automatically play the next random interval
+    playRandomInterval();
+}
+
+// Function to update practice status display
+function updatePracticeStatus() {
+    const statusDisplay = document.getElementById('practiceStatusDisplay');
+    
+    if (!currentPracticeInterval) {
+        statusDisplay.textContent = 'Select intervals and click "Play Random Interval" to start practicing!';
+        return;
+    }
+
+    const { rootNote, interval } = currentPracticeInterval;
+    const infiniteRelistens = practiceRelistensRemaining === Infinity;
+    const relistensText = infiniteRelistens ? '∞' : practiceRelistensRemaining;
+    
+    statusDisplay.innerHTML = `
+        <div>
+            <strong>Current:</strong> ${rootNote} + ${interval}<br>
+            <strong>Tries left:</strong> ${practiceTriesRemaining} | 
+            <strong>Relistens:</strong> ${relistensText}<br>
+            <strong>Score:</strong> ${practiceStats.correct}/${practiceStats.total}
+        </div>
+    `;
+}
+
+// Function to cycle through guess button states (0 -> 1 -> 2 -> 0)
+function cycleGuessButtonState(button) {
+    const currentState = parseInt(button.dataset.state);
+    const nextState = (currentState + 1) % 3;
+    
+    button.dataset.state = nextState.toString();
+    console.log(`Button for ${button.dataset.note} changed to state ${nextState}`);
+    console.log(button.style)
+    // Update button appearance based on state
+    switch (nextState) {
+        case 0: // Off
+            button.style.backgroundColor = '#333333ff';
+            button.style.borderColor = '#333333ff';
+            // button.style.borderColor = '#ccc';
+            // button.style.color = '#333';
+            button.style.color = '#ffffff';
+            button.textContent = button.dataset.note;
+            break;
+        case 1: // Once
+            button.style.backgroundColor = '#4CAF50';
+            button.style.borderColor = '#45a049';
+            button.style.color = '#ffffff';
+            button.textContent = button.dataset.note + '¹';
+            break;
+        case 2: // Twice
+            button.style.backgroundColor = '#2196F3';
+            button.style.borderColor = '#1976D2';
+            button.style.color = '#ffffff';
+            button.textContent = button.dataset.note + '²';
+            break;
+    }
+}
+
+// Function to update the guess display
+function updateGuessDisplay() {
+    console.log('Updating guess display...');
+    const guessDisplay = document.getElementById('guessDisplay');
+    const guessButtons = document.querySelectorAll('[data-note][data-state]');
+    
+    const selectedNotes = [];
+    guessButtons.forEach(button => {
+        const state = parseInt(button.dataset.state);
+        const note = button.dataset.note;
+        
+        if (state === 1) {
+            selectedNotes.push(note);
+        } else if (state === 2) {
+            selectedNotes.push(note + ' (×2)');
+        }
+    });
+    
+    if (selectedNotes.length === 0) {
+        guessDisplay.textContent = 'No notes selected';
+    } else {
+        guessDisplay.innerHTML = `<strong>Your guess was:</strong> ${selectedNotes.join(', ')}`;
+    }
+}
+
+// Function to clear all guess selections
+function clearGuess() {
+    const guessButtons = document.querySelectorAll('[data-note][data-state]');
+    guessButtons.forEach(button => {
+        if (button.dataset.state !== '0') {
+            // Reset to state 0
+            button.dataset.state = '0';
+            button.style.backgroundColor = '#ffffff';
+            button.style.borderColor = '#ccc';
+            button.style.color = '#333';
+            button.textContent = button.dataset.note;
+        }
+    });
+    updateGuessDisplay();
+}
+
+// Function to submit the current guess
+function submitGuess() {
+    if (!currentPracticeInterval) {
+        alert('No interval is currently being practiced!');
+        return;
+    }
+    
+    if (practiceTriesRemaining <= 0) {
+        alert('No tries remaining for this interval!');
+        return;
+    }
+    
+    // Get the current guess
+    const guessButtons = document.querySelectorAll('[data-note][data-state]');
+    const guessedNotes = [];
+    
+    guessButtons.forEach(button => {
+        const state = parseInt(button.dataset.state);
+        const note = button.dataset.note;
+        
+        if (state > 0) {
+            // Add the note the number of times specified by state
+            for (let i = 0; i < state; i++) {
+                guessedNotes.push(note);
+            }
+        }
+    });
+    
+    if (guessedNotes.length === 0) {
+        alert('Please select at least one note for your guess!');
+        return;
+    }
+    
+    // Calculate the correct answer
+    const { rootNote, interval } = currentPracticeInterval;
+    const correctAnswer = calculateIntervalNotes(rootNote, interval);
+    
+    // Check if the guess is correct
+    const isCorrect = arraysEqual(guessedNotes.sort(), correctAnswer.sort());
+    
+    practiceTriesRemaining--;
+    
+    if (isCorrect) {
+        practiceStats.correct++;
+        practiceStats.total++;
+        alert(`Correct! The interval was ${rootNote} + ${interval}`);
+        updatePracticeStatus();
+        clearGuess();
+        // Move to next interval
+        setTimeout(() => playRandomInterval(), 1000);
+    } else {
+        if (practiceTriesRemaining > 0) {
+            alert(`Incorrect. You guessed: ${guessedNotes.join(', ')}\nCorrect answer: ${correctAnswer.join(', ')}\nTries remaining: ${practiceTriesRemaining}`);
+            updatePracticeStatus();
+            clearGuess();
+        } else {
+            // No more tries
+            practiceStats.total++;
+            alert(`Game over! The correct answer was: ${correctAnswer.join(', ')}`);
+            updatePracticeStatus();
+            clearGuess();
+            // Move to next interval
+            setTimeout(() => playRandomInterval(), 1000);
+        }
+    }
+}
+
+// Helper function to calculate what notes should be in an interval
+function calculateIntervalNotes(rootNote, interval) {
+    // This is a simplified version - you might want to integrate with your intervals.js
+    const chromaticNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rootIndex = chromaticNotes.indexOf(rootNote);
+    
+    const intervalSemitones = {
+        'P1': 0, 'm2': 1, 'M2': 2, 'm3': 3, 'M3': 4, 'P4': 5,
+        'A4/d5': 6, 'P5': 7, 'm6': 8, 'M6': 9, 'm7': 10, 'M7': 11
+    };
+    
+    const semitones = intervalSemitones[interval];
+    if (semitones === undefined) return [rootNote];
+    
+    const targetIndex = (rootIndex + semitones) % 12;
+    const targetNote = chromaticNotes[targetIndex];
+    
+    // For unison (P1), the same note appears twice
+    if (interval === 'P1') {
+        return [rootNote, rootNote];
+    }
+    
+    return [rootNote, targetNote];
+}
+
+// Helper function to compare arrays
+function arraysEqual(arr1, arr2) {
+    if (arr1.length !== arr2.length) return false;
+    return arr1.every((val, index) => val === arr2[index]);
+}
+
+// Function to toggle an entire row
+function toggleRow(rowIndex) {
+    const rowCells = document.querySelectorAll(`[data-row="${rowIndex}"]`);
+    
+    // Check if all cells in the row are selected
+    const allSelected = Array.from(rowCells).every(cell => cell.classList.contains('selected'));
+    
+    // If all are selected, deselect all; otherwise, select all
+    rowCells.forEach(cell => {
+        const isSelected = cell.classList.contains('selected');
+        if (allSelected && isSelected) {
+            // Deselect all
+            cell.click();
+        } else if (!allSelected && !isSelected) {
+            // Select all unselected
+            cell.click();
+        }
+    });
+}
+
+// Function to toggle an entire column
+function toggleColumn(colIndex) {
+    const columnCells = document.querySelectorAll(`[data-col="${colIndex}"]`);
+    
+    // Check if all cells in the column are selected
+    const allSelected = Array.from(columnCells).every(cell => cell.classList.contains('selected'));
+    
+    // If all are selected, deselect all; otherwise, select all
+    columnCells.forEach(cell => {
+        const isSelected = cell.classList.contains('selected');
+        if (allSelected && isSelected) {
+            // Deselect all
+            cell.click();
+        } else if (!allSelected && !isSelected) {
+            // Select all unselected
+            cell.click();
+        }
+    });
+}
 
 export {drawNotes, outputNoteArray, outputDiv, updateOutputText, highlightBothPositions}
 
