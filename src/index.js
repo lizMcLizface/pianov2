@@ -33,6 +33,7 @@ import { context,
     tempo} from './synth';
 import { chord_progressions } from './progressions';
 import PolySynthWrapper from './components/PolySynthWrapper';
+import ThemeManagerApp from './components/ThemeManagerApp';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { THEMES } from './styles/themes';
 
@@ -42,11 +43,26 @@ let PolySynthTabPlaceholder = document.getElementById('PolySynthTabPlaceholder')
 let polySynthRef = null;
 const polySynthComponentRef = React.createRef();
 
+// Comment out the main React app since this is a hybrid HTML/React application
+// The main interface is in the HTML file, and React components are embedded in specific divs
+// However, we'll render a minimal theme manager for global theming
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  </React.StrictMode>
+);
+
 // Render PolySynth component into the PolySynthTabPlaceholder div
+// This needs to be wrapped in the same ThemeProvider to enable theming
 if (PolySynthTabPlaceholder) {
     const polySynthRoot = ReactDOM.createRoot(PolySynthTabPlaceholder);
     polySynthRoot.render(
-        React.createElement(PolySynthWrapper, { ref: polySynthComponentRef })
+        <ThemeProvider>
+            {React.createElement(PolySynthWrapper, { ref: polySynthComponentRef })}
+        </ThemeProvider>
     );
     
     // Set up the ref after a short delay to ensure component is mounted
@@ -57,15 +73,6 @@ if (PolySynthTabPlaceholder) {
         }
     }, 1000);
 }
-
-// const root = ReactDOM.createRoot(document.getElementById('root'));
-// root.render(
-//   <React.StrictMode>
-//     <ThemeProvider>
-//       <App />
-//     </ThemeProvider>
-//   </React.StrictMode>
-// );
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

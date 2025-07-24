@@ -63,6 +63,14 @@ const typographyStyles = `
 export const GlobalStyles = createGlobalStyle`
     ${resetStyles}
 
+    :root {
+        --theme-background: ${({ theme }) => theme.background};
+        --theme-lite: ${({ theme }) => theme.lite};
+        --theme-mid: ${({ theme }) => theme.mid};
+        --theme-strong: ${({ theme }) => theme.strong};
+        --theme-pop: ${({ theme }) => theme.pop};
+    }
+
     * {
         box-sizing: border-box;
         transition: ${defaultTransition};
@@ -79,5 +87,62 @@ export const GlobalStyles = createGlobalStyle`
         ${typographyStyles}
         outline: none;
         border: none;
+    }
+
+    /* Theme existing tab elements */
+    .tab {
+        background: ${({ theme }) => theme.background} !important;
+        color: ${({ theme }) => theme.strong} !important;
+        border-color: ${({ theme }) => theme.mid} !important;
+        box-shadow: 2px 0 8px ${({ theme }) => theme.mid}55 !important;
+    }
+
+    .tab.expanded {
+        box-shadow: 2px 0 16px ${({ theme }) => theme.mid}77 !important;
+    }
+
+    .tab button.tablinks {
+        background-color: ${({ theme }) => theme.background} !important;
+        color: ${({ theme }) => theme.strong} !important;
+        border: 1px solid ${({ theme }) => theme.mid} !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .tab button.tablinks:hover {
+        background-color: ${({ theme }) => theme.lite} !important;
+        border-color: ${({ theme }) => theme.pop} !important;
+    }
+
+    .tab button.tablinks.active {
+        background-color: ${({ theme }) => theme.pop} !important;
+        color: ${({ theme }) => theme.background} !important;
+        border-color: ${({ theme }) => theme.pop} !important;
+    }
+
+    .tabcontent {
+        background-color: ${({ theme }) => theme.background} !important;
+        color: ${({ theme }) => theme.strong} !important;
+        border-color: ${({ theme }) => theme.mid} !important;
+    }
+
+    /* Theme form elements that aren't part of styled components */
+    input:not([class*="Knob"]):not([class*="Select"]), 
+    select:not([class*="Knob"]):not([class*="Select"]), 
+    textarea:not([class*="Knob"]):not([class*="Select"]),
+    button:not([class*="Knob"]):not([class*="Select"]) {
+        background-color: ${({ theme }) => theme.background};
+        color: ${({ theme }) => theme.strong};
+        border: 1px solid ${({ theme }) => theme.mid};
+        border-radius: 4px;
+        padding: 8px 12px;
+        
+        &:hover {
+            border-color: ${({ theme }) => theme.pop};
+        }
+        
+        &:focus {
+            border-color: ${({ theme }) => theme.pop};
+            box-shadow: 0 0 0 2px ${({ theme }) => theme.pop}33;
+        }
     }
 `;

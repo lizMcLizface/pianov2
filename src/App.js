@@ -3,26 +3,22 @@ import './App.css';
 
 import { ThemeProvider } from 'styled-components';
 import { useTheme } from './contexts/ThemeContext';
+import { GlobalStyles } from './styles/globalStyles';
+import ThemeSelector from './components/ThemeSelector';
+import ThemeInjector from './components/ThemeInjector';
 
 function App() {
   const { theme, themes } = useTheme();
 
   return (
     <ThemeProvider theme={themes[theme]}>
+      <GlobalStyles />
+      <ThemeInjector />
       <div className="App">
         <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload. React is stupid. JS is
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
+          <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+            <ThemeSelector />
+          </div>
         </header>
       </div>
     </ThemeProvider>
