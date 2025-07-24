@@ -20,6 +20,7 @@ import {
     GuessButtonsContainer,
     GuessActionsContainer,
     SelectedDisplay,
+    StatusDisplay,
     GuessDisplay,
     ActionButton
 } from './IntervalPractice.styled';
@@ -38,7 +39,8 @@ let practiceSettingsGlobal = {
     volume: 50,            // Volume percentage
     simultaneousPlay: false, // Play notes simultaneously vs sequentially
     allowDuplicates: false,   // Allow duplicate notes
-    baseOctave: 4              // Base octave (1-6, default 4)
+    baseOctave: 4,             // Base octave (1-6, default 4)
+    preselectRoot: false       // Automatically preselect the root note in guesses
 }
 
 const BASE_CLASS_NAME = 'IntervalPractice';
@@ -59,11 +61,15 @@ const IntervalPractice = ({ className }) => {
         volume: 50,            // Volume percentage
         simultaneousPlay: false, // Play notes simultaneously vs sequentially
         allowDuplicates: false,   // Allow duplicate notes
-        baseOctave: 4              // Base octave (1-6, default 4)
+        baseOctave: 4,             // Base octave (1-6, default 4)
+        preselectRoot: false       // Automatically preselect the root note in guesses
     });
 
-    // State for selected intervals - default to C-M3
-    const [selectedIntervals, setSelectedIntervals] = useState(new Set(['C-M3']));
+    // State for selected intervals - default to all C intervals
+    const [selectedIntervals, setSelectedIntervals] = useState(new Set([
+        'C-P1', 'C-m2', 'C-M2', 'C-m3', 'C-M3', 'C-P4', 
+        'C-A4/d5', 'C-P5', 'C-m6', 'C-M6', 'C-m7', 'C-M7'
+    ]));
     
     // State for guess buttons
     const [guessStates, setGuessStates] = useState(
@@ -80,9 +86,13 @@ const IntervalPractice = ({ className }) => {
 
     // Individual practice state variables
     const [currentPracticeInterval, setCurrentPracticeInterval] = useState(null);
+    const [currentRootNote, setCurrentRootNote] = useState(null);
     const [practiceTriesRemaining, setPracticeTriesRemaining] = useState(0);
     const [practiceRelistensRemaining, setPracticeRelistensRemaining] = useState(0);
     const [practiceStats, setPracticeStats] = useState({ correct: 0, total: 0 });
+
+    // Status message state
+    const [statusMessage, setStatusMessage] = useState({ text: '', type: '', visible: false });
 
     practiceSettingsGlobal = {
         tries: practiceSettings.tries,
@@ -94,7 +104,8 @@ const IntervalPractice = ({ className }) => {
         volume: practiceSettings.volume,
         simultaneousPlay: practiceSettings.simultaneousPlay,
         allowDuplicates: practiceSettings.allowDuplicates,
-        baseOctave: practiceSettings.baseOctave
+        baseOctave: practiceSettings.baseOctave,
+        preselectRoot: practiceSettings.preselectRoot
     }
 
     // Get PolySynth reference for microtonal controls
@@ -223,7 +234,21 @@ const IntervalPractice = ({ className }) => {
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [currentPracticeInterval, practiceTriesRemaining, practiceRelistensRemaining, practiceStats]); // Include dependencies that submitGuess uses
+    }, [currentPracticeInterval, practiceTriesRemaining, practiceRelistensRemaining, practiceStats, guessStates, currentRootNote]); // Include dependencies that submitGuess uses
+
+    // Status message helper functions
+    const showStatus = (text, type = 'info', duration = 3000) => {
+        setStatusMessage({ text, type, visible: true });
+        
+        // Auto-hide after duration
+        setTimeout(() => {
+            setStatusMessage(prev => ({ ...prev, visible: false }));
+        }, duration);
+    };
+
+    const hideStatus = () => {
+        setStatusMessage(prev => ({ ...prev, visible: false }));
+    };
 
     // Update pitch value and sync with PolySynth
     const updatePitchValue = (pitchName, value) => {
@@ -340,7 +365,16 @@ const IntervalPractice = ({ className }) => {
 
     // Clear all guess selections
     const clearGuess = () => {
-        setGuessStates(chromaticNotes.reduce((acc, note) => ({ ...acc, [note]: 0 }), {}));
+        if (practiceSettingsGlobal.preselectRoot && currentRootNote) {
+            // Keep root note preselected if option is enabled
+            setGuessStates(prev => ({
+                ...chromaticNotes.reduce((acc, note) => ({ ...acc, [note]: 0 }), {}),
+                [currentRootNote]: 1
+            }));
+        } else {
+            // Clear everything
+            setGuessStates(chromaticNotes.reduce((acc, note) => ({ ...acc, [note]: 0 }), {}));
+        }
     };
 
     // Select/Clear all intervals
@@ -358,7 +392,7 @@ const IntervalPractice = ({ className }) => {
     // Play random interval
     const playRandomInterval = () => {
         if (selectedIntervals.size === 0) {
-            alert('Please select some intervals first!');
+            showStatus('Please select some intervals first!', 'error', 3000);
             return;
         }
 
@@ -391,6 +425,7 @@ const IntervalPractice = ({ className }) => {
         const polySynth = getPolySynthRef();
         let notesArray = [];
         let rootNoteMidi = 0;
+        let firstRootNote = null; // Track the first root note for preselection
         
         for(let n = 0; n < practiceSettingsGlobal.noteCount; n++) {        
             const randomKey = selectedArray[Math.floor(Math.random() * selectedArray.length)];
@@ -399,6 +434,7 @@ const IntervalPractice = ({ className }) => {
                 interval = 'A4'; // Normalize to A4 for playback
             }
             if(n == 0){
+                firstRootNote = rootNote; // Store the first root note
                 rootNoteMidi = noteToMidi(rootNote + '/' + practiceSettingsGlobal.baseOctave) + 12;
                 notesArray.push(noteToName(rootNoteMidi));
                 if (practiceSettingsGlobal.noteCount === 1) {
@@ -424,6 +460,18 @@ const IntervalPractice = ({ className }) => {
             notesArray = uniqueNotes;
         }
         setCurrentPracticeInterval(notesArray);
+        setCurrentRootNote(firstRootNote);
+
+        // Preselect root note if option is enabled
+        if (practiceSettingsGlobal.preselectRoot && firstRootNote) {
+            setGuessStates(prev => ({
+                ...chromaticNotes.reduce((acc, note) => ({ ...acc, [note]: 0 }), {}),
+                [firstRootNote]: 1
+            }));
+        } else {
+            // Clear guess states if preselect is disabled
+            clearGuess();
+        }
 
 
         // if(practiceSettingsGlobal.noteCount == 1) {
@@ -467,12 +515,12 @@ const IntervalPractice = ({ className }) => {
     // Replay current interval
     const replayCurrentInterval = () => {
         if (!currentPracticeInterval) {
-            alert('No interval is currently being practiced. Click "Play Random Interval" first!');
+            showStatus('No interval is currently being practiced. Click "Play Random Interval" first!', 'error', 3000);
             return;
         }
 
         if (practiceRelistensRemaining <= 0) {
-            alert('No relistens remaining for this interval!');
+            showStatus('No relistens remaining for this interval!', 'error', 3000);
             return;
         }
 
@@ -520,23 +568,24 @@ const IntervalPractice = ({ className }) => {
     // Skip to next interval
     const skipToNextInterval = () => {
         if (!currentPracticeInterval) {
-            alert('No interval is currently being practiced. Click "Play Random Interval" first!');
+            showStatus('No interval is currently being practiced. Click "Play Random Interval" first!', 'error', 3000);
             return;
         }
 
         setPracticeStats(prev => ({ ...prev, total: prev.total + 1 }));
+        showStatus('Skipped to next interval', 'info', 2000);
         playRandomInterval();
     };
 
     // Submit guess
     const submitGuess = () => {
         if (!currentPracticeInterval) {
-            alert('No interval is currently being practiced!');
+            showStatus('No interval is currently being practiced!', 'error', 3000);
             return;
         }
 
         if (practiceTriesRemaining <= 0) {
-            alert('No tries remaining for this interval!');
+            showStatus('No tries remaining for this interval!', 'error', 3000);
             return;
         }
 
@@ -549,7 +598,7 @@ const IntervalPractice = ({ className }) => {
         });
 
         if (guessedNotes.length === 0) {
-            alert('Please select at least one note for your guess!');
+            showStatus('Please select at least one note for your guess!', 'error', 3000);
             return;
         }
 
@@ -572,18 +621,18 @@ const IntervalPractice = ({ className }) => {
         if (isCorrect) {
             newStats = { correct: practiceStats.correct + 1, total: practiceStats.total + 1 };
             setPracticeStats(newStats);
-            // alert(`Correct! The interval was ${rootNote} + ${interval}`);
+            showStatus(`🎉 Correct! The notes were: ${correctAnswer.join(', ')}`, 'success', 3000);
             clearGuess();
             setTimeout(() => playRandomInterval(), 1000);
         } else {
             if (newTries > 0) {
-                alert(`Incorrect. Tries remaining: ${newTries}`);
+                showStatus(`❌ Incorrect. ${newTries} tries remaining. Try again!`, 'error', 3000);
                 clearGuess();
                 newStats = practiceStats; // Keep current stats for ongoing interval
             } else {
                 newStats = { correct: practiceStats.correct, total: practiceStats.total + 1 };
                 setPracticeStats(newStats);
-                // alert(`Game over! The correct answer was: ${correctAnswer.join(', ')}`);
+                showStatus(`💔 Out of tries! The correct answer was: ${correctAnswer.join(', ')}`, 'error', 4000);
                 clearGuess();
                 setTimeout(() => playRandomInterval(), 1000);
             }
@@ -816,7 +865,16 @@ const IntervalPractice = ({ className }) => {
                             />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            {/* Empty cell for layout */}
+                            <label style={{ fontSize: '11px', fontWeight: 'bold' }}>Preselect Root</label>
+                            <input
+                                type="checkbox"
+                                checked={practiceSettings.preselectRoot}
+                                onChange={(e) => setPracticeSettings(prev => ({ 
+                                    ...prev, 
+                                    preselectRoot: e.target.checked 
+                                }))}
+                                style={{ width: '16px', height: '16px' }}
+                            />
                         </div>
                     </KnobGrid>
                 </Module>
@@ -862,29 +920,41 @@ const IntervalPractice = ({ className }) => {
             {/* Status Displays */}
             <SelectedDisplay>
                 <strong>Selected Intervals ({selectedIntervals.size}):</strong><br />
-                {selectedIntervals.size === 0 
-                    ? 'No intervals selected' 
-                    : Array.from(selectedIntervals).map(key => key.replace('-', ' + ')).join(', ')
-                }
+
             </SelectedDisplay>
+
+            {/* Practice Status Display */}
+            {statusMessage.visible && (
+                <StatusDisplay status={statusMessage.type} visible={statusMessage.visible}>
+                    {statusMessage.text}
+                </StatusDisplay>
+            )}
+
+            {/* Practice Progress Display */}
+            {(currentPracticeInterval || practiceStats.total > 0) && (
+                <StatusDisplay status="info" visible={true}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                        <span>
+                            <strong>Status:</strong> {currentPracticeInterval ? 
+                                // `Playing ${currentPracticeInterval.map(note => note.replace(/[0-9]/g, '')).join(' + ')}` : 
+                                `No Hints\t`: 
+                                'Ready for next interval'}
+                        </span>
+                        <span>
+                            <strong>Score:</strong> {practiceStats.correct}/{practiceStats.total} 
+                            {practiceStats.total > 0 && ` (${Math.round((practiceStats.correct / practiceStats.total) * 100)}%)`}
+                        </span>
+                    </div>
+                    {currentPracticeInterval && (
+                        <div style={{ marginTop: '5px', fontSize: '11px', opacity: 0.8 }}>
+                            <strong>Tries:</strong> {practiceTriesRemaining} remaining | 
+                            <strong> Relistens:</strong> {practiceRelistensRemaining === Infinity ? '∞' : practiceRelistensRemaining} remaining
+                        </div>
+                    )}
+                </StatusDisplay>
+            )}
             </GuessSection>
             {/* Control Buttons */}
-
-
-            {practiceStatus.current && (
-                <div style={{ 
-                    marginTop: '15px', 
-                    padding: '10px', 
-                    backgroundColor: '#e3f2fd', 
-                    borderRadius: '4px',
-                    textAlign: 'center'
-                }}>
-                    <strong>Current:</strong> {practiceStatus.current.rootNote} + {practiceStatus.current.interval}<br />
-                    <strong>Tries left:</strong> {practiceStatus.tries} | 
-                    <strong>Relistens:</strong> {practiceStatus.relistens === Infinity ? '∞' : practiceStatus.relistens}<br />
-                    <strong>Score:</strong> {practiceStatus.stats.correct}/{practiceStatus.stats.total}
-                </div>
-            )}
 
                 {/* Microtonal Pitch Control */}
                 <MicrotonalModule label="Microtonal">

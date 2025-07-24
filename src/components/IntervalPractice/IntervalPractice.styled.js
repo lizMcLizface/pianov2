@@ -207,3 +207,46 @@ export const SelectedDisplay = styled.div`
     color: ${({ theme }) => theme.strong};
     border: 1px solid ${({ theme }) => theme.mid};
 `;
+
+export const StatusDisplay = styled.div.withConfig({
+    shouldForwardProp: (prop) => !['status', 'visible'].includes(prop),
+})`
+    padding: ${SPACING.s};
+    background-color: ${({ status, theme }) => {
+        switch(status) {
+            case 'success': return 'rgba(76, 175, 80, 0.1)';
+            case 'error': return 'rgba(244, 67, 54, 0.1)';
+            case 'info': return 'rgba(33, 150, 243, 0.05)';
+            default: return theme.lite;
+        }
+    }};
+    border: 1px solid ${({ status, theme }) => {
+        switch(status) {
+            case 'success': return 'rgba(76, 175, 80, 0.3)';
+            case 'error': return 'rgba(244, 67, 54, 0.3)';
+            case 'info': return 'rgba(33, 150, 243, 0.2)';
+            default: return theme.mid;
+        }
+    }};
+    border-radius: ${borderRadiusS};
+    min-height: 40px;
+    font-size: 12px;
+    color: ${({ status, theme }) => {
+        switch(status) {
+            case 'success': return 'rgba(46, 125, 50, 0.9)';
+            case 'error': return 'rgba(198, 40, 40, 0.9)';
+            case 'info': return 'rgba(25, 118, 210, 0.8)';
+            default: return theme.strong;
+        }
+    }};
+    margin-top: ${SPACING.s};
+    transition: all 0.3s ease;
+    opacity: ${({ visible }) => visible ? 1 : 0};
+    transform: translateY(${({ visible }) => visible ? '0' : '-10px'});
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: ${({ status }) => status === 'info' ? 'normal' : 'bold'};
+`;
