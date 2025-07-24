@@ -6,6 +6,9 @@ import Knob from './../Knob';
 import KnobGrid from './../KnobGrid';
 import Module from './../Module';
 import PeakMeter from './../PeakMeter';
+import Oscilloscope from './../Oscilloscope';
+import Spectrogram from './../Spectrogram';
+import SpectrumAnalyzer from './../SpectrumAnalyzer';
 import Select from './../Select';
 import presetData from '../../util/presetData';
 import { getNoteInfo, WAVEFORM, FILTER, REVERB, ENVELOPE_SHAPE } from '../../util/util';
@@ -1017,6 +1020,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
+                <Module label="Oscilloscope">
+                    <Oscilloscope audioCtx={AC} sourceNode={masterGain} />
+                </Module>
+
 
 
                 <Module label="Voicing">
@@ -1269,6 +1276,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </InfoContainer>
                 </InfoModule>
 
+                <Module label="Spectrum">
+                    <SpectrumAnalyzer audioCtx={AC} sourceNode={masterGain} />
+                </Module>
+
                 {/* <Lines /> */}
 
                 <MicrotonalModule label="Microtonal">
@@ -1426,6 +1437,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         </div>
                     </KnobGrid>
                 </MicrotonalModule>
+                <Module label="Spectrogram">
+                    <Spectrogram audioCtx={AC} sourceNode={masterGain} />
+                </Module>
+
 
 
             </ModuleGridContainer>

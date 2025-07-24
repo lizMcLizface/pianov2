@@ -23,7 +23,7 @@ export const ModuleGridContainer = styled.div`
     display: grid;
     position: relative;
     width: fit-content;
-    grid-template-columns: 130px 418px 418px  226px 226px 130px 130px 130px;
+    grid-template-columns: 130px 418px 418px  226px 226px 130px 130px 130px 420px;
     gap: ${SPACING.m};
     justify-items: center;
     align-items: center;
@@ -52,10 +52,12 @@ export const ModuleGridContainer = styled.div`
 
 export const InfoModule = styled(Module)`
     grid-row: span 2;
+    max-height: 240px;
+    overflow: hidden;
 `;
 
 export const MicrotonalModule = styled(Module)`
-    grid-column: 1 / -1;
+    grid-column: 1 / -2;
     width: 100%;
     max-width: none;
 `;
