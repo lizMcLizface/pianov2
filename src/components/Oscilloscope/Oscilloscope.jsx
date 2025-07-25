@@ -135,7 +135,7 @@ const Oscilloscope = ({ audioCtx, sourceNode, className = '' }) => {
                     }
                     
                     triggerIndex = closestTrigger.index;
-                    console.log(`Found ${allTriggers.length} triggers, using closest to middle at index:`, triggerIndex, 'Value:', closestTrigger.value);
+                    // console.log(`Found ${allTriggers.length} triggers, using closest to middle at index:`, triggerIndex, 'Value:', closestTrigger.value);
                 }
                 
                 // Update the persistent state for next frame
@@ -144,12 +144,12 @@ const Oscilloscope = ({ audioCtx, sourceNode, className = '' }) => {
             // console.log('Trigger index:', triggerIndex);
 
             // Debug: Log the first few waveform values to see if we're getting data
-            if (Math.random() < 0.01) { // Log occasionally
-                const maxVal = Math.max(...dataArray);
-                const minVal = Math.min(...dataArray);
-                console.log('Waveform range:', minVal, 'to', maxVal, 'Trigger at:', triggerIndex);
-                console.log('Trigger state:', triggerState.currentState);
-            }
+            // if (Math.random() < 0.01) { // Log occasionally
+            //     const maxVal = Math.max(...dataArray);
+            //     const minVal = Math.min(...dataArray);
+            //     console.log('Waveform range:', minVal, 'to', maxVal, 'Trigger at:', triggerIndex);
+            //     console.log('Trigger state:', triggerState.currentState);
+            // }
 
             // Clear canvas with dark background
             canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.9)';

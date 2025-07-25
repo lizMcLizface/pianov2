@@ -17,6 +17,8 @@ class MonoSynth {
         this.isInHoldPhase = false;
         this.holdPhaseEndTime = null;
         this.currentHoldLevel = 1; // Store hold level for use in noteOff
+        this.voiceId = null; // Unique identifier for the current voice session
+        this.voiceIdCounter = 0; // Counter for generating unique voice IDs
     }
 
     init() {
@@ -100,7 +102,11 @@ class MonoSynth {
     noteOn = (noteInfo, synthProps) => {
         if (!noteInfo) return;
 
+        // Clear any existing timeouts and generate new voice ID
         this.clearTimeouts();
+        this.voiceId = ++this.voiceIdCounter;
+        const currentVoiceId = this.voiceId; // Capture current voice ID for closures
+        
         const { freq, note, oct } = noteInfo;
         const { gainEnv, filterEnv, portamentoSpeed } = synthProps;
 
@@ -141,11 +147,17 @@ class MonoSynth {
                 // Attack -> Hold -> Decay -> Sustain
                 // console.log('MonoSynth gainEnv.hold:', gainEnv.hold, 'gainEnv.d:', gainEnv.d);
                 const attackTimeoutId = setTimeout(() => {
+                    // Check if this voice is still active
+                    if (this.voiceId !== currentVoiceId) return;
+                    
                     // Hold phase - maintain hold level
                     this.isInHoldPhase = true;
                     this.holdPhaseEndTime = Date.now() + (gainEnv.hold * 1000);
                     
                     const holdTimeoutId = setTimeout(() => {
+                        // Check if this voice is still active
+                        if (this.voiceId !== currentVoiceId) return;
+                        
                         this.isInHoldPhase = false;
                         this.holdPhaseEndTime = null;
                         const decayTime = Math.max(gainEnv.d, minTime);
@@ -157,6 +169,9 @@ class MonoSynth {
             } else {
                 // Traditional ADSR: Attack -> Decay -> Sustain
                 const timeoutId = setTimeout(() => {
+                    // Check if this voice is still active
+                    if (this.voiceId !== currentVoiceId) return;
+                    
                     const decayTime = Math.max(gainEnv.d, minTime);
                     this.gain.setGainCurve(holdLevel, gainEnv.s, decayTime, gainEnv.decayShape, gainEnv.decayExponent); // Decay from hold level to sustain
                 }, (attackTime * 1000));
@@ -167,6 +182,9 @@ class MonoSynth {
             this.gain.setGainCurve(this.gain.getGain(), holdLevel, 0); // Reset to hold level immediately
 
             const timeoutId = setTimeout(() => {
+                // Check if this voice is still active
+                if (this.voiceId !== currentVoiceId) return;
+                
                 const decayTime = Math.max(gainEnv.d, minTime);
                 this.gain.setGainCurve(holdLevel, gainEnv.s, decayTime, gainEnv.decayShape, gainEnv.decayExponent); // Decay
             }, (minTime * 1000));
@@ -184,6 +202,9 @@ class MonoSynth {
                 this.filter.setDetune(filterEnv.amount, attackTime); // Attack
 
                 const timeoutId = setTimeout(() => {
+                    // Check if this voice is still active
+                    if (this.voiceId !== currentVoiceId) return;
+                    
                     this.filter.setDetune(0, Math.max(filterEnv.d, minTime)); // Decay
                 }, (attackTime * 1000));
                 this.timeoutIds.push(timeoutId);
@@ -192,14 +213,27 @@ class MonoSynth {
                 this.filter.setDetune(0, Math.max(filterEnv.d, minTime)); // Decay
             }
         }
+        
+        return currentVoiceId; // Return voice ID for caller to track
     }
-    noteOff = ({ gainEnv, filterEnv }) => {
+    noteOff = ({ gainEnv, filterEnv }, voiceId = null) => {
+        // If voiceId is provided, only process if it matches current voice
+        if (voiceId !== null && this.voiceId !== voiceId) {
+            console.log('MonoSynth noteOff ignored - voice ID mismatch. Current:', this.voiceId, 'Requested:', voiceId);
+            return;
+        }
+        
+        const currentVoiceId = this.voiceId; // Capture current voice ID for closures
+        
         if (this.isInHoldPhase && this.holdPhaseEndTime) {
             // We're in hold phase - schedule decay->sustain->release after hold completes
             const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
             // console.log('MonoSynth noteOff during hold phase, remaining hold time:', remainingHoldTime);
             
             const holdCompleteTimeoutId = setTimeout(() => {
+                // Check if this voice is still active
+                if (this.voiceId !== currentVoiceId) return;
+                
                 // Hold phase completed, now do decay to sustain
                 this.isInHoldPhase = false;
                 this.holdPhaseEndTime = null;
@@ -212,6 +246,9 @@ class MonoSynth {
                     
                     // Then release after decay completes
                     const releaseTimeoutId = setTimeout(() => {
+                        // Check if this voice is still active
+                        if (this.voiceId !== currentVoiceId) return;
+                        
                         this.currentNote = null;
                         this.currentNoteInfo = null;
                         const releaseTime = Math.max(gainEnv.r, minTime);
@@ -240,13 +277,24 @@ class MonoSynth {
             this.filter.setDetune(0, Math.max(filterEnv.r, minTime)); // Release
         }
     }
-    noteStop = () => {
+    noteStop = (voiceId = null) => {
+        // If voiceId is provided, only process if it matches current voice
+        if (voiceId !== null && this.voiceId !== voiceId) {
+            console.log('MonoSynth noteStop ignored - voice ID mismatch. Current:', this.voiceId, 'Requested:', voiceId);
+            return;
+        }
+        
+        const currentVoiceId = this.voiceId; // Capture current voice ID for closures
+        
         if (this.isInHoldPhase && this.holdPhaseEndTime) {
             // Even for noteStop, respect the hold phase
             const remainingHoldTime = Math.max(0, this.holdPhaseEndTime - Date.now());
             // console.log('MonoSynth noteStop during hold phase, remaining hold time:', remainingHoldTime);
             
             const holdCompleteTimeoutId = setTimeout(() => {
+                // Check if this voice is still active
+                if (this.voiceId !== currentVoiceId) return;
+                
                 this.clearTimeouts();
                 this.currentNote = null;
                 this.currentNoteInfo = null;

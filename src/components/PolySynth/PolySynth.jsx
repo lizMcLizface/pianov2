@@ -33,6 +33,8 @@ const polyphony = 8;
 const synthArr = Array(polyphony).fill(0).map(_ => new MonoSynth(AC));
 let synthPos = 0;
 
+let polyphonyGlobal = 8;
+// let portamentoSpeedGlobal = 0;
 const synthMix = new Nodes.Compressor(AC);
 
 // Master Effects
@@ -186,12 +188,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (octaveMod < 7) {
             setOctaveMod(octaveMod + 1);
             synthArr.forEach(synth => synthNoteOff(synth));
+            regularActiveNotes.current.clear(); // Clear regular note tracking
         }
     };
     const octaveDown = () => {
         if (octaveMod > 1) {
             setOctaveMod(octaveMod - 1);
             synthArr.forEach(synth => synthNoteOff(synth));
+            regularActiveNotes.current.clear(); // Clear regular note tracking
         }
     };
 
@@ -213,7 +217,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     };
 
     const resetSynthPos = () => synthPos = 0;
-    const incrementSynthPos = () => synthPos = (synthPos + 1) % polyphony;
+    const incrementSynthPos = () => synthPos = (synthPos + 1) % polyphonyGlobal;
 
     const activateSynth = () => {
         setSynthActive(true);
@@ -298,6 +302,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         Octave: octaveRatio,
         AllThemPitches: allThemPitches
     };
+    portamentoSpeedGlobal = portamentoSpeed;
+    polyphonyGlobal = polyphony;
+
     const getGainEnv = (volume) => {
         const v = volume || 1;
         // Apply exponential scaling for more natural response
@@ -339,19 +346,21 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         const gainEnv = getGainEnv(volume);
         // console.log('Gain envelope:', gainEnv);
         const filterEnv = getFilterEnv();
-        synth.noteOn(
+        const voiceId = synth.noteOn(
             note,
             {
                 gainEnv,
                 filterEnv,
-                portamentoSpeed: polyphony === 1 ? portamentoSpeedGlobal : 0
+                portamentoSpeed: polyphonyGlobal === 1 ? portamentoSpeedGlobal : 0
             },
         );
+        return voiceId; // Return voice ID for tracking
     }
-    const synthNoteOff = (synth) => {
+    const synthNoteOff = (synth, note = null, voiceId = null) => {
         const gainEnv = getGainEnv(1); // Use default volume of 1 for note off
         const filterEnv = getFilterEnv();
-        synth.noteOff({ gainEnv, filterEnv });
+        console.log('Sending note off to synth', synth, 'note information', note, 'voiceId', voiceId);
+        synth.noteOff({ gainEnv, filterEnv }, voiceId);
     }
 
     // Programmatic note control functions
@@ -370,31 +379,37 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             let targetSynth = null;
             if (!synthArr[synthPos].currentNote) {
                 targetSynth = synthArr[synthPos];
+                console.log('Reusing synth at position:', synthPos);
             } else {
                 const initialPos = synthPos;
+                console.log('Finding available synth, starting at position:', synthPos);
                 incrementSynthPos();
 
                 while (synthPos !== initialPos) {
+                    console.log('Checking synth at position:', synthPos);
                     if (!synthArr[synthPos].currentNote) break;
                     incrementSynthPos();
                 }
+                console.log('Found available synth at position:', synthPos);
                 targetSynth = synthArr[synthPos];
             }
 
             // Create unique ID for this note instance
             const noteId = `${noteString}_${noteIdCounter.current++}`;
             
+            // Start the note and get the voice ID
+            const voiceId = synthNoteOn(targetSynth, note, gainValue);
+            
             // Store note info for tracking
             const noteInfo = {
                 synth: targetSynth,
                 noteString: noteString,
                 volume: gainValue,
-                noteId: noteId
+                noteId: noteId,
+                voiceId: voiceId // Store voice ID for proper cleanup
             };
             
             activeNotes.current.set(noteId, noteInfo);
-            
-            synthNoteOn(targetSynth, note, gainValue);
             incrementSynthPos();
             
             // If duration is specified, schedule note off
@@ -402,7 +417,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 setTimeout(() => {
                     const noteInfo = activeNotes.current.get(noteId);
                     if (noteInfo) {
-                        synthNoteOff(noteInfo.synth);
+                        synthNoteOff(noteInfo.synth, note, noteInfo.voiceId);
                         activeNotes.current.delete(noteId);
                     }
                 }, duration);
@@ -419,11 +434,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     notesToStop.push(noteId);
                 }
             });
+            console.log('Notes to stop: ', notes);
+            console.log('Found notes playing: ', notesToStop);
             
             notesToStop.forEach(noteId => {
                 const noteInfo = activeNotes.current.get(noteId);
                 if (noteInfo) {
-                    synthNoteOff(noteInfo.synth);
+                    synthNoteOff(noteInfo.synth, null, noteInfo.voiceId);
                     activeNotes.current.delete(noteId);
                 }
             });
@@ -433,7 +450,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const stopAllNotesProgrammatic = () => {
         console.log('Stopping all programmatic notes, count:', activeNotes.current.size);
         activeNotes.current.forEach((noteInfo, noteId) => {
-            synthNoteOff(noteInfo.synth);
+            synthNoteOff(noteInfo.synth, null, noteInfo.voiceId);
         });
         activeNotes.current.clear();
         
@@ -589,10 +606,15 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         AllThemPitches: allThemPitches
     };
 
+    // Track active notes for regular (non-programmatic) note playing
+    const regularActiveNotes = useRef(new Map()); // Maps note.note -> {synth, voiceId}
+
     // Function to delegate played notes to each of the synths
     const noteOn = (note) => {
+        let targetSynth = null;
+        
         if (!synthArr[synthPos].currentNote) {
-            synthNoteOn(synthArr[synthPos], note);
+            targetSynth = synthArr[synthPos];
         } else {
             const initialPos = synthPos;
             incrementSynthPos();
@@ -601,14 +623,30 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 if (!synthArr[synthPos].currentNote) break;
                 incrementSynthPos();
             }
-            synthNoteOn(synthArr[synthPos], note);
+            targetSynth = synthArr[synthPos];
         }
+
+        const voiceId = synthNoteOn(targetSynth, note);
+        
+        // Track this note for proper cleanup
+        regularActiveNotes.current.set(note.note, {
+            synth: targetSynth,
+            voiceId: voiceId
+        });
 
         incrementSynthPos();
     };
+    
     const noteOff = (note) => {
-        const targetSynths = synthArr.filter(synth => synth.currentNote === note.note);
-        targetSynths.forEach(synth => synthNoteOff(synth));
+        const noteInfo = regularActiveNotes.current.get(note.note);
+        if (noteInfo) {
+            synthNoteOff(noteInfo.synth, note, noteInfo.voiceId);
+            regularActiveNotes.current.delete(note.note);
+        } else {
+            // Fallback to old method if note not found in tracking
+            const targetSynths = synthArr.filter(synth => synth.currentNote === note.note);
+            targetSynths.forEach(synth => synthNoteOff(synth));
+        }
     };
 
     // Keyboard listeners
