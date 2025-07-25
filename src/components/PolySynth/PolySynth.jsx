@@ -48,6 +48,8 @@ const masterBitCrush = new Nodes.BitCrusher(AC);
 const masterLimiter = new Nodes.Compressor(AC);
 const masterEQ2 = new Nodes.EQ2(AC);
 
+let portamentoSpeedGlobal = 0;
+
 let gains = {
     gainAttack: 0,
     gainDecay: 0,
@@ -330,6 +332,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         decayExponent: filterEnvelopeDecayExponent,
         releaseExponent: filterEnvelopeReleaseExponent
     });
+    portamentoSpeedGlobal = portamentoSpeed;
 
     // Functions to pass envelope data to the synth
     const synthNoteOn = (synth, note, volume) => {
@@ -341,7 +344,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             {
                 gainEnv,
                 filterEnv,
-                portamentoSpeed: polyphony === 1 ? portamentoSpeed : 0
+                portamentoSpeed: polyphony === 1 ? portamentoSpeedGlobal : 0
             },
         );
     }
@@ -956,7 +959,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         <Knob
                             label="Cutoff"
                             value={masterFilterFreq}
-                            modifier={11000}
+                            scalingType="logarithmic"
+                            minValue={20}
+                            maxValue={11020}
                             resetValue={11000}
                             isRounded
                             onUpdate={(val) => setMasterFilterFreq(val)}
@@ -1061,7 +1066,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         <Knob
                             label="Cutoff"
                             value={filterFreq}
-                            modifier={11000}
+                            scalingType="logarithmic"
+                            minValue={20}
+                            maxValue={11020}
                             resetValue={11000}
                             isRounded
                             onUpdate={(val) => setFilterFreq(val)}
@@ -1099,8 +1106,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                         <Knob
                             label="Amount"
-                            type="B"
+                            type="A"
                             modifier={11000}
+                            scalingType="symmetric-log"
                             isRounded
                             value={filterEnvAmount}
                             onUpdate={(val) => setFilterEnvAmount(val)}

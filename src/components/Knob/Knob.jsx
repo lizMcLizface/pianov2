@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { clamp } from '../../util/util';
 import {
@@ -39,21 +39,97 @@ const Knob = ({
     type,
     resetValue,
     value,
+    scalingType,
+    minValue,
+    maxValue,
 }) => {
-    const getValueFromKnobRotation = (knobRotation) => {
+    const getValueFromKnobRotation = useCallback((knobRotation) => {
         const val = (type === 'A')
             ? ((knobRotation + maxRotation) / (maxRotation * 2))
             : (knobRotation / maxRotation);
 
-        const output = val * modifier + offset;
+        let output;
+        
+        switch (scalingType) {
+            case 'logarithmic': {
+                // Single-direction logarithmic scaling (for frequency parameters)
+                const min = minValue || offset;
+                const max = maxValue || (modifier + offset);
+                const logMin = Math.log(min);
+                const logMax = Math.log(max);
+                output = Math.exp(logMin + val * (logMax - logMin));
+                break;
+            }
+            case 'symmetric-log': {
+                // Double symmetric logarithmic scaling (for detune parameters)
+                const range = maxValue || modifier;
+                
+                // Simple symmetric scaling around center (0.5)
+                if (val === 0.5) {
+                    output = 0; // Exact center is 0
+                } else if (val > 0.5) {
+                    // Positive side: 0.5 to 1.0 maps to 0 to +range
+                    const normalizedVal = (val - 0.5) * 2; // 0 to 1
+                    // Simple exponential curve: x^2 gives more precision near center
+                    output = range * Math.pow(normalizedVal, 2);
+                } else {
+                    // Negative side: 0.0 to 0.5 maps to -range to 0
+                    const normalizedVal = (0.5 - val) * 2; // 0 to 1
+                    // Simple exponential curve: x^2 gives more precision near center
+                    output = -range * Math.pow(normalizedVal, 2);
+                }
+                output += offset;
+                break;
+            }
+            default: // linear
+                output = val * modifier + offset;
+                break;
+        }
 
         return isRounded ? Math.round(output) : output;
-    };
-    const getKnobRotationFromValue = (value) => {
+    }, [type, scalingType, minValue, maxValue, modifier, offset, isRounded]);
+    const getKnobRotationFromValue = useCallback((value) => {
+        let val;
+        
+        switch (scalingType) {
+            case 'logarithmic': {
+                // Single-direction logarithmic scaling (for frequency parameters)
+                const min = minValue || offset;
+                const max = maxValue || (modifier + offset);
+                const logMin = Math.log(min);
+                const logMax = Math.log(max);
+                val = (Math.log(value) - logMin) / (logMax - logMin);
+                break;
+            }
+            case 'symmetric-log': {
+                // Double symmetric logarithmic scaling (for detune parameters)
+                const range = maxValue || modifier;
+                const adjustedValue = value - offset;
+                
+                if (adjustedValue === 0) {
+                    val = 0.5; // Exact center
+                } else if (adjustedValue > 0) {
+                    // Positive side: inverse of output = range * normalizedVal^2
+                    // So: normalizedVal = sqrt(adjustedValue / range)
+                    const normalizedVal = Math.sqrt(Math.min(adjustedValue / range, 1));
+                    val = 0.5 + normalizedVal * 0.5;
+                } else {
+                    // Negative side: inverse of output = -range * normalizedVal^2
+                    // So: normalizedVal = sqrt(-adjustedValue / range)
+                    const normalizedVal = Math.sqrt(Math.min(-adjustedValue / range, 1));
+                    val = 0.5 - normalizedVal * 0.5;
+                }
+                break;
+            }
+            default: // linear
+                val = (value - offset) / modifier;
+                break;
+        }
+        
         return (type === 'A')
-            ? (((value - offset) / modifier) * 2 * maxRotation) - maxRotation
-            : ((value - offset) / modifier) * maxRotation;
-    };
+            ? (val * 2 * maxRotation) - maxRotation
+            : val * maxRotation;
+    }, [type, scalingType, minValue, maxValue, modifier, offset]);
 
     const [rotation, setRotation] = useState(getKnobRotationFromValue(value));
     const rotationRef = useRef(rotation);
@@ -121,7 +197,7 @@ const Knob = ({
             rotationRef.current = newRotation;
             valueRef.current = value;
         }
-    }, [value])
+    }, [value, getKnobRotationFromValue])
 
     return (
         <ComponentContainer className={`${BASE_CLASS_NAME}`} disabled={disabled}>
@@ -170,6 +246,12 @@ Knob.propTypes = {
     type: PropTypes.oneOf(['A', 'B']),
     resetValue: PropTypes.number,
     value: PropTypes.number,
+    // Defines the scaling behavior: 'linear', 'logarithmic', 'symmetric-log'
+    scalingType: PropTypes.oneOf(['linear', 'logarithmic', 'symmetric-log']),
+    // Minimum value for logarithmic scaling (overrides offset for min)
+    minValue: PropTypes.number,
+    // Maximum value for scaling (overrides modifier+offset for max)
+    maxValue: PropTypes.number,
 };
 
 Knob.defaultProps = {
@@ -182,6 +264,9 @@ Knob.defaultProps = {
     type: 'A',
     resetValue: 0,
     value: 0,
+    scalingType: 'linear',
+    minValue: null,
+    maxValue: null,
 };
 
 export default Knob;
