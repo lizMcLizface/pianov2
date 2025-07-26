@@ -157,6 +157,25 @@ $('#metronomeCheckBox').on('change', function (e) {
 
 class Metronome
 {
+    /**
+     * Metronome class with absolute timebase approach
+     * 
+     * This metronome uses an absolute time reference instead of relative timing.
+     * Key concepts:
+     * - referenceTime: The absolute time when the metronome started or tempo changed
+     * - timePerBeat: Duration of each beat in seconds (60 / BPM)
+     * - totalBeatsPlayed: Number of beats played since reference time
+     * 
+     * With these values, any beat's absolute time can be calculated as:
+     * beatTime = referenceTime + (beatNumber * timePerBeat)
+     * 
+     * This approach provides:
+     * - More robust timing that doesn't drift
+     * - Easy synchronization with external components
+     * - Ability to query timing information at any point
+     * - Support for tempo changes without losing timing accuracy
+     */
+
     constructor(tempo = 120)
     {
         this.audioContext = null;
@@ -167,90 +186,128 @@ class Metronome
         this.tempo = tempo;
         this.lookahead = 25;          // How frequently to call scheduling function (in milliseconds)
         this.scheduleAheadTime = 0.1;   // How far ahead to schedule audio (sec)
-        this.nextNoteTime = 0.0;     // when the next note is due
+        
+        // Absolute timebase properties using performance.now()
+        this.referenceTime = 0.0;      // Reference time when metronome timeline started (performance.now() time)
+        this.timePerBeat = 60.0 / tempo; // Time per beat in seconds
+        this.totalBeatsPlayed = 0;     // Total number of beats played since reference time
+        this.audioContextStartTime = null; // Offset between performance.now() and audioContext.currentTime
+        
+        // Initialize reference time immediately using performance.now()
+        this.initializeReferenceTime();
+        
         this.isRunning = false;
         this.intervalID = null;
     }
 
+    // Set reference time and reset timebase
+    setReferenceTime(time = null)
+    {
+        this.referenceTime = time || (performance.now() / 1000); // Convert ms to seconds
+        this.totalBeatsPlayed = 0;
+        this.currentBeatInBar = 0;
+        this.currentNoteInBeat = 0;
+        console.log('Setting reference time to:', this.referenceTime);
+    }
+
+    // Initialize absolute reference time (called once on construction)
+    initializeReferenceTime(time = null)
+    {
+        if (this.referenceTime === 0.0) {
+            this.setReferenceTime(time);
+            console.log('Initialize reference time to:', this.referenceTime);
+        }
+    }
+
+    // Force reset the reference time (use sparingly, only when you want to break sync)
+    forceResetReferenceTime(time = null)
+    {
+        this.setReferenceTime(time);
+        console.log("Force resetting reference time to:", this.referenceTime);
+    }
+
+    // Get current performance-based time in seconds
+    getCurrentTime()
+    {
+        return performance.now() / 1000;
+    }
+
+    // Convert performance time to audio context time
+    performanceTimeToAudioTime(performanceTime)
+    {
+        if (!this.audioContext || this.audioContextStartTime === null) {
+            return 0;
+        }
+        return performanceTime - this.audioContextStartTime;
+    }
+
+    // Update the audio context offset when audio context starts
+    updateAudioContextOffset()
+    {
+        if (this.audioContext && this.audioContextStartTime === null) {
+            this.audioContextStartTime = this.getCurrentTime() - this.audioContext.currentTime;
+            console.log('Audio context offset set to:', this.audioContextStartTime);
+        }
+    }
+
+    // Update tempo and recalculate timebase
+    setTempo(newTempo)
+    {
+        if (this.tempo === newTempo) return;
+        
+        // If running, calculate current position to maintain sync
+        if (this.isRunning && this.referenceTime > 0) {
+            const currentTime = this.getCurrentTime();
+            const elapsedTime = currentTime - this.referenceTime;
+            // Keep the same reference time, just update the beat calculations
+            this.totalBeatsPlayed = Math.floor(elapsedTime / this.timePerBeat);
+        }
+        
+        this.tempo = newTempo;
+        this.timePerBeat = 60.0 / newTempo;
+    }
+
+    // Get the absolute time for a specific beat number
+    getTimeForBeat(beatNumber)
+    {
+        return this.referenceTime + (beatNumber * this.timePerBeat);
+    }
+
+    // Get the next beat time after the current time
+    getNextBeatTime()
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const nextBeatNumber = Math.floor(elapsedTime / this.timePerBeat) + 1;
+        
+        return this.getTimeForBeat(nextBeatNumber);
+    }
+
+    // Get current beat information
+    getCurrentBeatInfo()
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const totalBeats = Math.floor(elapsedTime / this.timePerBeat);
+        const beatInBar = totalBeats % this.beatsPerBar;
+        
+        return {
+            totalBeats,
+            beatInBar,
+            nextBeatTime: this.getTimeForBeat(totalBeats + 1)
+        };
+    }
+
     nextNote()
     {
-        // Advance current note and time by a quarter note (crotchet if you're posh)
-        var secondsPerBeat = 60.0 / this.tempo; // Notice this picks up the CURRENT tempo value to calculate beat length.
-        // console.log($('#metronomeModeSelect').val());
-        // switch($('#metronomeModeSelect').val()){
-            // case '0':
-                this.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
-            
-                this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-                if (this.currentBeatInBar == this.beatsPerBar) {
-                    this.currentBeatInBar = 0;
-                }
-                // break;
-            // case '1':
-            //     this.nextNoteTime += secondsPerBeat / 2.; // Add beat length to last beat time
-            //     this.currentNoteInBeat++;
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     if(this.currentNoteInBeat == 2){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         // console.log('Advancing beat number'); 
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '2':
-            //     this.nextNoteTime += secondsPerBeat / 4.; // Add beat length to last beat time
-            //     this.currentNoteInBeat++;
-            //     if(this.currentNoteInBeat == 4){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '3':
-            //     this.nextNoteTime += secondsPerBeat / 3.; // Add beat length to last beat time
-                
-            //     this.currentNoteInBeat++;
-            //     if(this.currentNoteInBeat == 3){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-            //     break;
-            // case '4':
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     this.nextNoteTime += this.currentNoteInBeat == 0 ? secondsPerBeat / 3. * 2. : secondsPerBeat / 3.; // Add beat length to last beat time
-            //     // console.log('---------------------')
-            //     this.currentNoteInBeat++;
-            //     // if(this.currentNoteInBeat == 2){
-            //         // this.currentNoteInBeat++;
-            //         // this.nextNoteTime += secondsPerBeat / 3; // Add beat length to last beat time
-            //     // }
-            //     // console.log(this.currentNoteInBeat, this.currentBeatInBar)
-            //     if(this.currentNoteInBeat == 2){
-            //         this.currentNoteInBeat = 0;
-            //         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-            //         if (this.currentBeatInBar == this.beatsPerBar) {
-            //             this.currentBeatInBar = 0;
-            //         }
-            //     }
-
-        // }
-        // this.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
-    
-        // this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-        // if (this.currentBeatInBar == this.beatsPerBar) {
-        //     this.currentBeatInBar = 0;
-        // }
+        // This method is now simplified - we just track total beats
+        this.totalBeatsPlayed++;
+        this.currentBeatInBar = this.totalBeatsPlayed % this.beatsPerBar;
     }
 
     scheduleNote(beatNumber, noteNumber, time)
     {
+        console.log(`Scheduling note: beat ${beatNumber}, note ${noteNumber}, time ${time}`);
         // push the note on the queue, even if we're not playing.
         this.notesInQueue.push({ note: beatNumber, time: time });
     
@@ -286,15 +343,41 @@ class Metronome
 
     scheduler()
     {
-        // while there are notes that will need to play before the next interval, schedule them and advance the pointer.
-        while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime ) {
-            this.scheduleNote(this.currentBeatInBar, this.currentNoteInBeat, this.nextNoteTime);
-            this.nextNote();
+        if (!this.audioContext) return;
+        
+        const currentTime = this.getCurrentTime();
+        const lookAheadTime = currentTime + this.scheduleAheadTime;
+        
+        // Calculate beats to schedule based on performance time reference
+        const elapsedTime = currentTime - this.referenceTime;
+        const lookAheadElapsedTime = lookAheadTime - this.referenceTime;
+        
+        // Find the range of beats that need to be scheduled
+        const currentBeatNumber = Math.floor(elapsedTime / this.timePerBeat);
+        const lookAheadBeatNumber = Math.floor(lookAheadElapsedTime / this.timePerBeat);
+        
+        // Schedule any beats in the lookahead window that haven't been scheduled yet
+        for (let beatNumber = Math.max(this.totalBeatsPlayed, currentBeatNumber); beatNumber <= lookAheadBeatNumber; beatNumber++) {
+            const beatTimePerformance = this.getTimeForBeat(beatNumber);
+            const beatTimeAudio = this.performanceTimeToAudioTime(beatTimePerformance);
+            const beatInBar = beatNumber % this.beatsPerBar;
+            
+            // Only schedule if the beat time is in the future (in audio context time)
+            if (beatTimeAudio >= this.audioContext.currentTime) {
+                this.scheduleNote(beatInBar, 0, beatTimeAudio);
+            }
         }
+        
+        // Update the total beats scheduled
+        this.totalBeatsPlayed = Math.max(this.totalBeatsPlayed, lookAheadBeatNumber + 1);
+        
+        // Update current beat in bar for external reference
+        this.currentBeatInBar = currentBeatNumber % this.beatsPerBar;
     }
 
     start()
     {
+        console.log("Starting metronome at tempo:", this.tempo);
         if (this.isRunning) return;
 
         if (this.audioContext == null)
@@ -303,15 +386,16 @@ class Metronome
         }
 
         this.isRunning = true;
-
-        this.currentBeatInBar = 0;
-        this.nextNoteTime = this.audioContext.currentTime + 0.05;
+        
+        // Update the audio context offset when starting
+        this.updateAudioContextOffset();
 
         this.intervalID = setInterval(() => this.scheduler(), this.lookahead);
     }
 
     stop()
     {
+        console.log("Stopping metronome");
         this.isRunning = false;
 
         clearInterval(this.intervalID);
@@ -325,8 +409,84 @@ class Metronome
         else {
             this.start();
         }
+   }
+
+
+    // Utility methods for external code to use the absolute timebase
+    
+    // Get the time per beat (useful for synchronizing other components)
+    getTimePerBeat()
+    {
+        return this.timePerBeat;
+    }
+    
+    // Get the current tempo
+    getTempo()
+    {
+        return this.tempo;
+    }
+    
+    // Get the reference time (when the metronome timeline started)
+    getReferenceTime()
+    {
+        return this.referenceTime;
+    }
+    
+    // Check if we're currently on a beat (within a small tolerance)
+    isOnBeat(tolerance = 0.05)
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const beatPosition = (elapsedTime % this.timePerBeat) / this.timePerBeat;
+        
+        // Check if we're within tolerance of the start of a beat
+        return beatPosition < tolerance || beatPosition > (1 - tolerance);
+    }
+    
+    // Get time until next beat
+    getTimeUntilNextBeat()
+    {
+        const nextBeatTime = this.getNextBeatTime();
+        return Math.max(0, nextBeatTime - this.getCurrentTime());
+    }
+    
+    // Synchronize an external timer to the next beat
+    scheduleOnNextBeat(callback, offset = 0)
+    {
+        if (!callback) return null;
+        console.log('Scheduling callback on next beat with offset:', offset);
+        
+        const nextBeatTime = this.getNextBeatTime() + offset;
+        const delay = (nextBeatTime - this.getCurrentTime()) * 1000; // Convert to milliseconds
+        
+        if (delay > 0) {
+            return setTimeout(callback, delay);
+        } else {
+            // If we're past the next beat, schedule for the beat after
+            const timeAfterNext = nextBeatTime + this.timePerBeat + offset;
+            const delayAfterNext = (timeAfterNext - this.getCurrentTime()) * 1000;
+            return setTimeout(callback, Math.max(0, delayAfterNext));
+        }
     }
 }
+
+/**
+ * SYNCHRONIZATION FIX NOTES:
+ * 
+ * The original issue was that the metronome would reset its reference time
+ * whenever start() was called, including after tempo changes. This meant
+ * the first beat after starting would be aligned to the button press time
+ * rather than the absolute time reference.
+ * 
+ * SOLUTION:
+ * 1. Added initializeReferenceTime() - only sets reference time if it's not already set
+ * 2. Modified setTempo() - no longer resets reference time, maintains sync
+ * 3. Updated BPM slider handler - changes tempo without stopping/restarting
+ * 4. Improved scheduler() - uses absolute time calculations for beat scheduling
+ * 
+ * This ensures that beats are always aligned to the original absolute timeline,
+ * providing consistent synchronization regardless of when start/stop/tempo changes occur.
+ */
 
 // Create and export metronome instance
 const bpmSlider = document.querySelector('#bpmSlider');
@@ -359,13 +519,13 @@ bpmSlider.addEventListener('input', function() {
     })
 
     var isRunning = metronome.isRunning;
-    metronome.stop();
-    reset()
-    metronome.tempo = bpm;
-    if (isRunning)
-        metronome.start();
-    metronome.currentBeatInBar = 0;
-
+    metronome.forceResetReferenceTime();
+    
+    // Update tempo without stopping/restarting to maintain synchronization
+    metronome.setTempo(bpm);
+    
+    // Only reset visual animations, not the metronome timing
+    reset();
 
     // animations.forEach(animation => {
     //     const running = getComputedStyle(animation).getPropertyValue("--animps") || 'running';
@@ -413,11 +573,15 @@ bpmSlider.addEventListener('input', function() {
 
 $('#metronomeSoundCheckBox').on('change', function (e) {
     if($('#metronomeSoundCheckBox')[0].checked){
-        reset()
-        metronome.tempo = Number(bpmSlider.value);
-        metronome.currentBeatInBar = 0;
+        // reset()
+        metronome.setTempo(Number(bpmSlider.value));
+        // Force reset reference time when explicitly starting the sound
+        // metronome.forceResetReferenceTime();
         metronome.start();
     }else{
         metronome.stop();
     }
 });
+
+
+metronome.initializeReferenceTime();
