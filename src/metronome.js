@@ -283,26 +283,185 @@ class Metronome
         return this.getTimeForBeat(nextBeatNumber);
     }
 
-    // Get current beat information
-    getCurrentBeatInfo()
+    // Get the next half note time after the current time
+    getNextHalfNoteTime(alignToNextBeat = false)
     {
         const currentTime = this.getCurrentTime();
         const elapsedTime = currentTime - this.referenceTime;
-        const totalBeats = Math.floor(elapsedTime / this.timePerBeat);
-        const beatInBar = totalBeats % this.beatsPerBar;
+        const timePerHalfNote = this.timePerBeat * 2; // Half note is 2 quarter notes
         
-        return {
-            totalBeats,
-            beatInBar,
-            nextBeatTime: this.getTimeForBeat(totalBeats + 1)
-        };
+        if (alignToNextBeat) {
+            // Align to the next quarter note beat first
+            const nextBeatNumber = Math.floor(elapsedTime / this.timePerBeat) + 1;
+            const nextBeatTime = this.getTimeForBeat(nextBeatNumber);
+            
+            // Find the next half note aligned beat from that point
+            const beatsFromReference = nextBeatNumber;
+            const nextHalfNoteBeat = Math.ceil(beatsFromReference / 2) * 2;
+            return this.getTimeForBeat(nextHalfNoteBeat);
+        } else {
+            // Direct half note grid calculation
+            const nextHalfNoteNumber = Math.floor(elapsedTime / timePerHalfNote) + 1;
+            return this.referenceTime + (nextHalfNoteNumber * timePerHalfNote);
+        }
     }
 
-    nextNote()
+    // Get the next whole note time after the current time
+    getNextWholeNoteTime(alignToNextBeat = false)
     {
-        // This method is now simplified - we just track total beats
-        this.totalBeatsPlayed++;
-        this.currentBeatInBar = this.totalBeatsPlayed % this.beatsPerBar;
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const timePerWholeNote = this.timePerBeat * 4; // Whole note is 4 quarter notes
+        
+        if (alignToNextBeat) {
+            // Align to the next quarter note beat first
+            const nextBeatNumber = Math.floor(elapsedTime / this.timePerBeat) + 1;
+            const nextBeatTime = this.getTimeForBeat(nextBeatNumber);
+            
+            // Find the next whole note aligned beat from that point
+            const beatsFromReference = nextBeatNumber;
+            const nextWholeNoteBeat = Math.ceil(beatsFromReference / 4) * 4;
+            return this.getTimeForBeat(nextWholeNoteBeat);
+        } else {
+            // Direct whole note grid calculation
+            const nextWholeNoteNumber = Math.floor(elapsedTime / timePerWholeNote) + 1;
+            return this.referenceTime + (nextWholeNoteNumber * timePerWholeNote);
+        }
+    }
+
+    // Get the next eighth note time after the current time
+    getNextEighthNoteTime(alignToNextBeat = false)
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const timePerEighthNote = this.timePerBeat / 2; // Eighth note is half a quarter note
+        
+        if (alignToNextBeat) {
+            // Align to the next quarter note beat first
+            const nextBeatNumber = Math.floor(elapsedTime / this.timePerBeat) + 1;
+            return this.getTimeForBeat(nextBeatNumber);
+        } else {
+            // Direct eighth note grid calculation
+            const nextEighthNoteNumber = Math.floor(elapsedTime / timePerEighthNote) + 1;
+            return this.referenceTime + (nextEighthNoteNumber * timePerEighthNote);
+        }
+    }
+
+    // Get the next sixteenth note time after the current time
+    getNextSixteenthNoteTime(alignToNextBeat = false)
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        const timePerSixteenthNote = this.timePerBeat / 4; // Sixteenth note is quarter of a quarter note
+        
+        if (alignToNextBeat) {
+            // Align to the next quarter note beat first
+            const nextBeatNumber = Math.floor(elapsedTime / this.timePerBeat) + 1;
+            return this.getTimeForBeat(nextBeatNumber);
+        } else {
+            // Direct sixteenth note grid calculation
+            const nextSixteenthNoteNumber = Math.floor(elapsedTime / timePerSixteenthNote) + 1;
+            return this.referenceTime + (nextSixteenthNoteNumber * timePerSixteenthNote);
+        }
+    }
+
+    // Generic function to get next time for any note duration
+    getNextNoteTime(noteDuration, alignToNextBeat = false)
+    {
+        switch (noteDuration) {
+            case 'whole':
+                return this.getNextWholeNoteTime(alignToNextBeat);
+            case 'half':
+                return this.getNextHalfNoteTime(alignToNextBeat);
+            case 'quarter':
+                return this.getNextBeatTime(); // alignToNextBeat doesn't apply for quarter notes
+            case 'eighth':
+                return this.getNextEighthNoteTime(alignToNextBeat);
+            case 'sixteenth':
+                return this.getNextSixteenthNoteTime(alignToNextBeat);
+            default:
+                throw new Error(`Unknown note duration: ${noteDuration}`);
+        }
+    }
+
+    // Get current note position information for any note duration
+    getCurrentNoteInfo(noteDuration = 'quarter')
+    {
+        const currentTime = this.getCurrentTime();
+        const elapsedTime = currentTime - this.referenceTime;
+        
+        switch (noteDuration) {
+            case 'whole': {
+                const timePerWholeNote = this.timePerBeat * 4;
+                const totalWholeNotes = Math.floor(elapsedTime / timePerWholeNote);
+                const wholeNoteInBar = totalWholeNotes % (this.beatsPerBar / 4);
+                return {
+                    totalNotes: totalWholeNotes,
+                    noteInBar: wholeNoteInBar,
+                    nextNoteTime: this.getNextWholeNoteTime()
+                };
+            }
+            case 'half': {
+                const timePerHalfNote = this.timePerBeat * 2;
+                const totalHalfNotes = Math.floor(elapsedTime / timePerHalfNote);
+                const halfNoteInBar = totalHalfNotes % (this.beatsPerBar / 2);
+                return {
+                    totalNotes: totalHalfNotes,
+                    noteInBar: halfNoteInBar,
+                    nextNoteTime: this.getNextHalfNoteTime()
+                };
+            }
+            case 'quarter': {
+                const totalBeats = Math.floor(elapsedTime / this.timePerBeat);
+                const beatInBar = totalBeats % this.beatsPerBar;
+                return {
+                    totalNotes: totalBeats,
+                    noteInBar: beatInBar,
+                    nextNoteTime: this.getNextBeatTime()
+                };
+            }
+            case 'eighth': {
+                const timePerEighthNote = this.timePerBeat / 2;
+                const totalEighthNotes = Math.floor(elapsedTime / timePerEighthNote);
+                const eighthNoteInBar = totalEighthNotes % (this.beatsPerBar * 2);
+                return {
+                    totalNotes: totalEighthNotes,
+                    noteInBar: eighthNoteInBar,
+                    nextNoteTime: this.getNextEighthNoteTime()
+                };
+            }
+            case 'sixteenth': {
+                const timePerSixteenthNote = this.timePerBeat / 4;
+                const totalSixteenthNotes = Math.floor(elapsedTime / timePerSixteenthNote);
+                const sixteenthNoteInBar = totalSixteenthNotes % (this.beatsPerBar * 4);
+                return {
+                    totalNotes: totalSixteenthNotes,
+                    noteInBar: sixteenthNoteInBar,
+                    nextNoteTime: this.getNextSixteenthNoteTime()
+                };
+            }
+            default:
+                throw new Error(`Unknown note duration: ${noteDuration}`);
+        }
+    }
+
+    // Get the absolute time for a specific note number of any duration
+    getTimeForNote(noteNumber, noteDuration = 'quarter')
+    {
+        switch (noteDuration) {
+            case 'whole':
+                return this.referenceTime + (noteNumber * this.timePerBeat * 4);
+            case 'half':
+                return this.referenceTime + (noteNumber * this.timePerBeat * 2);
+            case 'quarter':
+                return this.getTimeForBeat(noteNumber);
+            case 'eighth':
+                return this.referenceTime + (noteNumber * this.timePerBeat / 2);
+            case 'sixteenth':
+                return this.referenceTime + (noteNumber * this.timePerBeat / 4);
+            default:
+                throw new Error(`Unknown note duration: ${noteDuration}`);
+        }
     }
 
     scheduleNote(beatNumber, noteNumber, time)
@@ -340,6 +499,7 @@ class Metronome
         osc.start(time);
         osc.stop(time + 0.03);
     }
+
 
     scheduler()
     {
@@ -401,73 +561,6 @@ class Metronome
         clearInterval(this.intervalID);
     }
 
-    startStop()
-    {
-        if (this.isRunning) {
-            this.stop();
-        }
-        else {
-            this.start();
-        }
-   }
-
-
-    // Utility methods for external code to use the absolute timebase
-    
-    // Get the time per beat (useful for synchronizing other components)
-    getTimePerBeat()
-    {
-        return this.timePerBeat;
-    }
-    
-    // Get the current tempo
-    getTempo()
-    {
-        return this.tempo;
-    }
-    
-    // Get the reference time (when the metronome timeline started)
-    getReferenceTime()
-    {
-        return this.referenceTime;
-    }
-    
-    // Check if we're currently on a beat (within a small tolerance)
-    isOnBeat(tolerance = 0.05)
-    {
-        const currentTime = this.getCurrentTime();
-        const elapsedTime = currentTime - this.referenceTime;
-        const beatPosition = (elapsedTime % this.timePerBeat) / this.timePerBeat;
-        
-        // Check if we're within tolerance of the start of a beat
-        return beatPosition < tolerance || beatPosition > (1 - tolerance);
-    }
-    
-    // Get time until next beat
-    getTimeUntilNextBeat()
-    {
-        const nextBeatTime = this.getNextBeatTime();
-        return Math.max(0, nextBeatTime - this.getCurrentTime());
-    }
-    
-    // Synchronize an external timer to the next beat
-    scheduleOnNextBeat(callback, offset = 0)
-    {
-        if (!callback) return null;
-        console.log('Scheduling callback on next beat with offset:', offset);
-        
-        const nextBeatTime = this.getNextBeatTime() + offset;
-        const delay = (nextBeatTime - this.getCurrentTime()) * 1000; // Convert to milliseconds
-        
-        if (delay > 0) {
-            return setTimeout(callback, delay);
-        } else {
-            // If we're past the next beat, schedule for the beat after
-            const timeAfterNext = nextBeatTime + this.timePerBeat + offset;
-            const delayAfterNext = (timeAfterNext - this.getCurrentTime()) * 1000;
-            return setTimeout(callback, Math.max(0, delayAfterNext));
-        }
-    }
 }
 
 /**
@@ -585,3 +678,32 @@ $('#metronomeSoundCheckBox').on('change', function (e) {
 
 
 metronome.initializeReferenceTime();
+
+/*
+USAGE EXAMPLES FOR NEW NOTE DURATION FUNCTIONS:
+
+// Get next time for different note durations
+const nextQuarterTime = metronome.getNextBeatTime();
+const nextHalfTime = metronome.getNextHalfNoteTime();
+const nextWholeTime = metronome.getNextWholeNoteTime();
+const nextEighthTime = metronome.getNextEighthNoteTime();
+const nextSixteenthTime = metronome.getNextSixteenthNoteTime();
+
+// Use alignToNextBeat parameter for longer/shorter notes
+const nextHalfAligned = metronome.getNextHalfNoteTime(true);  // Aligns to next quarter beat first
+const nextEighthDirect = metronome.getNextEighthNoteTime(false); // Direct eighth note grid
+
+// Generic function usage
+const nextTime = metronome.getNextNoteTime('eighth', false);
+
+// Get current position info
+const quarterInfo = metronome.getCurrentNoteInfo('quarter');
+// Returns: { totalNotes, noteInBar, nextNoteTime }
+
+const eighthInfo = metronome.getCurrentNoteInfo('eighth');
+// For 4/4 time: noteInBar will be 0-7 (8 eighth notes per bar)
+
+// Get absolute time for specific note numbers
+const beat10Time = metronome.getTimeForNote(10, 'quarter');
+const eighth5Time = metronome.getTimeForNote(5, 'eighth');
+*/
