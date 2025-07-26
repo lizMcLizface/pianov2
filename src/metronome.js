@@ -235,7 +235,12 @@ class Metronome
     // Convert performance time to audio context time
     performanceTimeToAudioTime(performanceTime)
     {
+        if (!this.audioContext || this.audioContextStartTime === null) {            
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.updateAudioContextOffset();
+        }
         if (!this.audioContext || this.audioContextStartTime === null) {
+            console.warn('Audio context not initialized or start time not set');
             return 0;
         }
         return performanceTime - this.audioContextStartTime;

@@ -3554,6 +3554,16 @@ if("?config" in  parsedQuery)
 
 // }
 
+function playCurrentNote() {
+    console.log('Playing current note at time:', metronome.getCurrentTime());
+    console.log('Performance time to audio time:', metronome.performanceTimeToAudioTime(metronome.getCurrentTime()));
+
+    let ct = metronome.getCurrentTime();
+    let audioTime = metronome.performanceTimeToAudioTime(ct);
+
+    return playCurrentNoteAtTime(audioTime + 0.001);
+}
+
 $('#playButton').on('click', function(e) {
     // Use global grid data for single note playback
     // highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
@@ -3571,6 +3581,12 @@ $('#playButton').on('click', function(e) {
 $('#startButton').on('click', function(e) {
     if (!window.isPlaying){
         window.isPlaying = true; 
+        // Reset sequencer timing for new playback session
+        // nextNoteTime = 0.0;
+        // Ensure metronome is running for timing synchronization
+        // if (!metronome.isRunning) {
+            // metronome.start();
+        // }
         // Use global grid data for playback loop
         noteLoop();
     }
@@ -3645,7 +3661,10 @@ function nextNote() {
     // window.highlightedBarIndex
 }
   
-function playCurrentNote() {
+function playCurrentNoteAtTime(audioTime) {
+    console.log('Playing note at audio time:', audioTime, 'for bar:', currentBarIndex, 'note index:', currentNoteIndex);
+    console.log('Metronome reference time:', metronome.referenceTime, 'ms');
+    console.log('Performance time to audio time:', metronome.performanceTimeToAudioTime(metronome.referenceTime), 'ms');
     if (!window.gridData) {
         console.log('Warning: no gridData available in global scope');
         return;
@@ -3675,29 +3694,24 @@ function playCurrentNote() {
     
     const notesToPlay = noteEvent.notes;
     // console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
-    // const noteLength = noteEvent.noteLength || 0.5; // Default to 0.5 seconds if not specified
+
+    // Calculate note duration in seconds based on durationValue and current tempo
+    const noteDurationSeconds = (60.0 / bpmSlider.value) * noteEvent.durationValue;
 
     // Play the notes
     if (notesToPlay.length === 1) {
         // Single note
-        // playNote(notesToPlay[0]);
-        
         // Also play with PolySynth if enabled
         if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             const noteWithOctave = convertNoteNameToPolySynthFormat(notesToPlay[0]);
             if (noteWithOctave) {
-                
-                playNote2([noteWithOctave], 60, 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue); // 1 second duration
+                // Schedule the note to play at the precise audio time
+                schedulePolySynthNote([noteWithOctave], audioTime, noteDurationSeconds * 1000);
             }
         }
     } else if (notesToPlay.length > 1) {
         // Multiple notes (chord)
-        // for (const note of notesToPlay) {
-        //     playNote(note, notesToPlay.length); // Pass chord size for volume adjustment
-        // }
-        
         // console.log('playing chord notes:', notesToPlay);
-        // console.log(polySynthRef, $('#polySynthMidiBox')[0].checked);
         // Also play with PolySynth if enabled
         if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             const chordNotes = notesToPlay.map(note => convertNoteNameToPolySynthFormat(note)).filter(n => n);
@@ -3705,11 +3719,27 @@ function playCurrentNote() {
             // console.log('Converted chord notes for PolySynth:', chordNotes);
             if (chordNotes.length > 0) {
                 // console.log('Playing chord with PolySynth:', chordNotes, 'bpm:', bpmSlider.value);
-                playNote2(chordNotes, 60, 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue); // 1 second duration
+                schedulePolySynthNote(chordNotes, audioTime, noteDurationSeconds * 1000);
             }
         }
     }
-    return 60.0 / bpmSlider.value * 1000 / 4 * noteEvent.durationValue;
+}
+
+// Helper function to schedule PolySynth notes at precise timing
+function schedulePolySynthNote(notes, audioTime, durationMs) {
+    console.log('Scheduling PolySynth note at audio time:', audioTime, 'with duration:', durationMs, 'ms', 'current time:', context.currentTime, 'notes:', notes);
+    // Calculate delay from current audio time to scheduled time
+    const delayMs = Math.max(0, (metronome.performanceTimeToAudioTime(audioTime) - metronome.performanceTimeToAudioTime(metronome.getCurrentTime())) * 1000);
+
+    console.log('Current audio time:', metronome.referenceTime, 'ms');
+    console.log('Calculated delay for PolySynth note:', delayMs, 'ms');
+
+    setTimeout(() => {
+        // if (window.isPlaying) {
+            console.log('Playing PolySynth note at scheduled time:', audioTime, 'with notes:', notes);
+            playNote2(notes, 60, durationMs);
+        // }
+    }, delayMs);
 }
 
 function playNote(note, chordSize = 1) {
