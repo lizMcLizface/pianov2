@@ -466,7 +466,7 @@ class Metronome
 
     scheduleNote(beatNumber, noteNumber, time)
     {
-        console.log(`Scheduling note: beat ${beatNumber}, note ${noteNumber}, time ${time}`);
+        // console.log(`Scheduling note: beat ${beatNumber}, note ${noteNumber}, time ${time}`);
         // push the note on the queue, even if we're not playing.
         this.notesInQueue.push({ note: beatNumber, time: time });
     
@@ -508,22 +508,31 @@ class Metronome
         const currentTime = this.getCurrentTime();
         const lookAheadTime = currentTime + this.scheduleAheadTime;
         
-        // Calculate beats to schedule based on performance time reference
+        // Get the next beat time using the existing getNextNoteTime method
+        const nextBeatTime = this.getNextNoteTime('quarter');
+        const nextBeatTimeAudio = this.performanceTimeToAudioTime(nextBeatTime);
+        
+        // console.log(`Current time: ${currentTime}, Next beat time: ${nextBeatTimeAudio}`);
+        
+        // Calculate which beats need to be scheduled within the lookahead window
         const elapsedTime = currentTime - this.referenceTime;
         const lookAheadElapsedTime = lookAheadTime - this.referenceTime;
         
-        // Find the range of beats that need to be scheduled
         const currentBeatNumber = Math.floor(elapsedTime / this.timePerBeat);
         const lookAheadBeatNumber = Math.floor(lookAheadElapsedTime / this.timePerBeat);
         
         // Schedule any beats in the lookahead window that haven't been scheduled yet
         for (let beatNumber = Math.max(this.totalBeatsPlayed, currentBeatNumber); beatNumber <= lookAheadBeatNumber; beatNumber++) {
+            // Use getTimeForBeat which is the underlying method that getNextNoteTime uses
             const beatTimePerformance = this.getTimeForBeat(beatNumber);
             const beatTimeAudio = this.performanceTimeToAudioTime(beatTimePerformance);
             const beatInBar = beatNumber % this.beatsPerBar;
             
             // Only schedule if the beat time is in the future (in audio context time)
             if (beatTimeAudio >= this.audioContext.currentTime) {
+                if(beatTimeAudio - this.performanceTimeToAudioTime(this.referenceTime) < 0.1)
+                    continue;
+                console.log('Scheduling beat at ', beatTimeAudio)
                 this.scheduleNote(beatInBar, 0, beatTimeAudio);
             }
         }
@@ -531,8 +540,9 @@ class Metronome
         // Update the total beats scheduled
         this.totalBeatsPlayed = Math.max(this.totalBeatsPlayed, lookAheadBeatNumber + 1);
         
-        // Update current beat in bar for external reference
-        this.currentBeatInBar = currentBeatNumber % this.beatsPerBar;
+        // Update current beat in bar for external reference using getCurrentNoteInfo
+        const currentNoteInfo = this.getCurrentNoteInfo('quarter');
+        this.currentBeatInBar = currentNoteInfo.noteInBar;
     }
 
     start()
