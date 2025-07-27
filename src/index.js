@@ -1461,6 +1461,7 @@ function highlightNotesInNotation(div, noteArray, highlightData = null) {
                 notes: simultaneousNotes,
                 duration: duration,
                 durationValue: durationValue,
+                durationValueStr: duration,
                 isPause: isPause
             });
 
@@ -3554,14 +3555,22 @@ if("?config" in  parsedQuery)
 
 // }
 
-function playCurrentNote() {
-    console.log('Playing current note at time:', metronome.getCurrentTime());
-    console.log('Performance time to audio time:', metronome.performanceTimeToAudioTime(metronome.getCurrentTime()));
+function playCurrentNote(gridAlign = false) {
+    // console.log('Initializing context for metronome')
+    metronome.initializeAudioContext();
+
+    // console.log('Playing current note at time:', metronome.getCurrentTime());
+    // console.log('Performance time to audio time:', metronome.performanceTimeToAudioTime(metronome.getCurrentTime()));
 
     let ct = metronome.getCurrentTime();
     let audioTime = metronome.performanceTimeToAudioTime(ct);
 
-    return playCurrentNoteAtTime(audioTime + 0.001);
+    let nextBeatTime = metronome.getNextNoteTime('eighth', false);
+    // console.log('Next beat time:', nextBeatTime);
+    let nextBeatAudioTime = metronome.performanceTimeToAudioTime(nextBeatTime);
+    // console.log('Next beat audio time:', nextBeatAudioTime);
+
+    return playCurrentNoteAtTime(audioTime, gridAlign);
 }
 
 $('#playButton').on('click', function(e) {
@@ -3615,6 +3624,7 @@ $('#stopButton').on('click', function(e) {
 
 const bpmSlider = document.querySelector('#bpmSlider');
 function noteLoop() {
+    metronome.initializeAudioContext();
     const secondsPerBeat = 60.0 / bpmSlider.value;
     if (window.isPlaying) {
         // Highlight current note being played
@@ -3622,8 +3632,9 @@ function noteLoop() {
         // highlightPlaybackPosition(currentBarIndex, currentNoteIndex);
         // highlightSelectedNotesSecondary(window.selectedBarIndex, window.selectedNoteIndex);
         
-        let duration = playCurrentNote();
+        let duration = playCurrentNote(true);
         nextNote();
+        console.log('Next note duration:', duration, 'ms');
         
         window.setTimeout(function() {
             noteLoop();
@@ -3660,8 +3671,27 @@ function nextNote() {
     // setSelectedPosition(window.highlightedBarIndex, window.highlightedNoteIndex);
     // window.highlightedBarIndex
 }
-  
-function playCurrentNoteAtTime(audioTime) {
+
+function notEventDurationToString(durationValue) {
+    // Convert duration value to string representation
+                // const durationValue = duration === 'w' ? 4 : 
+                //                 duration === 'h' ? 2 : 
+                //                 duration === 'q' || duration === '4' ? 1 : 
+                //                 duration === '8' ? 0.5 : 
+                //                 duration === '16' ? 0.25 : 1;
+    switch (durationValue) {
+        case 'w': return 'whole';
+        case 'h': return 'half';
+        case 'q':
+        case '4': return 'quarter';
+        case '8': return 'eighth';
+        case '16': return 'sixteenth';
+        default: throw new Error('Unknown duration value: ' + durationValue);
+    }
+}
+
+function playCurrentNoteAtTime(audioTime, gridAlign = false) {
+
     console.log('Playing note at audio time:', audioTime, 'for bar:', currentBarIndex, 'note index:', currentNoteIndex);
     console.log('Metronome reference time:', metronome.referenceTime, 'ms');
     console.log('Performance time to audio time:', metronome.performanceTimeToAudioTime(metronome.referenceTime), 'ms');
@@ -3686,18 +3716,25 @@ function playCurrentNoteAtTime(audioTime) {
     }
 
     const noteEvent = window.gridData[currentBarIndex].notes[currentNoteIndex];
-    
+    // Calculate note duration in seconds based on durationValue and current tempo
+    const noteDurationSeconds = (60.0 / bpmSlider.value) * noteEvent.durationValue;
+
+    if(gridAlign){
+        let nextBeatTime = metronome.getNextNoteTime(notEventDurationToString(noteEvent.duration), false);
+        // console.log('Next beat time:', nextBeatTime);
+        audioTime = metronome.performanceTimeToAudioTime(nextBeatTime);
+    }
+
     if (noteEvent.isPause) {
         // console.log('playing pause/rest');
-        return; // Don't play anything for pauses
+        return noteDurationSeconds; // Don't play anything for pauses
     }
     
     const notesToPlay = noteEvent.notes;
     // console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
 
-    // Calculate note duration in seconds based on durationValue and current tempo
-    const noteDurationSeconds = (60.0 / bpmSlider.value) * noteEvent.durationValue;
 
+    let delay = metronome.timePerBeat;
     // Play the notes
     if (notesToPlay.length === 1) {
         // Single note
@@ -3706,7 +3743,7 @@ function playCurrentNoteAtTime(audioTime) {
             const noteWithOctave = convertNoteNameToPolySynthFormat(notesToPlay[0]);
             if (noteWithOctave) {
                 // Schedule the note to play at the precise audio time
-                schedulePolySynthNote([noteWithOctave], audioTime, noteDurationSeconds * 1000);
+                delay = schedulePolySynthNote([noteWithOctave], audioTime, noteDurationSeconds * 1000);
             }
         }
     } else if (notesToPlay.length > 1) {
@@ -3719,17 +3756,18 @@ function playCurrentNoteAtTime(audioTime) {
             // console.log('Converted chord notes for PolySynth:', chordNotes);
             if (chordNotes.length > 0) {
                 // console.log('Playing chord with PolySynth:', chordNotes, 'bpm:', bpmSlider.value);
-                schedulePolySynthNote(chordNotes, audioTime, noteDurationSeconds * 1000);
+                delay = schedulePolySynthNote(chordNotes, audioTime, noteDurationSeconds * 1000);
             }
         }
     }
+    return delay + 0.01;
 }
 
 // Helper function to schedule PolySynth notes at precise timing
 function schedulePolySynthNote(notes, audioTime, durationMs) {
     console.log('Scheduling PolySynth note at audio time:', audioTime, 'with duration:', durationMs, 'ms', 'current time:', context.currentTime, 'notes:', notes);
     // Calculate delay from current audio time to scheduled time
-    const delayMs = Math.max(0, (metronome.performanceTimeToAudioTime(audioTime) - metronome.performanceTimeToAudioTime(metronome.getCurrentTime())) * 1000);
+    const delayMs = Math.max(0, (audioTime - metronome.performanceTimeToAudioTime(metronome.getCurrentTime())) * 1000);
 
     console.log('Current audio time:', metronome.referenceTime, 'ms');
     console.log('Calculated delay for PolySynth note:', delayMs, 'ms');
@@ -3740,6 +3778,7 @@ function schedulePolySynthNote(notes, audioTime, durationMs) {
             playNote2(notes, 60, durationMs);
         // }
     }, delayMs);
+    return delayMs;
 }
 
 function playNote(note, chordSize = 1) {
@@ -4912,6 +4951,8 @@ function toggleColumn(colIndex) {
         }
     });
 }
+
+
 
 export {drawNotes, outputNoteArray, outputDiv, updateOutputText, highlightBothPositions}
 

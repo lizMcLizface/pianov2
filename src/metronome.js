@@ -232,6 +232,14 @@ class Metronome
         return performance.now() / 1000;
     }
 
+    initializeAudioContext(){
+        if (!this.audioContext || this.audioContextStartTime === null) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.updateAudioContextOffset();
+            this.setTempo(this.tempo); // Ensure tempo is set after audio context initialization
+        }
+    }
+
     // Convert performance time to audio context time
     performanceTimeToAudioTime(performanceTime)
     {
@@ -337,6 +345,7 @@ class Metronome
     // Get the next eighth note time after the current time
     getNextEighthNoteTime(alignToNextBeat = false)
     {
+        console.log('getNextEighthNoteTime called with alignToNextBeat:', alignToNextBeat);
         const currentTime = this.getCurrentTime();
         const elapsedTime = currentTime - this.referenceTime;
         const timePerEighthNote = this.timePerBeat / 2; // Eighth note is half a quarter note
@@ -348,7 +357,9 @@ class Metronome
         } else {
             // Direct eighth note grid calculation
             const nextEighthNoteNumber = Math.floor(elapsedTime / timePerEighthNote) + 1;
-            return this.referenceTime + (nextEighthNoteNumber * timePerEighthNote);
+            let nextBeat =  this.referenceTime + (nextEighthNoteNumber * timePerEighthNote);
+            console.log('Next Eighth Note Time:', nextBeat, 'Reference Time:', this.referenceTime, 'Eighth Note Number:', nextEighthNoteNumber);
+            return nextBeat;
         }
     }
 
