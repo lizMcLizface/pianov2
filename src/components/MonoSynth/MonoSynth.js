@@ -11,10 +11,19 @@ class MonoSynth {
         this.detuneSpread = 0;
         this.stereoSpread = 0;
         
+        // Sub oscillator parameters
+        this.subOscOctaveOffset = 0; // Range: -3 to +3 octaves
+        this.subOscillators = [];
+        this.subOscillatorPanners = [];
+        this.subOscillatorMixer = new Gain(this.AC); // Mix sub oscillators
+        
         // Multiple oscillators for voice spreading
         this.oscillators = [];
         this.oscillatorPanners = [];
         this.oscillatorMixer = new Gain(this.AC); // Mix multiple oscillators
+        
+        // Main oscillator mixer (combines main oscs and sub oscs)
+        this.mainOscillatorMixer = new Gain(this.AC);
         
         // Initialize with one oscillator
         this.initializeOscillators(1);
@@ -106,6 +115,9 @@ class MonoSynth {
         this.oscillatorMixer.setGain(gainReduction);
         
         this.voiceCount = count;
+        
+        // Initialize sub oscillators with the same count
+        this.initializeSubOscillators(count);
         
         // Force immediate update of detuning and stereo spread
         this.updateVoiceDetuning();
@@ -246,18 +258,31 @@ class MonoSynth {
         // We'll control the bypass via the filter's gain instead of reconnecting
         this.noiseGen.connect(this.noiseFilter.getNode());
         
-        // Connect oscillator mixer and filtered noise to main mixer
-        this.mixer.connectOscillator(this.oscillatorMixer.getNode());
+        // Connect main oscillators and sub oscillators to main oscillator mixer
+        this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
+        this.subOscillatorMixer.connect(this.mainOscillatorMixer.getNode());
+        
+        // Connect main oscillator mixer and filtered noise to main mixer
+        this.mixer.connectOscillator(this.mainOscillatorMixer.getNode());
         this.mixer.connectNoise(this.noiseFilter.getNode());
         
-        console.log('Connected oscillator mixer and filtered noise to mixer');
+        console.log('Connected oscillator mixers and filtered noise to mixer');
         
-        // Start all oscillators
+        // Start all main oscillators
         this.oscillators.forEach(osc => {
             try {
                 osc.start();
             } catch (e) {
-                console.warn('Oscillator already started:', e);
+                console.warn('Main oscillator already started:', e);
+            }
+        });
+        
+        // Start all sub oscillators
+        this.subOscillators.forEach(subOsc => {
+            try {
+                subOsc.start();
+            } catch (e) {
+                console.warn('Sub oscillator already started:', e);
             }
         });
         
@@ -301,6 +326,7 @@ class MonoSynth {
     setStereoSpread(spreadPercent) {
         this.stereoSpread = Math.max(0, Math.min(100, spreadPercent)); // Limit to 0-100%
         this.updateStereoSpread();
+        this.updateSubOscillatorStereoSpread();
     }
 
     // Method to reset all oscillators to clean state (useful when switching voice counts)
@@ -335,6 +361,9 @@ class MonoSynth {
                 console.warn('Failed to connect vibrato to oscillator:', e);
             }
         });
+        
+        // Also connect to sub oscillators
+        this.connectVibratoToSubOscillators(vibratoLFO);
     }
 
     connect = (destination) => {
@@ -367,9 +396,11 @@ class MonoSynth {
     setVolume = (val) => this.volume.setGain(clamp(val, 0, 1));
     setWaveform = (type) => {
         this.oscillators.forEach(osc => osc.setType(type));
+        this.subOscillators.forEach(subOsc => subOsc.setType(type));
     };
     setDutyCycle = (val) => {
         this.oscillators.forEach(osc => osc.setDutyCycle(val));
+        this.subOscillators.forEach(subOsc => subOsc.setDutyCycle(val));
     };
     setFilterType = (val) => this.filter.setType(val);
     setFilterFreq = (val) => this.filter.setFreq(val);
@@ -523,6 +554,21 @@ class MonoSynth {
                 }
             }
         });
+
+        // Set frequency for all sub oscillators (no detuning, just octave offset)
+        if (this.subOscOctaveOffset !== 0) {
+            const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
+            const subBaseFreq = freq * octaveMultiplier;
+            
+            // Validate sub frequency
+            if (isFinite(subBaseFreq) && subBaseFreq > 0 && subBaseFreq <= 20000) {
+                this.subOscillators.forEach(subOsc => {
+                    subOsc.setFreq(subBaseFreq, portamentoSpeed);
+                });
+            } else {
+                console.warn('Invalid sub oscillator frequency:', subBaseFreq);
+            }
+        }
 
         // console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
         
@@ -708,6 +754,164 @@ class MonoSynth {
             this.gain.setGainCurve(this.gain.getGain(), 0, 0); // Immediate stop
             this.filter.setDetune(0, minTime);
         }
+    }
+
+    initializeSubOscillators(count) {
+        // Clean up existing sub oscillators if we need fewer
+        if (count < this.subOscillators.length) {
+            for (let i = count; i < this.subOscillators.length; i++) {
+                try {
+                    if (this.subOscillators[i] && this.subOscillatorPanners[i]) {
+                        this.subOscillators[i].disconnect();
+                    }
+                } catch (e) {
+                    console.warn('Failed to disconnect sub oscillator:', e);
+                }
+                
+                try {
+                    if (this.subOscillatorPanners[i]) {
+                        this.subOscillatorPanners[i].disconnect();
+                    }
+                } catch (e) {
+                    console.warn('Failed to disconnect sub oscillator panner:', e);
+                }
+            }
+            this.subOscillators = this.subOscillators.slice(0, count);
+            this.subOscillatorPanners = this.subOscillatorPanners.slice(0, count);
+        }
+        
+        // Create new sub oscillators if we need more
+        while (this.subOscillators.length < count) {
+            const subOsc = new Oscillator(this.AC);
+            const subPanner = new StereoPanner(this.AC);
+            
+            this.subOscillators.push(subOsc);
+            this.subOscillatorPanners.push(subPanner);
+            
+            // Connect: sub oscillator -> panner -> sub mixer
+            subOsc.connect(subPanner.getNode());
+            subPanner.connect(this.subOscillatorMixer.getNode());
+            
+            // Start the new sub oscillator only if init has already been called
+            if (this.isInitialized) {
+                try {
+                    subOsc.start();
+                } catch (e) {
+                    console.warn('Failed to start sub oscillator:', e);
+                }
+            }
+        }
+        
+        // Update sub oscillator mixer gain and bypass
+        this.updateSubOscillatorMix();
+        
+        // Update sub oscillator frequencies and stereo spread
+        this.updateSubOscillatorFrequencies();
+        this.updateSubOscillatorStereoSpread();
+        
+        // Reconnect vibrato if it was previously connected
+        if (this.vibratoLFO) {
+            this.connectVibratoToSubOscillators(this.vibratoLFO);
+        }
+    }
+
+    updateSubOscillatorMix() {
+        // When subOscOctaveOffset is 0, bypass the sub oscillators completely
+        if (this.subOscOctaveOffset === 0) {
+            this.subOscillatorMixer.setGain(0);
+        } else {
+            // Gentle gain reduction to prevent clipping when sub oscillators are active
+            const count = this.subOscillators.length;
+            const gainReduction = count === 1 ? 0.5 : 0.5 / (1 + (count - 1) * 0.2);
+            this.subOscillatorMixer.setGain(gainReduction);
+        }
+    }
+
+    updateSubOscillatorFrequencies() {
+        if (!this.currentNoteInfo || this.subOscOctaveOffset === 0) return;
+        
+        const { baseFreq_ } = this.currentNoteInfo;
+        const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
+        const subBaseFreq = baseFreq_ * octaveMultiplier;
+        
+        // Validate sub frequency
+        if (!isFinite(subBaseFreq) || subBaseFreq <= 0 || subBaseFreq > 20000) {
+            console.warn('Invalid sub oscillator frequency:', subBaseFreq);
+            return;
+        }
+        
+        this.subOscillators.forEach((subOsc, index) => {
+            try {
+                // Sub oscillators don't get detuning - they stay pitched at exact octave intervals
+                subOsc.setFreq(subBaseFreq, 0.001);
+            } catch (e) {
+                console.warn('Failed to set sub oscillator frequency:', e);
+            }
+        });
+    }
+
+    updateSubOscillatorStereoSpread() {
+        if (this.subOscillatorPanners.length <= 1) {
+            // Single sub oscillator, ensure it's centered
+            if (this.subOscillatorPanners[0]) {
+                try {
+                    this.subOscillatorPanners[0].setPan(0);
+                } catch (e) {
+                    console.warn('Failed to center sub oscillator pan:', e);
+                }
+            }
+            return;
+        }
+
+        // Distribute sub oscillators across the stereo field (same as main oscillators)
+        this.subOscillatorPanners.forEach((panner, index) => {
+            let panPosition = 0;
+            
+            if (this.subOscillatorPanners.length === 2) {
+                panPosition = (index - 0.5) * 2;
+            } else {
+                panPosition = (index / (this.subOscillatorPanners.length - 1) - 0.5) * 2;
+            }
+            
+            const scaledPan = panPosition * (this.stereoSpread / 100);
+            const clampedPan = Math.max(-1, Math.min(1, scaledPan));
+            
+            try {
+                panner.setPan(clampedPan);
+            } catch (e) {
+                console.warn('Failed to set sub oscillator pan position:', e);
+            }
+        });
+    }
+
+    // Sub oscillator control methods
+    setSubOscOctaveOffset(octaveOffset) {
+        const clampedOffset = Math.max(-3, Math.min(3, octaveOffset));
+        this.subOscOctaveOffset = clampedOffset;
+        
+        // Update the sub oscillator mix (bypass when offset is 0)
+        this.updateSubOscillatorMix();
+        
+        // Update frequencies if a note is currently playing
+        this.updateSubOscillatorFrequencies();
+    }
+
+    getSubOscOctaveOffset() {
+        return this.subOscOctaveOffset;
+    }
+
+    // Connect vibrato LFO to sub oscillators
+    connectVibratoToSubOscillators(vibratoLFO) {
+        this.subOscillators.forEach(subOsc => {
+            try {
+                const subOscNode = subOsc.getOscillatorNode();
+                if (subOscNode && subOscNode.detune) {
+                    vibratoLFO.connect(subOscNode.detune);
+                }
+            } catch (e) {
+                console.warn('Failed to connect vibrato to sub oscillator:', e);
+            }
+        });
     }
 }
 

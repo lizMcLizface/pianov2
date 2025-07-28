@@ -115,6 +115,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [masterFilterGain, setMasterFilterGain] = useState(0);
     const [vcoType, setVcoType] = useState('sine');
     const [vcoDutyCycle, setVcoDutyCycle] = useState(0.5);
+    const [subOscOctaveOffset, setSubOscOctaveOffset] = useState(0);
     
     // Voice Spreading and Detuning Parameters
     const [voiceCount, setVoiceCount] = useState(1);
@@ -745,6 +746,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setGainRelease(preset.gainRelease);
         setVcoType(preset.vcoType);
         setVcoDutyCycle(preset.vcoDutyCycle || 0.5);
+        setSubOscOctaveOffset(preset.subOscOctaveOffset || 0);
         
         // Load voice spreading settings with defaults
         setVoiceCount(preset.voiceCount || 1);
@@ -889,12 +891,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             const synth1 = synthArr[0];
             if (synth1.getWaveform() !== vcoType) synthArr.forEach((synth) => synth.setWaveform(vcoType));
             if (synth1.getDutyCycle() !== vcoDutyCycle) synthArr.forEach((synth) => synth.setDutyCycle(vcoDutyCycle));
+            if (synth1.getSubOscOctaveOffset() !== subOscOctaveOffset) synthArr.forEach((synth) => synth.setSubOscOctaveOffset(subOscOctaveOffset));
             if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
             if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
             if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
             if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
         });
-    }, [vcoType, vcoDutyCycle, filterType, filterFreq, filterQ, filterGain]);
+    }, [vcoType, vcoDutyCycle, subOscOctaveOffset, filterType, filterFreq, filterQ, filterGain]);
 
     useLayoutEffect(() => {
         scheduleParameterUpdate('voices', () => {
@@ -1014,6 +1017,17 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             max={0.99}
                             disabled={vcoType !== 'square_dc'}
                             onUpdate={(val) => setVcoDutyCycle(val)}
+                        />
+                        <Knob
+                            label="Sub Osc"
+                            value={subOscOctaveOffset}
+                            modifier={6}
+                            offset={-3}
+                            // min={-3}
+                            // max={6}
+                            // resetValue={0}
+                            decimalPlaces={0}
+                            onUpdate={(val) => setSubOscOctaveOffset(Math.round(val))}
                         />
                         <Knob
                             label="Voices"

@@ -9,6 +9,7 @@ export default {
         masterFilterGain: 0,
         vcoType: 'sine',
         vcoPan: 0,
+        subOscOctaveOffset: 0,
         voiceCount: 1,
         detuneSpread: 0,
         stereoSpread: 0,
