@@ -156,6 +156,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     // Noise state
     const [noiseType, setNoiseType] = useState('white');
     const [noiseMix, setNoiseMix] = useState(0);
+    const [noiseFilterEnabled, setNoiseFilterEnabled] = useState(false);
+    const [noiseFilterQ, setNoiseFilterQ] = useState(1);
 
     // Microtonal/Pitch Adjustment State (default 1.0 = no adjustment)
     const [pitchC, setPitchC] = useState(1.0);
@@ -748,6 +750,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         // Load noise settings with defaults
         setNoiseType(preset.noiseType || 'white');
         setNoiseMix(preset.noiseMix || 0);
+        setNoiseFilterEnabled(preset.noiseFilterEnabled || false);
+        setNoiseFilterQ(preset.noiseFilterQ || 1);
 
         // Load envelope shape settings with defaults
         setEnvelopeAttackShape(preset.envelopeAttackShape || 'exponential');
@@ -806,6 +810,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         synthArr.forEach((synth) => {
             synth.setNoiseType(noiseType);
             synth.setNoiseMix(noiseMix);
+            synth.setNoiseFilterEnabled(noiseFilterEnabled);
+            synth.setNoiseFilterQ(noiseFilterQ);
         });
 
         if (masterDistortion.getAmount() !== distortionAmount) masterDistortion.setAmount(distortionAmount);
@@ -847,7 +853,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
         flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
-        noiseMix, noiseType,
+        noiseMix, noiseType, noiseFilterEnabled, noiseFilterQ,
     ]);
 
     // Update frequencies of all playing notes when microtonal parameters change
@@ -893,7 +899,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
                 <Module label="Noise">
-                    <KnobGrid columns={1} rows={2}>
+                    <KnobGrid columns={2} rows={2}>
                         <Select
                             label="Type"
                             options={NOISE}
@@ -907,6 +913,58 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             min={0}
                             max={1}
                             onUpdate={(val) => setNoiseMix(val)}
+                        />
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => setNoiseFilterEnabled(!noiseFilterEnabled)}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${noiseFilterEnabled ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: noiseFilterEnabled ? '#4CAF50' : '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => {
+                                    if (noiseFilterEnabled) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    e.target.style.background = noiseFilterEnabled ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {noiseFilterEnabled ? 'ON' : 'OFF'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Filter
+                            </span>
+                        </div>
+                        <Knob
+                            label="Filter Q"
+                            value={noiseFilterQ}
+                            modifier={10}
+                            min={0.1}
+                            max={30}
+                            disabled={!noiseFilterEnabled}
+                            onUpdate={(val) => setNoiseFilterQ(val)}
                         />
                     </KnobGrid>
                 </Module>

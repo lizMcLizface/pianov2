@@ -62,7 +62,6 @@ class NoiseGenerator {
         const bufferSize = 4096;
         this.workletNode = this.AC.createScriptProcessor(bufferSize, 0, 1);
         
-        let sampleCount = 0;
         this.workletNode.onaudioprocess = (event) => {
             const outputBuffer = event.outputBuffer;
             const outputData = outputBuffer.getChannelData(0);
@@ -84,12 +83,6 @@ class NoiseGenerator {
                         outputData[i] = 0;
                 }
             }
-            
-            // Log first few samples to verify noise generation
-            sampleCount++;
-            if (sampleCount % 100 === 0) {
-                console.log('Noise samples:', outputData.slice(0, 5), 'gain:', this.gainNode.gain.value);
-            }
         };
         
         this.workletNode.connect(this.gainNode);
@@ -102,7 +95,7 @@ class NoiseGenerator {
         silentGain.connect(this.AC.destination);
         
         this.isInitialized = true;
-        console.log('Noise fallback initialized, connected to gainNode');
+        console.log('Noise fallback initialized and connected');
     }
     
     setNoiseType(type) {

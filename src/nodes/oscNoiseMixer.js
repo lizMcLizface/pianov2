@@ -32,8 +32,6 @@ class OscNoiseMixer {
         const oscGain = Math.cos(clampedRatio * Math.PI / 2);
         const noiseGain = Math.sin(clampedRatio * Math.PI / 2);
         
-        console.log('Setting mix ratio:', clampedRatio, 'oscGain:', oscGain, 'noiseGain:', noiseGain);
-        
         this.oscGain.gain.setValueAtTime(oscGain, this.AC.currentTime);
         this.noiseGain.gain.setValueAtTime(noiseGain, this.AC.currentTime);
     }

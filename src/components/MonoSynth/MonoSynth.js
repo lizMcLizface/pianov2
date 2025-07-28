@@ -8,6 +8,7 @@ class MonoSynth {
 
         this.osc = new Oscillator(this.AC);
         this.noiseGen = new NoiseGenerator(this.AC);
+        this.noiseFilter = new Filter(this.AC); // Bandpass filter for noise
         this.mixer = new OscNoiseMixer(this.AC);
         this.gain = new Gain(this.AC); // AHDSR Gain
         this.volume = new Gain(this.AC); // Volume
@@ -21,16 +22,30 @@ class MonoSynth {
         this.currentHoldLevel = 1; // Store hold level for use in noteOff
         this.voiceId = null; // Unique identifier for the current voice session
         this.voiceIdCounter = 0; // Counter for generating unique voice IDs
+        
+        // Noise filter settings
+        this.noiseFilterEnabled = false;
+        this.noiseFilterQ = 1;
     }
 
     init() {
         console.log('MonoSynth init - connecting audio nodes');
         
-        // Connect oscillator and noise to mixer
-        this.mixer.connectOscillator(this.osc.getNode());
-        this.mixer.connectNoise(this.noiseGen.getNode());
+        // Set up noise filter as bandpass with bypass capability
+        this.noiseFilter.setType('bandpass');
+        this.noiseFilter.setFreq(440); // Default frequency
+        this.noiseFilter.setQ(this.noiseFilterQ);
         
-        console.log('Connected osc and noise to mixer');
+        // Create a static audio routing that doesn't change:
+        // Noise -> NoiseFilter -> Mixer (always)
+        // We'll control the bypass via the filter's gain instead of reconnecting
+        this.noiseGen.connect(this.noiseFilter.getNode());
+        
+        // Connect oscillator and filtered noise to mixer
+        this.mixer.connectOscillator(this.osc.getNode());
+        this.mixer.connectNoise(this.noiseFilter.getNode());
+        
+        console.log('Connected osc and filtered noise to mixer');
         
         // Connect mixer to gain and filter chain
         this.mixer.connect(this.gain.getNode());
@@ -40,6 +55,9 @@ class MonoSynth {
         this.volume.setGain(0.2);
         this.gain.setGain(0);
         this.osc.start();
+        
+        // Initialize filter state
+        this.updateNoiseFilterBypass();
         
         console.log('MonoSynth audio chain connected');
     }
@@ -91,6 +109,38 @@ class MonoSynth {
     setNoiseGain = (gain) => {
         console.log('MonoSynth setNoiseGain:', gain);
         this.noiseGen.setGain(gain);
+    };
+    
+    // Noise filter methods
+    setNoiseFilterEnabled = (enabled) => {
+        this.noiseFilterEnabled = enabled;
+        this.updateNoiseFilterBypass();
+    };
+    
+    setNoiseFilterQ = (q) => {
+        this.noiseFilterQ = q;
+        this.noiseFilter.setQ(q);
+    };
+    
+    updateNoiseFilterBypass = () => {
+        if (this.noiseFilterEnabled) {
+            // Enable filtering - set normal Q and frequency
+            this.noiseFilter.setQ(this.noiseFilterQ);
+            this.updateNoiseFilterFrequency();
+        } else {
+            // Bypass filtering - set very low Q and wide frequency to make filter transparent
+            this.noiseFilter.setQ(0.1); // Very low Q = very wide, transparent filter
+            this.noiseFilter.setFreq(1000); // Mid frequency when bypassed
+        }
+        console.log('Noise filter', this.noiseFilterEnabled ? 'enabled' : 'bypassed');
+    };
+    
+    updateNoiseFilterFrequency = () => {
+        if (this.noiseFilterEnabled && this.currentNoteInfo) {
+            const { baseFreq_ } = this.currentNoteInfo;
+            this.noiseFilter.setFreq(baseFreq_);
+            console.log('Updated noise filter frequency to:', baseFreq_);
+        }
     };
 
     // Update frequency for microtonal adjustments
@@ -154,8 +204,12 @@ class MonoSynth {
         this.currentNoteInfo = {
             noteName: noteName,
             baseFreq: baseFreq,
-            octave: oct || parseInt(note.match(/\d+$/)?.[0]) || 4
+            octave: oct || parseInt(note.match(/\d+$/)?.[0]) || 4,
+            baseFreq_: freq // Store the actual frequency for noise filter
         };
+        
+        // Update noise filter frequency if enabled
+        this.updateNoiseFilterFrequency();
         
         this.osc.setFreq(freq, portamentoSpeed);
 
