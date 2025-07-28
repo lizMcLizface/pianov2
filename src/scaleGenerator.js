@@ -3,6 +3,16 @@ import {HeptatonicScales, scales, highlightKeysForScales, getScaleNotes} from '.
 import {identifySyntheticChords} from './intervals';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 
+// Import progression refresh function (use dynamic import to avoid circular dependency)
+let refreshProgressionDisplay = null;
+try {
+    import('./progressions').then(module => {
+        refreshProgressionDisplay = module.refreshProgressionDisplay;
+    });
+} catch (e) {
+    console.warn('Could not import progression refresh function:', e);
+}
+
 // Global array to store selected scales
 let selectedScales = ['Major-1']; // Default to first scale
 let exclusiveMode = true; // Toggle between exclusive and multiple selection modes
@@ -131,9 +141,13 @@ function updateCurrentScaleDisplay() {
     highlightKeysForScales(scaleNotes);
     highlightScaleNotes(scaleNotes);
 
+    // Refresh progression display if available
+    if (refreshProgressionDisplay && typeof refreshProgressionDisplay === 'function') {
+        refreshProgressionDisplay();
+    }
 
     // let scale = scales[family][parseInt(mode, 10) - 1];
-    // console.log("Current Scale:", scaleName, "R/oot Note:", rootNote);
+    // console.log("Current Scale:", scaleName, "Root Note:", rootNote);
     // console.log("Scale Notes:", scaleNotes);
     // let identifiedChords_3 = identifySyntheticChords(scale, 3, rootNote);
     // let identifiedChords_4 = identifySyntheticChords(scaleNotes, 4, rootNote);

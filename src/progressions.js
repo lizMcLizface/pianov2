@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { selectedRootNote, selectedScales } from './scaleGenerator';
+import { selectedRootNote, selectedScales, getPrimaryScale, getPrimaryRootNote } from './scaleGenerator';
 import { identifySyntheticChords } from './intervals';
 import { HeptatonicScales } from './scales';
 import {outputNoteArray, drawNotes, outputDiv} from './index'
@@ -74,8 +74,8 @@ chord_csv.split('\n').forEach(line => {
 
 let placeholder = document.getElementById('ProgressionTabPlaceholder');
 
-// Global variable to store selected chord progressions (multiple selection)
-let selectedProgressions = ['50s progression']; // Default to first progression
+// Global variable to store selected chord progression (single selection)
+let selectedProgression = '50s progression'; // Default to first progression
 
 // Global variables for progression realization options
 let progressionOptions = {
@@ -108,7 +108,7 @@ function createProgressionTable() {
     progressionTableContainer.id = 'progressionTableContainer';
     
     let progressionTableLabel = document.createElement('h3');
-    progressionTableLabel.textContent = 'Chord Progression Selection (Multiple Selection Enabled)';
+    progressionTableLabel.textContent = 'Chord Progression Selection';
     progressionTableLabel.style.margin = '0 0 10px 0';
     progressionTableLabel.style.fontSize = '16px';
     progressionTableLabel.style.fontWeight = 'bold';
@@ -151,7 +151,7 @@ function createProgressionTable() {
         cell.textContent = progressionName;
         
         // Check if this progression is currently selected
-        let isSelected = selectedProgressions.includes(progressionName);
+        let isSelected = selectedProgression === progressionName;
         
         if (isSelected) {
             cell.style.backgroundColor = '#4CAF50';
@@ -171,32 +171,16 @@ function createProgressionTable() {
                 }
             });
             
-            // Check if Ctrl key is pressed
-            if (e.ctrlKey || e.metaKey) { // metaKey for Mac Cmd key
-                // Ctrl+Click: Clear all selections and select only this one
-                selectedProgressions = [progressionName];
-            } else {
-                // Normal click: Toggle selection
-                if (isSelected) {
-                    // Only deselect if this wouldn't leave us with no selections
-                    if (selectedProgressions.length > 1) {
-                        const index = selectedProgressions.indexOf(progressionName);
-                        selectedProgressions.splice(index, 1);
-                    }
-                    // If this would leave us with no selections, do nothing
-                } else {
-                    // Add to selection
-                    selectedProgressions.push(progressionName);
-                }
-            }
+            // Exclusive selection - always select the clicked progression
+            selectedProgression = progressionName;
             
-            console.log('Selected chord progressions:', selectedProgressions);
-            console.log('Progression details:', selectedProgressions.map(name => chord_progressions[name]));
+            console.log('Selected chord progression:', selectedProgression);
+            console.log('Progression details:', chord_progressions[selectedProgression]);
             
             // Refresh the table to update visual state
             createProgressionTable();
             
-            // Update staff display when progressions change
+            // Update staff display when progression changes
             drawProgressionStaff();
         };
         
@@ -225,14 +209,9 @@ function createProgressionTable() {
             tooltipText += `<strong>Length:</strong> ${progressionData.length} chords<br>`;
             tooltipText += `<strong>Chords:</strong> ${progressionData.progression}<br>`;
             if (isSelected) {
-                tooltipText += `<em>Click to deselect</em><br>`;
-                if (selectedProgressions.length === 1) {
-                    tooltipText += `<small>(Last selection - cannot deselect)</small><br>`;
-                }
-                tooltipText += `<small>Ctrl+Click to select only this</small>`;
+                tooltipText += `<em>Currently selected</em>`;
             } else {
-                tooltipText += `<em>Click to select</em><br>`;
-                tooltipText += `<small>Ctrl+Click to select only this</small>`;
+                tooltipText += `<em>Click to select</em>`;
             }
             tooltip.innerHTML = tooltipText;
             
@@ -834,22 +813,31 @@ function drawProgressionStaff() {
     const staffDiv = document.getElementById('progressionStaffDiv');
     if (!staffDiv) return;
     
-    // Get the first selected progression for display
-    if (selectedProgressions.length === 0) return;
+    // Get the selected progression for display
+    if (!selectedProgression) return;
     
-    const firstProgression = chord_progressions[selectedProgressions[0]];
-    if (!firstProgression) return;
+    const progressionData = chord_progressions[selectedProgression];
+    if (!progressionData) return;
     
     // Parse the chord symbols from the progression
-    const chordSymbols = firstProgression.progression.split(' ').filter(chord => chord.trim() !== '');
+    const chordSymbols = progressionData.progression.split(' ').filter(chord => chord.trim() !== '');
     const numChords = Math.min(chordSymbols.length, 8); // Limit to 8 chords for display
     
     // Setup staves based on number of chords
     const { renderer, context, displayWidth, trebleStaves, bassStaves, trebleStave, bassStave } = 
         setupProgressionStaves(staffDiv, numChords);
     
+    // Get primary scale and root note
+    const primaryScale = getPrimaryScale();
+    const primaryRootNote = getPrimaryRootNote();
     
-    let chordNotes = getProgressionNotes(selectedProgressions[0], selectedScales[0].split('-')[0], selectedScales[0].split('-')[1], selectedRootNote[0]);
+    if (!primaryScale || !primaryRootNote) {
+        console.error('No primary scale or root note selected');
+        return;
+    }
+    
+    const [scaleFamily, scaleMode] = primaryScale.split('-');
+    let chordNotes = getProgressionNotes(selectedProgression, scaleFamily, scaleMode, primaryRootNote);
     console.log('Chord notes:', chordNotes);
 
     noteArray = []; // Reset note array for new progression
@@ -1191,7 +1179,16 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
     return notes;
 }
 
-getProgressionNotes('50s progression', selectedScales[0].split('-')[0], selectedScales[0].split('-')[1], selectedRootNote[0]);
+// Test the progression functionality with primary scale/root
+function testProgressionFunctionality() {
+    const primaryScale = getPrimaryScale();
+    const primaryRootNote = getPrimaryRootNote();
+    
+    if (primaryScale && primaryRootNote) {
+        const [scaleFamily, scaleMode] = primaryScale.split('-');
+        getProgressionNotes('50s progression', scaleFamily, scaleMode, primaryRootNote);
+    }
+}
 
 // Convert progression noteArray format to outputNoteArray format
 function convertProgressionToOutputFormat() {
@@ -1324,4 +1321,12 @@ function replaceOutputWithProgression() {
     updateOutputText();
 }
 
-export {chord_progressions, selectedProgressions, progressionOptions, createProgressionTable, createProgressionOptionsPanel, createProgressionStaffDisplay, drawProgressionStaff, addProgressionToOutput, replaceOutputWithProgression}
+// Function to refresh progression display when primary scale/root changes
+function refreshProgressionDisplay() {
+    // Only refresh if there is a selected progression and the staff display exists
+    if (selectedProgression && document.getElementById('progressionStaffDiv')) {
+        drawProgressionStaff();
+    }
+}
+
+export {chord_progressions, selectedProgression, progressionOptions, createProgressionTable, createProgressionOptionsPanel, createProgressionStaffDisplay, drawProgressionStaff, addProgressionToOutput, replaceOutputWithProgression, refreshProgressionDisplay}
