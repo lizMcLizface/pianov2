@@ -113,6 +113,12 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [masterFilterGain, setMasterFilterGain] = useState(0);
     const [vcoType, setVcoType] = useState('sine');
     const [vcoDutyCycle, setVcoDutyCycle] = useState(0.5);
+    
+    // Voice Spreading and Detuning Parameters
+    const [voiceCount, setVoiceCount] = useState(1);
+    const [detuneSpread, setDetuneSpread] = useState(0);
+    const [stereoSpread, setStereoSpread] = useState(0);
+    
     const [gainAttack, setGainAttack] = useState(0);
     const [gainDecay, setGainDecay] = useState(0);
     const [gainSustain, setGainSustain] = useState(0.7);
@@ -237,7 +243,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         synthArr.forEach(synth => {
             synth.connect(synthMix.getNode());
-            vibratoLFO.connect(synth.getOscillatorNode().detune);
+            synth.connectVibratoToAll(vibratoLFO);
             synth.init();
         });
 
@@ -713,6 +719,12 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setGainRelease(preset.gainRelease);
         setVcoType(preset.vcoType);
         setVcoDutyCycle(preset.vcoDutyCycle || 0.5);
+        
+        // Load voice spreading settings with defaults
+        setVoiceCount(preset.voiceCount || 1);
+        setDetuneSpread(preset.detuneSpread || 0);
+        setStereoSpread(preset.stereoSpread || 0);
+        
         setFilterType(preset.filterType);
         setFilterFreq(preset.filterFreq);
         setFilterQ(preset.filterQ);
@@ -806,6 +818,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
         if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
 
+        // Voice Spreading and Detuning Updates
+        synthArr.forEach((synth) => {
+            synth.setVoiceCount(voiceCount);
+            synth.setDetuneSpread(detuneSpread);
+            synth.setStereoSpread(stereoSpread);
+        });
+
         // Sync noise settings
         synthArr.forEach((synth) => {
             synth.setNoiseType(noiseType);
@@ -848,9 +867,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (masterEQ2.getHighFreq() !== eqHighFreq) masterEQ2.setHighFreq(eqHighFreq);
     }, [
         masterVolume, masterFilterType, masterFilterFreq, masterFilterQ, masterFilterGain, vcoType, vcoDutyCycle,
-        filterType, filterFreq, filterQ, filterGain, distortionAmount, distortionDist, reverbType,
-        reverbAmount, delayTime, delayFeedback, delayTone, delayAmount, vibratoDepth, vibratoRate,
-        bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
+        voiceCount, detuneSpread, stereoSpread,
+        filterType, filterFreq, filterQ, filterGain, distortionAmount, distortionDist, reverbType,
+        reverbAmount, delayTime, delayFeedback, delayTone, delayAmount, vibratoDepth, vibratoRate,
+        bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
         flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
         noiseMix, noiseType, noiseFilterEnabled, noiseFilterQ,
@@ -879,7 +899,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             <ModuleGridContainer>
 
                 <Module label="VCO">
-                    <KnobGrid columns={1} rows={2}>
+                    <KnobGrid columns={2} rows={3}>
                         <Select
                             label="Waveform"
                             options={WAVEFORM}
@@ -894,6 +914,37 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             max={0.99}
                             disabled={vcoType !== 'square_dc'}
                             onUpdate={(val) => setVcoDutyCycle(val)}
+                        />
+                        <Knob
+                            label="Voices"
+                            value={voiceCount}
+                            modifier={8}
+                            offset={1}
+                            min={1}
+                            max={8}
+                            resetValue={1}
+                            decimalPlaces={0}
+                            onUpdate={(val) => setVoiceCount(Math.round(val))}
+                        />
+                        <Knob
+                            label="Detune Spread"
+                            value={detuneSpread}
+                            modifier={100}
+                            min={0}
+                            max={100}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setDetuneSpread(val)}
+                        />
+                        <Knob
+                            label="Stereo Spread"
+                            value={stereoSpread}
+                            modifier={100}
+                            min={0}
+                            max={100}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setStereoSpread(val)}
                         />
                     </KnobGrid>
                 </Module>
