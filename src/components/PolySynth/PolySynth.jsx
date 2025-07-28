@@ -232,6 +232,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const resetSynthPos = () => synthPos = 0;
     const incrementSynthPos = () => synthPos = (synthPos + 1) % polyphonyGlobal;
 
+    // Throttled parameter update to prevent audio interruption
     const activateSynth = () => {
         setSynthActive(true);
         AC.resume();
@@ -270,7 +271,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         masterLimiter.setKnee(0);
         masterLimiter.setRatio(20);
 
-        masterGain.connect(AC.destination);
+        // Ensure master gain is always connected to destination
+        try {
+            masterGain.connect(AC.destination);
+        } catch (e) {
+            // If already connected, disconnect and reconnect
+            masterGain.getNode().disconnect();
+            masterGain.connect(AC.destination);
+        }
         
         // Mark as initialized
         synthInitialized.current = true;
@@ -688,6 +696,11 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         // Cleanup function to prevent memory leaks
         return () => {
+            // Clear batched parameter update timers
+            if (batchedParameterUpdate.current.timer) {
+                clearTimeout(batchedParameterUpdate.current.timer);
+            }
+            
             // Stop all programmatic notes
             stopAllNotesProgrammatic();
             
@@ -799,89 +812,141 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         resetSynthPos();
     }, [currentPreset]);
 
+    // Batched async parameter updates to prevent audio crackling
+    const batchedParameterUpdate = useRef({
+        timer: null,
+        pendingUpdates: new Map()
+    });
+
+    const scheduleParameterUpdate = (key, updateFn) => {
+        batchedParameterUpdate.current.pendingUpdates.set(key, updateFn);
+        
+        if (batchedParameterUpdate.current.timer) {
+            clearTimeout(batchedParameterUpdate.current.timer);
+        }
+        
+        batchedParameterUpdate.current.timer = setTimeout(() => {
+            // Use requestAnimationFrame for better performance
+            requestAnimationFrame(() => {
+                try {
+                    // Ensure AudioContext is running
+                    if (AC.state === 'suspended') {
+                        AC.resume().catch(console.error);
+                    }
+                    
+                    // Execute all pending updates in a single batch
+                    batchedParameterUpdate.current.pendingUpdates.forEach((updateFn, key) => {
+                        try {
+                            updateFn();
+                        } catch (e) {
+                            console.warn(`Parameter update failed for ${key}:`, e);
+                        }
+                    });
+                    
+                    batchedParameterUpdate.current.pendingUpdates.clear();
+                } catch (e) {
+                    console.warn('Batched parameter update failed:', e);
+                }
+            });
+        }, 8); // 8ms = ~120fps, much faster response than before
+    };
+
     // Sync node values to the current state on change
     useLayoutEffect(() => {
-        if (masterGain.getGain() !== masterVolume) masterGain.setGain(masterVolume);
-
-        if (masterFilter.getType() !== masterFilterType) masterFilter.setType(masterFilterType);
-        if (masterFilter.getFreq() !== masterFilterFreq) masterFilter.setFreq(masterFilterFreq);
-        if (masterFilter.getQ() !== masterFilterQ) masterFilter.setQ(masterFilterQ);
-        if (masterFilter.getGain() !== masterFilterGain) masterFilter.setGain(masterFilterGain);
-
-
-
-        const synth1 = synthArr[0];
-        if (synth1.getWaveform() !== vcoType) synthArr.forEach((synth) => synth.setWaveform(vcoType));
-        if (synth1.getDutyCycle() !== vcoDutyCycle) synthArr.forEach((synth) => synth.setDutyCycle(vcoDutyCycle));
-        if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
-        if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
-        if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
-        if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
-
-        // Voice Spreading and Detuning Updates
-        synthArr.forEach((synth) => {
-            synth.setVoiceCount(voiceCount);
-            synth.setDetuneSpread(detuneSpread);
-            synth.setStereoSpread(stereoSpread);
+        scheduleParameterUpdate('master', () => {
+            if (masterGain.getGain() !== masterVolume) masterGain.setGain(masterVolume);
+            if (masterFilter.getType() !== masterFilterType) masterFilter.setType(masterFilterType);
+            if (masterFilter.getFreq() !== masterFilterFreq) masterFilter.setFreq(masterFilterFreq);
+            if (masterFilter.getQ() !== masterFilterQ) masterFilter.setQ(masterFilterQ);
+            if (masterFilter.getGain() !== masterFilterGain) masterFilter.setGain(masterFilterGain);
         });
+    }, [masterVolume, masterFilterType, masterFilterFreq, masterFilterQ, masterFilterGain]);
 
-        // Sync noise settings
-        synthArr.forEach((synth) => {
-            synth.setNoiseType(noiseType);
-            synth.setNoiseMix(noiseMix);
-            synth.setNoiseFilterEnabled(noiseFilterEnabled);
-            synth.setNoiseFilterQ(noiseFilterQ);
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('synth', () => {
+            const synth1 = synthArr[0];
+            if (synth1.getWaveform() !== vcoType) synthArr.forEach((synth) => synth.setWaveform(vcoType));
+            if (synth1.getDutyCycle() !== vcoDutyCycle) synthArr.forEach((synth) => synth.setDutyCycle(vcoDutyCycle));
+            if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
+            if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
+            if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
+            if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
         });
+    }, [vcoType, vcoDutyCycle, filterType, filterFreq, filterQ, filterGain]);
 
-        if (masterDistortion.getAmount() !== distortionAmount) masterDistortion.setAmount(distortionAmount);
-        if (masterDistortion.getDistortion() !== distortionDist) masterDistortion.setDistortion(distortionDist);
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('voices', () => {
+            synthArr.forEach((synth) => {
+                synth.setVoiceCount(voiceCount);
+                synth.setDetuneSpread(detuneSpread);
+                synth.setStereoSpread(stereoSpread);
+            });
+        });
+    }, [voiceCount, detuneSpread, stereoSpread]);
 
-        if (masterFlanger.getAmount() !== flangerAmount) masterFlanger.setAmount(flangerAmount);
-        if (masterFlanger.getDepth() !== flangerDepth) masterFlanger.setDepth(flangerDepth);
-        if (masterFlanger.getRate() !== flangerRate) masterFlanger.setRate(flangerRate);
-        if (masterFlanger.getFeedback() !== flangerFeedback) masterFlanger.setFeedback(flangerFeedback);
-        if (masterFlanger.getDelay() !== flangerDelay) masterFlanger.setDelay(flangerDelay);
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('noise', () => {
+            synthArr.forEach((synth) => {
+                synth.setNoiseType(noiseType);
+                synth.setNoiseMix(noiseMix);
+                synth.setNoiseFilterEnabled(noiseFilterEnabled);
+                synth.setNoiseFilterQ(noiseFilterQ);
+            });
+        });
+    }, [noiseType, noiseMix, noiseFilterEnabled, noiseFilterQ]);
 
-        if (masterDelay.getTone() !== delayTone) masterDelay.setTone(delayTone);
-        if (masterDelay.getAmount() !== delayAmount) masterDelay.setAmount(delayAmount);
-        if (masterDelay.getDelayTime() !== delayTime) masterDelay.setDelayTime(delayTime);
-        if (masterDelay.getFeedback() !== delayFeedback) masterDelay.setFeedback(delayFeedback);
-
-        if (masterPingPong.getDelayTime() !== pingPongDelayTime) masterPingPong.setDelayTime(pingPongDelayTime);
-        if (masterPingPong.getFeedback() !== pingPongFeedback) masterPingPong.setFeedback(pingPongFeedback);
-        if (masterPingPong.getTone() !== pingPongTone) masterPingPong.setTone(pingPongTone);
-        if (masterPingPong.getAmount() !== pingPongAmount) masterPingPong.setAmount(pingPongAmount);
-
-        if (masterReverb.getAmount() !== reverbAmount) masterReverb.setAmount(reverbAmount);
-        if (masterReverb.getType() !== reverbType) masterReverb.setType(reverbType);
-
-        if (masterBitCrush.getBitDepth() !== bitCrushDepth) masterBitCrush.setBitDepth(bitCrushDepth);
-        if (masterBitCrush.getAmount() !== bitCrushAmount) masterBitCrush.setAmount(bitCrushAmount);
-
-        if (vibratoLFO.getRate() !== vibratoRate) vibratoLFO.setRate(vibratoRate);
-        if (vibratoLFO.getDepth() !== vibratoDepth) vibratoLFO.setDepth(vibratoDepth);
-
-        if (masterEQ2.getLowGain() !== eqLowGain) masterEQ2.setLowGain(eqLowGain);
-        if (masterEQ2.getHighGain() !== eqHighGain) masterEQ2.setHighGain(eqHighGain);
-        if (masterEQ2.getLowFreq() !== eqLowFreq) masterEQ2.setLowFreq(eqLowFreq);
-        if (masterEQ2.getHighFreq() !== eqHighFreq) masterEQ2.setHighFreq(eqHighFreq);
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('effects', () => {
+            if (masterDistortion.getAmount() !== distortionAmount) masterDistortion.setAmount(distortionAmount);
+            if (masterDistortion.getDistortion() !== distortionDist) masterDistortion.setDistortion(distortionDist);
+            
+            if (masterFlanger.getAmount() !== flangerAmount) masterFlanger.setAmount(flangerAmount);
+            if (masterFlanger.getDepth() !== flangerDepth) masterFlanger.setDepth(flangerDepth);
+            if (masterFlanger.getRate() !== flangerRate) masterFlanger.setRate(flangerRate);
+            if (masterFlanger.getFeedback() !== flangerFeedback) masterFlanger.setFeedback(flangerFeedback);
+            if (masterFlanger.getDelay() !== flangerDelay) masterFlanger.setDelay(flangerDelay);
+            
+            if (masterDelay.getTone() !== delayTone) masterDelay.setTone(delayTone);
+            if (masterDelay.getAmount() !== delayAmount) masterDelay.setAmount(delayAmount);
+            if (masterDelay.getDelayTime() !== delayTime) masterDelay.setDelayTime(delayTime);
+            if (masterDelay.getFeedback() !== delayFeedback) masterDelay.setFeedback(delayFeedback);
+            
+            if (masterPingPong.getDelayTime() !== pingPongDelayTime) masterPingPong.setDelayTime(pingPongDelayTime);
+            if (masterPingPong.getFeedback() !== pingPongFeedback) masterPingPong.setFeedback(pingPongFeedback);
+            if (masterPingPong.getTone() !== pingPongTone) masterPingPong.setTone(pingPongTone);
+            if (masterPingPong.getAmount() !== pingPongAmount) masterPingPong.setAmount(pingPongAmount);
+            
+            if (masterReverb.getAmount() !== reverbAmount) masterReverb.setAmount(reverbAmount);
+            if (masterReverb.getType() !== reverbType) masterReverb.setType(reverbType);
+            
+            if (masterBitCrush.getBitDepth() !== bitCrushDepth) masterBitCrush.setBitDepth(bitCrushDepth);
+            if (masterBitCrush.getAmount() !== bitCrushAmount) masterBitCrush.setAmount(bitCrushAmount);
+            
+            if (vibratoLFO.getRate() !== vibratoRate) vibratoLFO.setRate(vibratoRate);
+            if (vibratoLFO.getDepth() !== vibratoDepth) vibratoLFO.setDepth(vibratoDepth);
+            
+            if (masterEQ2.getLowGain() !== eqLowGain) masterEQ2.setLowGain(eqLowGain);
+            if (masterEQ2.getHighGain() !== eqHighGain) masterEQ2.setHighGain(eqHighGain);
+            if (masterEQ2.getLowFreq() !== eqLowFreq) masterEQ2.setLowFreq(eqLowFreq);
+            if (masterEQ2.getHighFreq() !== eqHighFreq) masterEQ2.setHighFreq(eqHighFreq);
+        });
     }, [
-        masterVolume, masterFilterType, masterFilterFreq, masterFilterQ, masterFilterGain, vcoType, vcoDutyCycle,
-        voiceCount, detuneSpread, stereoSpread,
-        filterType, filterFreq, filterQ, filterGain, distortionAmount, distortionDist, reverbType,
-        reverbAmount, delayTime, delayFeedback, delayTone, delayAmount, vibratoDepth, vibratoRate,
-        bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
+        distortionAmount, distortionDist, reverbType, reverbAmount, 
+        delayTime, delayFeedback, delayTone, delayAmount, 
+        vibratoDepth, vibratoRate, bitCrushDepth, bitCrushAmount, 
+        eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
-        flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
-        noiseMix, noiseType, noiseFilterEnabled, noiseFilterQ,
+        flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate
     ]);
 
     // Update frequencies of all playing notes when microtonal parameters change
     useLayoutEffect(() => {
-        synthArr.forEach(synth => {
-            if (synth.getCurrentNoteInfo()) {
-                synth.updateNoteFrequency(pitchEnv);
-            }
+        scheduleParameterUpdate('microtonal', () => {
+            synthArr.forEach(synth => {
+                if (synth.getCurrentNoteInfo()) {
+                    synth.updateNoteFrequency(pitchEnv);
+                }
+            });
         });
     }, [
         pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF, pitchFSharp,

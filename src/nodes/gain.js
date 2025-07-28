@@ -38,14 +38,23 @@ class Gain {
         const when = startTime !== null ? startTime : this.AC.currentTime;
         
         // Cancel any existing scheduled values to prevent overlaps
-        this.node.gain.cancelScheduledValues(when);
+        try {
+            this.node.gain.cancelScheduledValues(when);
+        } catch (e) {
+            // If canceling fails, just log and continue
+            console.warn('Failed to cancel scheduled values:', e);
+        }
         
         // Read actual current value if currentLevel is null or not provided
         const actualCurrentLevel = this.node.gain.value;
         
         if (duration <= 0) {
             // Immediate change
-            this.node.gain.setValueAtTime(finalLevel, when);
+            try {
+                this.node.gain.setValueAtTime(finalLevel, when);
+            } catch (e) {
+                console.warn('Failed to set immediate gain value:', e);
+            }
             return;
         }
 
@@ -63,8 +72,21 @@ class Gain {
         // Set the current value first to ensure smooth transition
         // this.node.gain.setValueAtTime(actualCurrentLevel, when);
         
-        // Apply the curve
-        this.node.gain.setValueCurveAtTime(curveArray, when, duration);
+        // Apply the curve with additional error handling
+        try {
+            this.node.gain.setValueCurveAtTime(curveArray, when, duration);
+        } catch (e) {
+            // If curve setting fails, fall back to linear ramp
+            console.warn('setValueCurveAtTime failed, using fallback:', e);
+            try {
+                this.node.gain.setValueAtTime(actualCurrentLevel, when);
+                this.node.gain.linearRampToValueAtTime(finalLevel, when + duration);
+            } catch (fallbackError) {
+                console.warn('Fallback gain update also failed:', fallbackError);
+                // Last resort: immediate value set
+                this.node.gain.setValueAtTime(finalLevel, this.AC.currentTime);
+            }
+        }
     }
 }
 
