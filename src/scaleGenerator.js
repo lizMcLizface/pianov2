@@ -6,8 +6,104 @@ import {identifySyntheticChords} from './intervals';
 let selectedScales = ['Major-1']; // Default to first scale
 let exclusiveMode = true; // Toggle between exclusive and multiple selection modes
 
+// Primary scale index for navigation through multiple selected scales
+let primaryScaleIndex = 0;
+
 // Global variable to store selected root notes (can be array or single string)
 let selectedRootNote = 'C'; // Default to C
+
+// Primary root note index for navigation through multiple selected root notes
+let primaryRootNoteIndex = 0;
+
+// Function to get the current primary scale
+function getPrimaryScale() {
+    if (selectedScales.length === 0) return null;
+    if (primaryScaleIndex >= selectedScales.length) {
+        primaryScaleIndex = 0; // Reset if index is out of bounds
+    }
+    return selectedScales[primaryScaleIndex];
+}
+
+// Function to navigate to next scale
+function navigateToNextScale() {
+    if (selectedScales.length <= 1) return false; // No navigation needed
+    primaryScaleIndex = (primaryScaleIndex + 1) % selectedScales.length;
+    updateCurrentScaleDisplay();
+    return true;
+}
+
+// Function to navigate to previous scale
+function navigateToPreviousScale() {
+    if (selectedScales.length <= 1) return false; // No navigation needed
+    primaryScaleIndex = (primaryScaleIndex - 1 + selectedScales.length) % selectedScales.length;
+    updateCurrentScaleDisplay();
+    return true;
+}
+
+// Function to get the current primary root note
+function getPrimaryRootNote() {
+    if (Array.isArray(selectedRootNote)) {
+        if (selectedRootNote.length === 0) return 'C';
+        if (primaryRootNoteIndex >= selectedRootNote.length) {
+            primaryRootNoteIndex = 0; // Reset if index is out of bounds
+        }
+        return selectedRootNote[primaryRootNoteIndex];
+    }
+    return selectedRootNote;
+}
+
+// Function to navigate to next root note
+function navigateToNextRootNote() {
+    if (!Array.isArray(selectedRootNote) || selectedRootNote.length <= 1) return false; // No navigation needed
+    primaryRootNoteIndex = (primaryRootNoteIndex + 1) % selectedRootNote.length;
+    updateCurrentScaleDisplay();
+    return true;
+}
+
+// Function to navigate to previous root note
+function navigateToPreviousRootNote() {
+    if (!Array.isArray(selectedRootNote) || selectedRootNote.length <= 1) return false; // No navigation needed
+    primaryRootNoteIndex = (primaryRootNoteIndex - 1 + selectedRootNote.length) % selectedRootNote.length;
+    updateCurrentScaleDisplay();
+    return true;
+}
+
+// Function to update the current scale display in the HTML
+function updateCurrentScaleDisplay() {
+    const currentScaleNode = document.getElementById('currentScaleNode');
+    if (!currentScaleNode) return;
+
+    const primaryScale = getPrimaryScale();
+    if (!primaryScale) {
+        currentScaleNode.textContent = 'No Scale Selected';
+        return;
+    }
+
+    const [family, mode] = primaryScale.split('-');
+    const scales = HeptatonicScales;
+    const scaleName = scales[family][parseInt(mode, 10) - 1].name;
+    const rootNote = getPrimaryRootNote();
+    
+    // Display format: "Root ScaleName" (e.g., "C Major", "F# Dorian")
+    currentScaleNode.textContent = `${rootNote} ${scaleName}`;
+    
+    // Show navigation indicators
+    let indicators = [];
+    if (selectedScales.length > 1) {
+        indicators.push(`Scale: ${primaryScaleIndex + 1}/${selectedScales.length}`);
+    }
+    if (Array.isArray(selectedRootNote) && selectedRootNote.length > 1) {
+        indicators.push(`Root: ${primaryRootNoteIndex + 1}/${selectedRootNote.length}`);
+    }
+    if (indicators.length > 0) {
+        currentScaleNode.textContent += ` (${indicators.join(', ')})`;
+    }
+
+    // Update keyboard highlighting for the primary scale
+    const intervals = scales[family][parseInt(mode, 10) - 1].intervals;
+    const scaleNotes = getScaleNotes(rootNote, intervals);
+    highlightKeysForScales(scaleNotes);
+}
 
 // Utility functions to manage selected scales
 function getSelectedScales() {
@@ -16,15 +112,22 @@ function getSelectedScales() {
 
 function clearSelectedScales() {
     selectedScales = [];
+    primaryScaleIndex = 0;
     // Refresh the table to update visual state
     createHeptatonicScaleTable();
+    updateCurrentScaleDisplay();
 }
 
 function addSelectedScale(scaleId) {
     if (!selectedScales.includes(scaleId)) {
         selectedScales.push(scaleId);
+        // If this is the first scale being added, make it primary
+        if (selectedScales.length === 1) {
+            primaryScaleIndex = 0;
+        }
         // Refresh the table to update visual state
         createHeptatonicScaleTable();
+        updateCurrentScaleDisplay();
     }
 }
 
@@ -32,8 +135,15 @@ function removeSelectedScale(scaleId) {
     const index = selectedScales.indexOf(scaleId);
     if (index > -1) {
         selectedScales.splice(index, 1);
+        // Adjust primary scale index if needed
+        if (primaryScaleIndex >= selectedScales.length) {
+            primaryScaleIndex = Math.max(0, selectedScales.length - 1);
+        } else if (primaryScaleIndex > index) {
+            primaryScaleIndex--;
+        }
         // Refresh the table to update visual state
         createHeptatonicScaleTable();
+        updateCurrentScaleDisplay();
     }
 }
 
@@ -43,12 +153,14 @@ function toggleSelectionMode() {
     // If switching to exclusive mode and multiple items are selected, keep only the first one
     if (exclusiveMode && selectedScales.length > 1) {
         selectedScales = [selectedScales[0]];
+        primaryScaleIndex = 0;
     }
     
     // Handle root note selection mode change
     if (exclusiveMode && Array.isArray(selectedRootNote)) {
         // Switch to exclusive mode - keep only the first selected root note
         selectedRootNote = selectedRootNote[0];
+        primaryRootNoteIndex = 0;
     }
     
     // console.log(`Selection mode: ${exclusiveMode ? 'Exclusive' : 'Multiple'}`);
@@ -129,15 +241,18 @@ function createRootNoteTable() {
             if (Array.isArray(selectedRootNote) && selectedRootNote.length === chromaticNotes.length) {
                 // All are selected, reset to just 'C'
                 selectedRootNote = 'C';
+                primaryRootNoteIndex = 0;
             } else {
                 // Not all selected, select all
                 selectedRootNote = [...chromaticNotes];
+                primaryRootNoteIndex = 0;
             }
         }
         
         // console.log('Selected root note(s):', selectedRootNote);
         // Refresh both tables to update visual state
         createHeptatonicScaleTable();
+        updateCurrentScaleDisplay();
     };
     
     // Add hover effects and tooltips for "All" cell
@@ -237,6 +352,7 @@ function createRootNoteTable() {
             if (exclusiveMode) {
                 // In exclusive mode, always select the clicked note
                 selectedRootNote = note;
+                primaryRootNoteIndex = 0;
             } else {
                 // In multiple mode, toggle selection
                 if (Array.isArray(selectedRootNote)) {
@@ -245,9 +361,16 @@ function createRootNoteTable() {
                     if (index > -1) {
                         // Note is selected, remove it
                         selectedRootNote.splice(index, 1);
+                        // Adjust primary root note index if needed
+                        if (primaryRootNoteIndex >= selectedRootNote.length) {
+                            primaryRootNoteIndex = Math.max(0, selectedRootNote.length - 1);
+                        } else if (primaryRootNoteIndex > index) {
+                            primaryRootNoteIndex--;
+                        }
                         // If array becomes empty, default to 'C'
                         if (selectedRootNote.length === 0) {
                             selectedRootNote = 'C';
+                            primaryRootNoteIndex = 0;
                         }
                     } else {
                         // Note is not selected, add it
@@ -258,9 +381,11 @@ function createRootNoteTable() {
                     if (selectedRootNote === note) {
                         // Clicking the same note - convert to array with just 'C'
                         selectedRootNote = 'C';
+                        primaryRootNoteIndex = 0;
                     } else {
                         // Clicking a different note - convert to array with both
                         selectedRootNote = [selectedRootNote, note];
+                        primaryRootNoteIndex = 0;
                     }
                 }
             }
@@ -268,6 +393,7 @@ function createRootNoteTable() {
             // console.log('Selected root note(s):', selectedRootNote);
             // Refresh both tables to update visual state
             createHeptatonicScaleTable();
+            updateCurrentScaleDisplay();
         };
         
         // Add hover effects and tooltips
@@ -297,7 +423,7 @@ function createRootNoteTable() {
 
             let firstScaleId = selectedScales[0];
             let [family, mode] = firstScaleId.split('-');
-    let scales = HeptatonicScales;
+            let scales = HeptatonicScales;
             // console.log('note: ', note, 'family: ', family, 'mode: ', mode);
             let intervals = scales[family][parseInt(mode, 10) - 1].intervals;
             let scaleNotes = getScaleNotes(note, intervals);
@@ -325,11 +451,11 @@ function createRootNoteTable() {
                     tooltip.parentNode.removeChild(tooltip);
                 }
             });
-    let scales = HeptatonicScales;
+            let scales = HeptatonicScales;
             let firstScaleId = selectedScales[0];
             let [family, mode] = firstScaleId.split('-');
             let intervals = scales[family][parseInt(mode, 10) - 1].intervals;
-            let scaleNotes = getScaleNotes(selectedRootNote[0], intervals);
+            let scaleNotes = getScaleNotes(getPrimaryRootNote(), intervals);
             // console.log("Scale Notes for", scaleName, ":", scaleNotes);
             highlightKeysForScales(scaleNotes);
             cell.onmousemove = null;
@@ -419,8 +545,11 @@ function createHeptatonicScaleTable() {
     
     clearButton.onclick = function() {
         selectedScales = ['Major-1']; // Reset to default first scale
+        primaryScaleIndex = 0;
         selectedRootNote = 'C'; // Reset root note to C
+        primaryRootNoteIndex = 0;
         createHeptatonicScaleTable();
+        updateCurrentScaleDisplay();
     };
     
     // Add event listener to toggle
@@ -532,6 +661,7 @@ function createHeptatonicScaleTable() {
                         
                         // Refresh the table to update visual state
                         createHeptatonicScaleTable();
+                        updateCurrentScaleDisplay();
                     };
                     
                     // Add tooltip for row selection
@@ -619,8 +749,10 @@ function createHeptatonicScaleTable() {
                             } else {
                                 // Scale is not selected, clear all and select only this one
                                 selectedScales = [scaleId];
+                                primaryScaleIndex = 0;
                                 // In exclusive mode, always refresh the entire table
                                 createHeptatonicScaleTable();
+                                updateCurrentScaleDisplay();
                             }
                         } else {
                             // Multiple selection mode (original behavior)
@@ -644,6 +776,7 @@ function createHeptatonicScaleTable() {
                             if (typeof window.updateCrossReferenceDisplay === 'function') {
                                 window.updateCrossReferenceDisplay();
                             }
+                            updateCurrentScaleDisplay();
                         }
                         
                         // console.log('Selected scales:', selectedScales);
@@ -667,7 +800,7 @@ function createHeptatonicScaleTable() {
                             <strong>Alternative Names:</strong> ${altNames.join(', ')}<br>
                             <em>Click to ${selectedScales.includes(scaleId) ? 'deselect' : 'select'}</em>
                         `;
-                        let scaleNotes = getScaleNotes(selectedRootNote[0], currentScale[j-1].intervals);
+                        let scaleNotes = getScaleNotes(getPrimaryRootNote(), currentScale[j-1].intervals);
                         // console.log("Scale Notes for", scaleName, ":", scaleNotes);
                         highlightKeysForScales(scaleNotes);
                         if (scales[scaleNames[i-1]][j-1].intervals.length === 7) {
@@ -699,7 +832,7 @@ function createHeptatonicScaleTable() {
                             let firstScaleId = selectedScales[0];
                             let [family, mode] = firstScaleId.split('-');
                             let intervals = scales[family][parseInt(mode, 10) - 1].intervals;
-                            let scaleNotes = getScaleNotes(selectedRootNote[0], intervals);
+                            let scaleNotes = getScaleNotes(getPrimaryRootNote(), intervals);
                             // console.log("Scale Notes for", scaleName, ":", scaleNotes);
                             highlightKeysForScales(scaleNotes);
                         };
@@ -723,11 +856,25 @@ function createHeptatonicScaleTable() {
         window.updateCrossReferenceDisplay();
     }
 
+    // Update the current scale display
+    updateCurrentScaleDisplay();
+
     return;
 
 }
 
 
+
+
 export {
-    createHeptatonicScaleTable, selectedRootNote, selectedScales
+    createHeptatonicScaleTable, 
+    selectedRootNote, 
+    selectedScales,
+    getPrimaryScale,
+    navigateToNextScale,
+    navigateToPreviousScale,
+    getPrimaryRootNote,
+    navigateToNextRootNote,
+    navigateToPreviousRootNote,
+    updateCurrentScaleDisplay
 }

@@ -7,7 +7,7 @@ import $ from 'jquery';
 import { metronome, reset } from './metronome';
 import {processChord} from './intervals';
 import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from './scales';
-import {createHeptatonicScaleTable, selectedRootNote, selectedScales} from './scaleGenerator';
+import {createHeptatonicScaleTable, selectedRootNote, selectedScales, navigateToNextScale, navigateToPreviousScale, navigateToNextRootNote, navigateToPreviousRootNote} from './scaleGenerator';
 import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
@@ -1666,6 +1666,34 @@ function onKeyPress(event, up) {
         console.log('Increasing Base Octave: ', baseOctave);
         baseOctave += 1;
         if(baseOctave > 8) baseOctave = 8;
+    }
+
+    // Scale navigation with n and m keys
+    if (event.type == 'keydown' && event.code == 'KeyN'){
+        if (navigateToPreviousScale()) {
+            console.log('Navigated to previous scale');
+        }
+        return; // Don't process as a musical note
+    }
+    if (event.type == 'keydown' && event.code == 'KeyM'){
+        if (navigateToNextScale()) {
+            console.log('Navigated to next scale');
+        }
+        return; // Don't process as a musical note
+    }
+
+    // Root note navigation with comma and period keys
+    if (event.type == 'keydown' && event.code == 'Comma'){
+        if (navigateToPreviousRootNote()) {
+            console.log('Navigated to previous root note');
+        }
+        return; // Don't process as a musical note
+    }
+    if (event.type == 'keydown' && event.code == 'Period'){
+        if (navigateToNextRootNote()) {
+            console.log('Navigated to next root note');
+        }
+        return; // Don't process as a musical note
     }
 
     // console.log('Base Octave: ', baseOctave);
