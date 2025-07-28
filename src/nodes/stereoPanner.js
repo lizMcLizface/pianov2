@@ -18,6 +18,14 @@ class StereoPanner {
         }
     }
 
+    disconnect = () => {
+        try {
+            this.gain.getNode().disconnect();
+        } catch (e) {
+            console.warn('Failed to disconnect StereoPanner:', e);
+        }
+    }
+
     // Getters
     getNode = () => this.node;
     getPan = () => this.node.pan.value;

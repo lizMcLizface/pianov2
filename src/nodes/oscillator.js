@@ -26,6 +26,14 @@ class Oscillator {
         }
     }
     
+    disconnect = () => {
+        try {
+            this.outputBuffer.disconnect();
+        } catch (e) {
+            console.warn('Failed to disconnect Oscillator:', e);
+        }
+    }
+    
     start = () => this.node.start();
 
     // Getters

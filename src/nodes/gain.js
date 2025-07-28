@@ -14,6 +14,14 @@ class Gain {
         }
     }
 
+    disconnect = () => {
+        try {
+            this.node.disconnect();
+        } catch (e) {
+            console.warn('Failed to disconnect Gain node:', e);
+        }
+    }
+
     // Getters
     getNode = () => this.node;
     getGain = () => this.node.gain.value;

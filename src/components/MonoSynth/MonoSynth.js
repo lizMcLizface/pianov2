@@ -44,12 +44,35 @@ class MonoSynth {
     }
 
     initializeOscillators(count) {
-        // If we need fewer oscillators, just disconnect the extras
+        // If we need fewer oscillators, disconnect and clean up the extras
         if (count < this.oscillators.length) {
             for (let i = count; i < this.oscillators.length; i++) {
                 try {
-                    this.oscillatorPanners[i].disconnect();
-                } catch (e) {}
+                    // Disconnect oscillator from panner first
+                    if (this.oscillators[i] && this.oscillatorPanners[i]) {
+                        this.oscillators[i].disconnect();
+                    }
+                } catch (e) {
+                    console.warn('Failed to disconnect oscillator:', e);
+                }
+                
+                try {
+                    // Disconnect panner from mixer
+                    if (this.oscillatorPanners[i]) {
+                        this.oscillatorPanners[i].disconnect();
+                    }
+                } catch (e) {
+                    console.warn('Failed to disconnect panner:', e);
+                }
+                
+                try {
+                    // Reset frequency of disconnected oscillators to prevent weird states
+                    if (this.oscillators[i]) {
+                        this.oscillators[i].setFreq(440);
+                    }
+                } catch (e) {
+                    console.warn('Failed to reset oscillator frequency:', e);
+                }
             }
             this.oscillators = this.oscillators.slice(0, count);
             this.oscillatorPanners = this.oscillatorPanners.slice(0, count);
@@ -83,6 +106,8 @@ class MonoSynth {
         this.oscillatorMixer.setGain(gainReduction);
         
         this.voiceCount = count;
+        
+        // Force immediate update of detuning and stereo spread
         this.updateVoiceDetuning();
         this.updateStereoSpread();
         
@@ -94,9 +119,20 @@ class MonoSynth {
 
     updateVoiceDetuning() {
         if (this.oscillators.length <= 1) {
-            // Single oscillator, no detuning needed
-            if (this.oscillators[0] && this.currentNoteInfo) {
-                this.setOscillatorFrequency(this.oscillators[0], 0);
+            // Single oscillator, ensure it's not detuned
+            if (this.oscillators[0]) {
+                if (this.currentNoteInfo) {
+                    // If a note is playing, set to base frequency with no detune
+                    this.setOscillatorFrequency(this.oscillators[0], 0);
+                } else {
+                    // If no note is playing, reset to a standard frequency to clear any detune
+                    // This ensures the oscillator is ready for the next note
+                    try {
+                        this.oscillators[0].setFreq(440); // Reset to A4
+                    } catch (e) {
+                        console.warn('Failed to reset single oscillator frequency:', e);
+                    }
+                }
             }
             return;
         }
@@ -129,9 +165,13 @@ class MonoSynth {
 
     updateStereoSpread() {
         if (this.oscillatorPanners.length <= 1) {
-            // Single oscillator, center it
+            // Single oscillator, ensure it's centered
             if (this.oscillatorPanners[0]) {
-                this.oscillatorPanners[0].setPan(0);
+                try {
+                    this.oscillatorPanners[0].setPan(0); // Force center position
+                } catch (e) {
+                    console.warn('Failed to center single oscillator pan:', e);
+                }
             }
             return;
         }
@@ -242,6 +282,12 @@ class MonoSynth {
         const clampedCount = Math.max(1, Math.min(8, Math.round(count))); // Limit to 1-8 voices
         if (clampedCount !== this.voiceCount) {
             this.initializeOscillators(clampedCount);
+            
+            // Reset oscillator states to prevent detuned artifacts
+            // Use a small delay to ensure oscillator initialization is complete
+            setTimeout(() => {
+                this.resetOscillatorStates();
+            }, 10);
         }
     }
 
@@ -252,6 +298,22 @@ class MonoSynth {
 
     setStereoSpread(spreadPercent) {
         this.stereoSpread = Math.max(0, Math.min(100, spreadPercent)); // Limit to 0-100%
+        this.updateStereoSpread();
+    }
+
+    // Method to reset all oscillators to clean state (useful when switching voice counts)
+    resetOscillatorStates() {
+        this.oscillators.forEach(osc => {
+            try {
+                // Reset to standard frequency to clear any detune artifacts
+                osc.setFreq(440);
+            } catch (e) {
+                console.warn('Failed to reset oscillator state:', e);
+            }
+        });
+        
+        // Force update detuning based on current settings
+        this.updateVoiceDetuning();
         this.updateStereoSpread();
     }
 
