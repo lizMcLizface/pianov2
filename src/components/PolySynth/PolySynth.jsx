@@ -359,14 +359,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const synthNoteOff = (synth, note = null, voiceId = null) => {
         const gainEnv = getGainEnv(1); // Use default volume of 1 for note off
         const filterEnv = getFilterEnv();
-        console.log('Sending note off to synth', synth, 'note information', note, 'voiceId', voiceId);
+        // console.log('Sending note off to synth', synth, 'note information', note, 'voiceId', voiceId);
         synth.noteOff({ gainEnv, filterEnv }, voiceId);
     }
 
     // Programmatic note control functions
     const playNotesProgrammatic = (notes, volume = 50, duration = null) => {
         if (!synthActive) activateSynth();
-        console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
+        // console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
         
         const gainValue = volume / 100; // Convert percentage to gain value
         
@@ -379,18 +379,18 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             let targetSynth = null;
             if (!synthArr[synthPos].currentNote) {
                 targetSynth = synthArr[synthPos];
-                console.log('Reusing synth at position:', synthPos);
+                // console.log('Reusing synth at position:', synthPos);
             } else {
                 const initialPos = synthPos;
-                console.log('Finding available synth, starting at position:', synthPos);
+                // console.log('Finding available synth, starting at position:', synthPos);
                 incrementSynthPos();
 
                 while (synthPos !== initialPos) {
-                    console.log('Checking synth at position:', synthPos);
+                    // console.log('Checking synth at position:', synthPos);
                     if (!synthArr[synthPos].currentNote) break;
                     incrementSynthPos();
                 }
-                console.log('Found available synth at position:', synthPos);
+                // console.log('Found available synth at position:', synthPos);
                 targetSynth = synthArr[synthPos];
             }
 
@@ -434,8 +434,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     notesToStop.push(noteId);
                 }
             });
-            console.log('Notes to stop: ', notes);
-            console.log('Found notes playing: ', notesToStop);
+            // console.log('Notes to stop: ', notes);
+            // console.log('Found notes playing: ', notesToStop);
             
             notesToStop.forEach(noteId => {
                 const noteInfo = activeNotes.current.get(noteId);
@@ -448,7 +448,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     };
 
     const stopAllNotesProgrammatic = () => {
-        console.log('Stopping all programmatic notes, count:', activeNotes.current.size);
+        // console.log('Stopping all programmatic notes, count:', activeNotes.current.size);
         activeNotes.current.forEach((noteInfo, noteId) => {
             synthNoteOff(noteInfo.synth, null, noteInfo.voiceId);
         });

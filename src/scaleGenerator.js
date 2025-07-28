@@ -1,6 +1,7 @@
 import $ from 'jquery';
 import {HeptatonicScales, scales, highlightKeysForScales, getScaleNotes} from './scales';
 import {identifySyntheticChords} from './intervals';
+import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 
 // Global array to store selected scales
 let selectedScales = ['Major-1']; // Default to first scale
@@ -68,6 +69,31 @@ function navigateToPreviousRootNote() {
     return true;
 }
 
+
+var currentScaleHighlight = []
+function highlightScaleNotes(noteArray){
+    for( var key of currentScaleHighlight){
+        var midi = noteToMidi(key) + 12;
+        keys[midi].element.classList.remove('scaleKey');
+    }
+    currentScaleHighlight = [];
+    if(Array.isArray(noteArray)){
+        for(var key of noteArray){
+            var midi = noteToMidi(key) + 12;
+            // console.log('key: ', key, ' midi note:', midi);
+            // console.log(keys[midi])
+            if(midi >=  parseInt($('#lowestNoteSelection').val()) && midi <=  parseInt($('#highestNoteSelection').val())){
+            keys[midi].element.classList.add('scaleKey');;
+            currentScaleHighlight.push(key);
+            }
+        }
+    }else{
+        var midi = noteToMidi(noteArray) + 12;
+        keys[midi].element.classList.add('scaleKey');;   
+        currentScaleHighlight.push(noteArray);     
+    }
+}
+
 // Function to update the current scale display in the HTML
 function updateCurrentScaleDisplay() {
     const currentScaleNode = document.getElementById('currentScaleNode');
@@ -103,6 +129,7 @@ function updateCurrentScaleDisplay() {
     const intervals = scales[family][parseInt(mode, 10) - 1].intervals;
     const scaleNotes = getScaleNotes(rootNote, intervals);
     highlightKeysForScales(scaleNotes);
+    highlightScaleNotes(scaleNotes);
 }
 
 // Utility functions to manage selected scales
