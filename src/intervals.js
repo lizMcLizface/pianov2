@@ -597,7 +597,7 @@ function generateSyntheticChords(scale, length = 3, root = 'C') {
 // });
 
 function identifySyntheticChords(scale, length = 3, root = 'C') {
-    const scaleNotes = getScaleNotes(root, scale.intervals);
+    // const scaleNotes = getScaleNotes(root, scale.intervals);
 
     const syntheticChords = generateSyntheticChords(scale, length, root);
     const trimmedSyntheticChords = syntheticChords.map(chord =>

@@ -130,6 +130,19 @@ function updateCurrentScaleDisplay() {
     const scaleNotes = getScaleNotes(rootNote, intervals);
     highlightKeysForScales(scaleNotes);
     highlightScaleNotes(scaleNotes);
+
+
+    // let scale = scales[family][parseInt(mode, 10) - 1];
+    // console.log("Current Scale:", scaleName, "R/oot Note:", rootNote);
+    // console.log("Scale Notes:", scaleNotes);
+    // let identifiedChords_3 = identifySyntheticChords(scale, 3, rootNote);
+    // let identifiedChords_4 = identifySyntheticChords(scaleNotes, 4, rootNote);
+    // let identifiedChords_5 = identifySyntheticChords(scaleNotes, 5, rootNote);
+
+    // console.log("Identified 3-note chords:", identifiedChords_3);
+    // console.log("Identified 4-note chords:", identifiedChords_4);
+    // console.log("Identified 5-note chords:", identifiedChords_5);
+
 }
 
 // Utility functions to manage selected scales

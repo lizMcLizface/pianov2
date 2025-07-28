@@ -1304,7 +1304,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             ))}
                         </InfoSelect>
                     </InfoContainer>
-                    <PeakMeter audioCtx={AC} sourceNode={masterGain} />
+                    {/* <PeakMeter audioCtx={AC} sourceNode={masterGain} /> */}
                     <InfoContainer>
                         <PopText>- Theme -</PopText>
                         <InfoSelect
