@@ -123,12 +123,12 @@ class MonoSynth {
             if (this.oscillators[0]) {
                 if (this.currentNoteInfo) {
                     // If a note is playing, set to base frequency with no detune
-                    this.setOscillatorFrequency(this.oscillators[0], 0);
+                    this.setOscillatorFrequency(this.oscillators[0], 0, 0.001); // Very short ramp
                 } else {
                     // If no note is playing, reset to a standard frequency to clear any detune
-                    // This ensures the oscillator is ready for the next note
+                    // Use smooth ramp to prevent clicks
                     try {
-                        this.oscillators[0].setFreq(440); // Reset to A4
+                        this.oscillators[0].setFreq(440, 0.002); // 2ms ramp
                     } catch (e) {
                         console.warn('Failed to reset single oscillator frequency:', e);
                     }
@@ -159,7 +159,7 @@ class MonoSynth {
             // Clamp detune to reasonable range to prevent frequency issues
             detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset)); // ±1 octave max
             
-            this.setOscillatorFrequency(osc, detuneOffset);
+            this.setOscillatorFrequency(osc, detuneOffset, 0.001); // Very short ramp for detuning
         });
     }
 
@@ -199,7 +199,7 @@ class MonoSynth {
         });
     }
 
-    setOscillatorFrequency(oscillator, detuneInCents) {
+    setOscillatorFrequency(oscillator, detuneInCents, rampTime = 0.002) {
         if (!this.currentNoteInfo || !oscillator) return;
         
         const { baseFreq_ } = this.currentNoteInfo;
@@ -226,7 +226,8 @@ class MonoSynth {
         }
         
         try {
-            oscillator.setFreq(detunedFreq);
+            // Use small ramp time to prevent clicks/cracks
+            oscillator.setFreq(detunedFreq, rampTime);
         } catch (e) {
             console.warn('Failed to set oscillator frequency:', e);
         }
@@ -293,6 +294,7 @@ class MonoSynth {
 
     setDetuneSpread(spreadInCents) {
         this.detuneSpread = Math.max(0, Math.min(100, spreadInCents)); // Limit to 0-100 cents
+        // Use very short ramp when updating detuning to prevent clicks
         this.updateVoiceDetuning();
     }
 
@@ -305,16 +307,18 @@ class MonoSynth {
     resetOscillatorStates() {
         this.oscillators.forEach(osc => {
             try {
-                // Reset to standard frequency to clear any detune artifacts
-                osc.setFreq(440);
+                // Reset to standard frequency with smooth ramp to prevent clicks
+                osc.setFreq(440, 0.005); // 5ms ramp
             } catch (e) {
                 console.warn('Failed to reset oscillator state:', e);
             }
         });
         
-        // Force update detuning based on current settings
-        this.updateVoiceDetuning();
-        this.updateStereoSpread();
+        // Small delay to allow frequency ramp to complete, then update detuning
+        setTimeout(() => {
+            this.updateVoiceDetuning();
+            this.updateStereoSpread();
+        }, 10);
     }
 
     // Connect vibrato LFO to all oscillators

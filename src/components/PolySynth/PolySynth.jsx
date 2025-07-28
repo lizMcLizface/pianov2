@@ -42,6 +42,8 @@ const masterGain = new Nodes.Gain(AC);
 const masterFilter = new Nodes.Filter(AC);
 const masterDistortion = new Nodes.Distortion(AC);
 const masterFlanger = new Nodes.Flanger(AC);
+const masterChorus = new Nodes.Chorus(AC);
+const masterPhaser = new Nodes.Phaser(AC);
 const masterDelay = new Nodes.Delay(AC);
 const masterPingPong = new Nodes.PingPongDelay(AC);
 const masterReverb = new Nodes.Reverb(AC);
@@ -142,6 +144,15 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [flangerRate, setFlangerRate] = useState(0);
     const [flangerFeedback, setFlangerFeedback] = useState(0);
     const [flangerDelay, setFlangerDelay] = useState(0);
+    const [chorusAmount, setChorusAmount] = useState(0);
+    const [chorusRate, setChorusRate] = useState(0.6);
+    const [chorusDepth, setChorusDepth] = useState(0.002);
+    const [chorusFeedback, setChorusFeedback] = useState(0);
+    const [phaserAmount, setPhaserAmount] = useState(0);
+    const [phaserRate, setPhaserRate] = useState(0.5);
+    const [phaserDepth, setPhaserDepth] = useState(800);
+    const [phaserFeedback, setPhaserFeedback] = useState(0.3);
+    const [phaserFrequency, setPhaserFrequency] = useState(800);
     const [delayTime, setDelayTime] = useState(0);
     const [delayFeedback, setDelayFeedback] = useState(0);
     const [delayTone, setDelayTone] = useState(4400);
@@ -258,7 +269,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         synthMix.setRatio(20);
 
         masterDistortion.connect(masterFlanger.getNode());
-        masterFlanger.connect(masterBitCrush.getNode());
+        masterFlanger.connect(masterChorus.getNode());
+        masterChorus.connect(masterPhaser.getNode());
+        masterPhaser.connect(masterBitCrush.getNode());
         masterBitCrush.connect(masterDelay.getNode());
         masterDelay.connect(masterPingPong.getNode());
         masterPingPong.connect(masterReverb.getNode());
@@ -753,6 +766,15 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setFlangerRate(preset.flangerRate);
         setFlangerDelay(preset.flangerDelay);
         setFlangerFeedback(preset.flangerFeedback);
+        setChorusAmount(preset.chorusAmount || 0);
+        setChorusRate(preset.chorusRate || 0.6);
+        setChorusDepth(preset.chorusDepth || 0.002);
+        setChorusFeedback(preset.chorusFeedback || 0);
+        setPhaserAmount(preset.phaserAmount || 0);
+        setPhaserRate(preset.phaserRate || 0.5);
+        setPhaserDepth(preset.phaserDepth || 800);
+        setPhaserFeedback(preset.phaserFeedback || 0.3);
+        setPhaserFrequency(preset.phaserFrequency || 800);
         setDelayAmount(preset.delayAmount);
         setDelayFeedback(preset.delayFeedback);
         setDelayTime(preset.delayTime);
@@ -906,6 +928,17 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             if (masterFlanger.getFeedback() !== flangerFeedback) masterFlanger.setFeedback(flangerFeedback);
             if (masterFlanger.getDelay() !== flangerDelay) masterFlanger.setDelay(flangerDelay);
             
+            if (masterChorus.getAmount() !== chorusAmount) masterChorus.setAmount(chorusAmount);
+            if (masterChorus.getRate() !== chorusRate) masterChorus.setRate(chorusRate);
+            if (masterChorus.getDepth() !== chorusDepth) masterChorus.setDepth(chorusDepth);
+            if (masterChorus.getFeedback() !== chorusFeedback) masterChorus.setFeedback(chorusFeedback);
+            
+            if (masterPhaser.getAmount() !== phaserAmount) masterPhaser.setAmount(phaserAmount);
+            if (masterPhaser.getRate() !== phaserRate) masterPhaser.setRate(phaserRate);
+            if (masterPhaser.getDepth() !== phaserDepth) masterPhaser.setDepth(phaserDepth);
+            if (masterPhaser.getFeedback() !== phaserFeedback) masterPhaser.setFeedback(phaserFeedback);
+            if (masterPhaser.getFrequency() !== phaserFrequency) masterPhaser.setFrequency(phaserFrequency);
+            
             if (masterDelay.getTone() !== delayTone) masterDelay.setTone(delayTone);
             if (masterDelay.getAmount() !== delayAmount) masterDelay.setAmount(delayAmount);
             if (masterDelay.getDelayTime() !== delayTime) masterDelay.setDelayTime(delayTime);
@@ -936,7 +969,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         vibratoDepth, vibratoRate, bitCrushDepth, bitCrushAmount, 
         eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
-        flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate
+        flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
+        chorusAmount, chorusRate, chorusDepth, chorusFeedback,
+        phaserAmount, phaserRate, phaserDepth, phaserFeedback, phaserFrequency
     ]);
 
     // Update frequencies of all playing notes when microtonal parameters change
@@ -1404,6 +1439,79 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             label="Dry/Wet"
                             value={flangerAmount}
                             onUpdate={(val) => setFlangerAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+                <Module label="Chorus">
+                    <KnobGrid columns={2} rows={2}>
+                        <Knob
+                            label="Rate"
+                            value={chorusRate}
+                            modifier={5}
+                            resetValue={0.6}
+                            decimalPlaces={2}
+                            onUpdate={(val) => setChorusRate(val)}
+                        />
+                        <Knob
+                            label="Depth"
+                            value={chorusDepth}
+                            modifier={0.01}
+                            resetValue={0.002}
+                            decimalPlaces={4}
+                            onUpdate={(val) => setChorusDepth(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={chorusFeedback}
+                            onUpdate={(val) => setChorusFeedback(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={chorusAmount}
+                            onUpdate={(val) => setChorusAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+                <Module label="Phaser">
+                    <KnobGrid columns={3} rows={2}>
+                        <Knob
+                            label="Rate"
+                            value={phaserRate}
+                            modifier={5}
+                            resetValue={0.5}
+                            decimalPlaces={2}
+                            onUpdate={(val) => setPhaserRate(val)}
+                        />
+                        <Knob
+                            label="Depth"
+                            value={phaserDepth}
+                            modifier={1000}
+                            resetValue={800}
+                            isRounded
+                            onUpdate={(val) => setPhaserDepth(val)}
+                        />
+                        <Knob
+                            label="Frequency"
+                            value={phaserFrequency}
+                            scalingType="logarithmic"
+                            minValue={200}
+                            maxValue={8000}
+                            resetValue={800}
+                            isRounded
+                            onUpdate={(val) => setPhaserFrequency(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={phaserFeedback}
+                            resetValue={0.3}
+                            onUpdate={(val) => setPhaserFeedback(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={phaserAmount}
+                            onUpdate={(val) => setPhaserAmount(val)}
                         />
                     </KnobGrid>
                 </Module>

@@ -103,9 +103,29 @@ class Oscillator {
     
     setFreq = (freq, time = 0) => {
         if (freq < 0 || freq > MAX_FREQ) return false;
-        time
-            ? this.node.frequency.setTargetAtTime(freq, this.AC.currentTime, time)
-            : this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
+        
+        try {
+            if (time > 0) {
+                // Cancel any pending frequency changes to prevent conflicts
+                this.node.frequency.cancelScheduledValues(this.AC.currentTime);
+                // Set current value first, then ramp
+                this.node.frequency.setValueAtTime(this.node.frequency.value, this.AC.currentTime);
+                // Use linear ramp for smooth frequency transitions (prevents clicks)
+                this.node.frequency.linearRampToValueAtTime(freq, this.AC.currentTime + time);
+            } else {
+                // Cancel any pending changes and set immediately
+                this.node.frequency.cancelScheduledValues(this.AC.currentTime);
+                this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
+            }
+        } catch (e) {
+            console.warn('Failed to set oscillator frequency:', e);
+            // Fallback: try simple immediate set
+            try {
+                this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
+            } catch (fallbackError) {
+                console.warn('Fallback frequency set also failed:', fallbackError);
+            }
+        }
     }
 }
 

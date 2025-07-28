@@ -11,6 +11,8 @@ import BitCrusher from './bitcrusher';
 import Compressor from './compressor';
 import StereoPanner from './stereoPanner';
 import Flanger from './flanger';
+import Chorus from './chorus';
+import Phaser from './phaser';
 import Source from './source';
 import SignalGenerator from './signalGenerator';
 import NoiseGenerator from './noiseGenerator';
@@ -30,6 +32,8 @@ export {
     BitCrusher,
     StereoPanner,
     Flanger,
+    Chorus,
+    Phaser,
     Source,
     SignalGenerator,
     NoiseGenerator,
