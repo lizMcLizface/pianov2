@@ -3,35 +3,101 @@ const MAX_FREQ = 44100;
 class Oscillator {
     constructor(AC) {
         this.AC = AC;
-        this.WAVEFORMS = ['sine', 'triangle', 'square', 'sawtooth'];
+        this.WAVEFORMS = ['sine', 'triangle', 'square', 'sawtooth', 'square_dc'];
         this.node = this.AC.createOscillator();
+        this.waveShaper = null;
+        
+        // Create a stable output buffer node that never changes
+        this.outputBuffer = this.AC.createGain();
+        this.outputBuffer.gain.value = 1.0; // Unity gain, just acts as a buffer
+        
+        this.currentType = 'sine';
+        this.dutyCycle = 0.5; // Default 50% duty cycle
+        
+        // Initially connect oscillator directly to output buffer
+        this.node.connect(this.outputBuffer);
     }
 
     connect = (destination) => {
         if (Array.isArray(destination)) {
-            destination.forEach((dest) => this.node.connect(dest));
+            destination.forEach((dest) => this.outputBuffer.connect(dest));
         } else {
-            this.node.connect(destination);
+            this.outputBuffer.connect(destination);
         }
     }
+    
     start = () => this.node.start();
 
     // Getters
-    getNode = () => this.node;
-    getType = () => this.node.type;
+    getNode = () => this.outputBuffer; // Always return the stable output buffer
+    getOscillatorNode = () => this.node; // Return the actual oscillator for modulation
+    getType = () => this.currentType;
     getFreq = () => this.node.frequency.value;
+    getDutyCycle = () => this.dutyCycle;
+
+    // Create waveshaper curve for duty cycle square wave
+    createDutyCycleCurve = (dutyCycle) => {
+        const curveLength = 2048;
+        const curve = new Float32Array(curveLength);
+        
+        for (let i = 0; i < curveLength; i++) {
+            const x = i / (curveLength - 1); // Normalize to 0-1 range
+            curve[i] = x < dutyCycle ? 1.0 : -1.0; // Step function
+        }
+        
+        return curve;
+    }
 
     // Setters
     setType = (type) => {
         if (!this.WAVEFORMS.includes(type)) return false;
-        this.node.type = type;
+        
+        this.currentType = type;
+        
+        if (type === 'square_dc') {
+            // Use waveshaper for duty cycle control
+            if (!this.waveShaper) {
+                this.waveShaper = this.AC.createWaveShaper();
+            }
+            
+            // Disconnect current setup and reconnect through waveshaper
+            this.node.disconnect();
+            this.node.type = 'triangle'; // Use triangle as source
+            
+            // Update the curve with current duty cycle
+            this.waveShaper.curve = this.createDutyCycleCurve(this.dutyCycle);
+            
+            // Connect: oscillator -> waveshaper -> output buffer
+            this.node.connect(this.waveShaper);
+            this.waveShaper.disconnect(); // Clear any existing connections
+            this.waveShaper.connect(this.outputBuffer);
+        } else {
+            // Use built-in waveforms
+            // Disconnect waveshaper if it exists
+            if (this.waveShaper) {
+                this.node.disconnect();
+                this.waveShaper.disconnect();
+            }
+            
+            // Set built-in waveform and connect directly to output buffer
+            this.node.type = type;
+            this.node.connect(this.outputBuffer);
+        }
     }
+    
+    setDutyCycle = (dutyCycle) => {
+        this.dutyCycle = Math.max(0.01, Math.min(0.99, dutyCycle)); // Clamp between 1% and 99%
+        
+        if (this.currentType === 'square_dc' && this.waveShaper) {
+            this.waveShaper.curve = this.createDutyCycleCurve(this.dutyCycle);
+        }
+    }
+    
     setFreq = (freq, time = 0) => {
         if (freq < 0 || freq > MAX_FREQ) return false;
         time
             ? this.node.frequency.setTargetAtTime(freq, this.AC.currentTime, time)
             : this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
-
     }
 }
 

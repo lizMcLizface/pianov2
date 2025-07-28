@@ -112,6 +112,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [masterFilterQ, setMasterFilterQ] = useState(0);
     const [masterFilterGain, setMasterFilterGain] = useState(0);
     const [vcoType, setVcoType] = useState('sine');
+    const [vcoDutyCycle, setVcoDutyCycle] = useState(0.5);
     const [gainAttack, setGainAttack] = useState(0);
     const [gainDecay, setGainDecay] = useState(0);
     const [gainSustain, setGainSustain] = useState(0.7);
@@ -230,7 +231,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         synthArr.forEach(synth => {
             synth.connect(synthMix.getNode());
-            vibratoLFO.connect(synth.getNode().detune);
+            vibratoLFO.connect(synth.getOscillatorNode().detune);
             synth.init();
         });
 
@@ -705,6 +706,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setGainSustain(preset.gainSustain);
         setGainRelease(preset.gainRelease);
         setVcoType(preset.vcoType);
+        setVcoDutyCycle(preset.vcoDutyCycle || 0.5);
         setFilterType(preset.filterType);
         setFilterFreq(preset.filterFreq);
         setFilterQ(preset.filterQ);
@@ -786,6 +788,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
         const synth1 = synthArr[0];
         if (synth1.getWaveform() !== vcoType) synthArr.forEach((synth) => synth.setWaveform(vcoType));
+        if (synth1.getDutyCycle() !== vcoDutyCycle) synthArr.forEach((synth) => synth.setDutyCycle(vcoDutyCycle));
         if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
         if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
         if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
@@ -824,7 +827,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (masterEQ2.getLowFreq() !== eqLowFreq) masterEQ2.setLowFreq(eqLowFreq);
         if (masterEQ2.getHighFreq() !== eqHighFreq) masterEQ2.setHighFreq(eqHighFreq);
     }, [
-        masterVolume, masterFilterType, masterFilterFreq, masterFilterQ, masterFilterGain, vcoType,
+        masterVolume, masterFilterType, masterFilterFreq, masterFilterQ, masterFilterGain, vcoType, vcoDutyCycle,
         filterType, filterFreq, filterQ, filterGain, distortionAmount, distortionDist, reverbType,
         reverbAmount, delayTime, delayFeedback, delayTone, delayAmount, vibratoDepth, vibratoRate,
         bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
@@ -855,12 +858,21 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             <ModuleGridContainer>
 
                 <Module label="VCO">
-                    <KnobGrid columns={1} rows={1}>
+                    <KnobGrid columns={1} rows={2}>
                         <Select
                             label="Waveform"
                             options={WAVEFORM}
                             value={vcoType}
                             onUpdate={(val) => setVcoType(val)}
+                        />
+                        <Knob
+                            label="Duty Cycle"
+                            value={vcoDutyCycle}
+                            modifier={1}
+                            min={0.01}
+                            max={0.99}
+                            disabled={vcoType !== 'square_dc'}
+                            onUpdate={(val) => setVcoDutyCycle(val)}
                         />
                     </KnobGrid>
                 </Module>

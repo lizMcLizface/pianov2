@@ -48,7 +48,9 @@ class MonoSynth {
 
     // Getters
     getNode = () => this.osc.getNode();
+    getOscillatorNode = () => this.osc.getOscillatorNode();
     getWaveform = () => this.osc.getType();
+    getDutyCycle = () => this.osc.getDutyCycle();
     getFilterType = () => this.filter.getType();
     getFilterFreq = () => this.filter.getFreq();
     getFilterQ = () => this.filter.getQ();
@@ -58,6 +60,7 @@ class MonoSynth {
     // Parameter setters
     setVolume = (val) => this.volume.setGain(clamp(val, 0, 1));
     setWaveform = (type) => this.osc.setType(type);
+    setDutyCycle = (val) => this.osc.setDutyCycle(val);
     setFilterType = (val) => this.filter.setType(val);
     setFilterFreq = (val) => this.filter.setFreq(val);
     setFilterQ = (val) => this.filter.setQ(val);

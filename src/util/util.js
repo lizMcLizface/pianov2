@@ -57,6 +57,7 @@ export const WAVEFORM = {
     triangle: 'M 10 25 L 19 16 L 31 34 L 40 25',
     square: 'M 10 32 L 10 18 L 25 18 L 25 32 L 40 32 L 40 18',
     sawtooth: 'M 10 32 L 10 18 L 25 32 L 25 18 L 40 32 L 40 18',
+    square_dc: 'M 10 32 L 10 18 L 17 18 L 17 32 L 40 32 L 40 18', // Asymmetric square for duty cycle
 };
 
 export const FILTER = {
