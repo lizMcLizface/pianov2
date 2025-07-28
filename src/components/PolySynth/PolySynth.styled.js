@@ -51,8 +51,8 @@ export const ModuleGridContainer = styled.div`
 `;
 
 export const InfoModule = styled(Module)`
-    grid-row: span 2;
-    max-height: 240px;
+    grid-row: span 1;
+    // max-height: 200px;
     overflow: hidden;
 `;
 

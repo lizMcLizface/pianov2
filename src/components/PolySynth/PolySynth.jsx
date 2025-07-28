@@ -1260,50 +1260,82 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
 
-
-                <Module label="Vibrato">
+                <Module label="Drive">
                     <KnobGrid columns={1} rows={2}>
                         <Knob
-                            label="Depth"
-                            value={vibratoDepth}
-                            modifier={200}
-                            onUpdate={(val) => setVibratoDepth(val)}
-                        />
-                        <Knob
-                            label="Rate"
-                            value={vibratoRate}
-                            modifier={50}
-                            onUpdate={(val) => setVibratoRate(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Reverb">
-                    <KnobGrid columns={1} rows={2}>
-                        <Select
-                            label="Type"
-                            options={REVERB}
-                            value={reverbType}
-                            onUpdate={(val) => setReverbType(val)}
+                            label="Distortion"
+                            value={distortionDist}
+                            modifier={30}
+                            onUpdate={(val) => setDistortionDist(val)}
                         />
                         <Knob
                             label="Dry/Wet"
-                            value={reverbAmount}
-                            onUpdate={(val) => setReverbAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-                
-                <Module label="Master">
-                    <KnobGrid columns={1} rows={1}>
-                        <Knob
-                            label="Volume"
-                            value={masterVolume}
-                            onUpdate={(val) => setMasterVolume(val)}
+                            value={distortionAmount}
+                            onUpdate={(val) => setDistortionAmount(val)}
                         />
                     </KnobGrid>
                 </Module>
 
+                <Module label="Crush">
+                    <KnobGrid columns={1} rows={2}>
+                        <Knob
+                            label="Bit Depth"
+                            value={bitCrushDepth}
+                            modifier={14}
+                            resetValue={8}
+                            offset={2}
+                            isRounded
+                            onUpdate={(val) => setBitCrushDepth(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={bitCrushAmount}
+                            onUpdate={(val) => setBitCrushAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+                <InfoModule>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between' }}>
+                        <InfoContainer style={{ marginBottom: 0 }}>
+                            <Knob
+                                label="Master Vol"
+                                value={masterVolume}
+                                onUpdate={(val) => setMasterVolume(val)}
+                            />
+                        </InfoContainer>
+                        <InfoContainer style={{ marginBottom: 0 }}>
+                            <PopText>Preset</PopText>
+                            <InfoSelect
+                                value={currentPreset}
+                                onChange={(e) => {
+                                    setCurrentPreset(e.target.value);
+                                    e.target.blur();
+                                }}
+                            >
+                                {Object.keys(presetData).map((preset) => (
+                                    <option key={`Preset_${preset}`} value={preset}>{preset}</option>
+                                ))}
+                            </InfoSelect>
+                        </InfoContainer>
+                        <InfoContainer style={{ marginBottom: 0 }}>
+                            <PopText>Theme</PopText>
+                            <InfoSelect
+                                value={currentTheme}
+                                onChange={(e) => {
+                                    setTheme(e.target.value);
+                                    localStorage.setItem('PolySynth-Theme', e.target.value);
+                                    e.target.blur();
+                                }}
+                            >
+                                {Object.keys(THEMES).map(theme => (
+                                    <option key={`themes_${theme}`} value={theme}>{theme}</option>
+                                ))}
+                            </InfoSelect>
+                        </InfoContainer>
+                    </div>
+                    {/* <PeakMeter audioCtx={AC} sourceNode={masterGain} /> */}
+                </InfoModule>
 
 
                 <Module label="Voicing">
@@ -1593,73 +1625,39 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
-                <Module label="Drive">
+
+                <Module label="Vibrato">
                     <KnobGrid columns={1} rows={2}>
                         <Knob
-                            label="Distortion"
-                            value={distortionDist}
-                            modifier={30}
-                            onUpdate={(val) => setDistortionDist(val)}
+                            label="Depth"
+                            value={vibratoDepth}
+                            modifier={200}
+                            onUpdate={(val) => setVibratoDepth(val)}
                         />
                         <Knob
-                            label="Dry/Wet"
-                            value={distortionAmount}
-                            onUpdate={(val) => setDistortionAmount(val)}
+                            label="Rate"
+                            value={vibratoRate}
+                            modifier={50}
+                            onUpdate={(val) => setVibratoRate(val)}
                         />
                     </KnobGrid>
                 </Module>
 
-                <Module label="Crush">
+                <Module label="Reverb">
                     <KnobGrid columns={1} rows={2}>
-                        <Knob
-                            label="Bit Depth"
-                            value={bitCrushDepth}
-                            modifier={14}
-                            resetValue={8}
-                            offset={2}
-                            isRounded
-                            onUpdate={(val) => setBitCrushDepth(val)}
+                        <Select
+                            label="Type"
+                            options={REVERB}
+                            value={reverbType}
+                            onUpdate={(val) => setReverbType(val)}
                         />
                         <Knob
                             label="Dry/Wet"
-                            value={bitCrushAmount}
-                            onUpdate={(val) => setBitCrushAmount(val)}
+                            value={reverbAmount}
+                            onUpdate={(val) => setReverbAmount(val)}
                         />
                     </KnobGrid>
                 </Module>
-
-                <InfoModule>
-                    <InfoContainer>
-                        <PopText>Preset</PopText>
-                        <InfoSelect
-                            value={currentPreset}
-                            onChange={(e) => {
-                                setCurrentPreset(e.target.value);
-                                e.target.blur();
-                            }}
-                        >
-                            {Object.keys(presetData).map((preset) => (
-                                <option key={`Preset_${preset}`} value={preset}>{preset}</option>
-                            ))}
-                        </InfoSelect>
-                    </InfoContainer>
-                    {/* <PeakMeter audioCtx={AC} sourceNode={masterGain} /> */}
-                    <InfoContainer>
-                        <PopText>- Theme -</PopText>
-                        <InfoSelect
-                            value={currentTheme}
-                            onChange={(e) => {
-                                setTheme(e.target.value);
-                                localStorage.setItem('PolySynth-Theme', e.target.value);
-                                e.target.blur();
-                            }}
-                        >
-                            {Object.keys(THEMES).map(theme => (
-                                <option key={`themes_${theme}`} value={theme}>{theme}</option>
-                            ))}
-                        </InfoSelect>
-                    </InfoContainer>
-                </InfoModule>
 
                 <Module label="Spectrum">
                     <SpectrumAnalyzer audioCtx={AC} sourceNode={masterGain} />
