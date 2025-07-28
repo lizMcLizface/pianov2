@@ -1,4 +1,4 @@
-import { Oscillator, Gain, Filter } from '../../nodes';
+import { Oscillator, Gain, Filter, NoiseGenerator, OscNoiseMixer } from '../../nodes';
 import { clamp, minTime } from '../../util/util';
 
 // Monophonic Synth Class
@@ -7,6 +7,8 @@ class MonoSynth {
         this.AC = AC;
 
         this.osc = new Oscillator(this.AC);
+        this.noiseGen = new NoiseGenerator(this.AC);
+        this.mixer = new OscNoiseMixer(this.AC);
         this.gain = new Gain(this.AC); // AHDSR Gain
         this.volume = new Gain(this.AC); // Volume
         this.filter = new Filter(this.AC);
@@ -22,13 +24,24 @@ class MonoSynth {
     }
 
     init() {
-        this.osc.connect(this.gain.getNode());
+        console.log('MonoSynth init - connecting audio nodes');
+        
+        // Connect oscillator and noise to mixer
+        this.mixer.connectOscillator(this.osc.getNode());
+        this.mixer.connectNoise(this.noiseGen.getNode());
+        
+        console.log('Connected osc and noise to mixer');
+        
+        // Connect mixer to gain and filter chain
+        this.mixer.connect(this.gain.getNode());
         this.gain.connect(this.filter.getNode());
         this.filter.connect(this.volume.getNode());
 
         this.volume.setGain(0.2);
         this.gain.setGain(0);
         this.osc.start();
+        
+        console.log('MonoSynth audio chain connected');
     }
 
     connect = (destination) => {
@@ -65,6 +78,20 @@ class MonoSynth {
     setFilterFreq = (val) => this.filter.setFreq(val);
     setFilterQ = (val) => this.filter.setQ(val);
     setFilterGain = (val) => this.filter.setGain(val);
+    
+    // Noise-related methods
+    setNoiseType = (type) => {
+        console.log('MonoSynth setNoiseType:', type);
+        this.noiseGen.setNoiseType(type);
+    };
+    setNoiseMix = (ratio) => {
+        console.log('MonoSynth setNoiseMix:', ratio);
+        this.mixer.setMixRatio(ratio);
+    };
+    setNoiseGain = (gain) => {
+        console.log('MonoSynth setNoiseGain:', gain);
+        this.noiseGen.setGain(gain);
+    };
 
     // Update frequency for microtonal adjustments
     updateNoteFrequency = (pitchEnv) => {

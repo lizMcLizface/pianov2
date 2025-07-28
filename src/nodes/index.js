@@ -13,6 +13,8 @@ import StereoPanner from './stereoPanner';
 import Flanger from './flanger';
 import Source from './source';
 import SignalGenerator from './signalGenerator';
+import NoiseGenerator from './noiseGenerator';
+import OscNoiseMixer from './oscNoiseMixer';
 
 export {
     Compressor,
@@ -30,4 +32,6 @@ export {
     Flanger,
     Source,
     SignalGenerator,
+    NoiseGenerator,
+    OscNoiseMixer,
 };

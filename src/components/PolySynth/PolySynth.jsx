@@ -11,7 +11,7 @@ import Spectrogram from './../Spectrogram';
 import SpectrumAnalyzer from './../SpectrumAnalyzer';
 import Select from './../Select';
 import presetData from '../../util/presetData';
-import { getNoteInfo, WAVEFORM, FILTER, REVERB, ENVELOPE_SHAPE } from '../../util/util';
+import { getNoteInfo, WAVEFORM, FILTER, REVERB, ENVELOPE_SHAPE, NOISE } from '../../util/util';
 import { THEMES } from '../../styles/themes';
 
 import {
@@ -152,6 +152,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [eqHighGain, setEqHighGain] = useState(0);
     const [eqLowFreq, setEqLowFreq] = useState(320);
     const [eqHighFreq, setEqHighFreq] = useState(3200);
+
+    // Noise state
+    const [noiseType, setNoiseType] = useState('white');
+    const [noiseMix, setNoiseMix] = useState(0);
 
     // Microtonal/Pitch Adjustment State (default 1.0 = no adjustment)
     const [pitchC, setPitchC] = useState(1.0);
@@ -741,6 +745,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setEqLowFreq(preset.eqLowFreq);
         setEqHighFreq(preset.eqHighFreq);
 
+        // Load noise settings with defaults
+        setNoiseType(preset.noiseType || 'white');
+        setNoiseMix(preset.noiseMix || 0);
+
         // Load envelope shape settings with defaults
         setEnvelopeAttackShape(preset.envelopeAttackShape || 'exponential');
         setEnvelopeDecayShape(preset.envelopeDecayShape || 'exponential');
@@ -794,6 +802,12 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
         if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
 
+        // Sync noise settings
+        synthArr.forEach((synth) => {
+            synth.setNoiseType(noiseType);
+            synth.setNoiseMix(noiseMix);
+        });
+
         if (masterDistortion.getAmount() !== distortionAmount) masterDistortion.setAmount(distortionAmount);
         if (masterDistortion.getDistortion() !== distortionDist) masterDistortion.setDistortion(distortionDist);
 
@@ -833,6 +847,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         bitCrushDepth, bitCrushAmount, eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
         flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
+        noiseMix, noiseType,
     ]);
 
     // Update frequencies of all playing notes when microtonal parameters change
@@ -873,6 +888,25 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             max={0.99}
                             disabled={vcoType !== 'square_dc'}
                             onUpdate={(val) => setVcoDutyCycle(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+                <Module label="Noise">
+                    <KnobGrid columns={1} rows={2}>
+                        <Select
+                            label="Type"
+                            options={NOISE}
+                            value={noiseType}
+                            onUpdate={(val) => setNoiseType(val)}
+                        />
+                        <Knob
+                            label="Mix"
+                            value={noiseMix}
+                            modifier={1}
+                            min={0}
+                            max={1}
+                            onUpdate={(val) => setNoiseMix(val)}
                         />
                     </KnobGrid>
                 </Module>

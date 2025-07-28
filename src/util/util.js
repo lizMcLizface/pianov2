@@ -78,6 +78,12 @@ export const REVERB = {
     reverb6: 'M 15 25 A 10 10 0 1 1 15 25.1',
 };
 
+export const NOISE = {
+    white: 'M 10 15 L 12 30 L 14 10 L 16 35 L 18 20 L 20 5 L 22 40 L 24 25 L 26 15 L 28 35 L 30 10 L 32 30 L 34 20 L 36 40 L 38 15 L 40 25',
+    pink: 'M 10 20 L 12 25 L 14 18 L 16 28 L 18 22 L 20 15 L 22 32 L 24 26 L 26 20 L 28 30 L 30 18 L 32 25 L 34 22 L 36 28 L 38 20 L 40 24',
+    brown: 'M 10 25 Q 12 22 14 24 Q 16 26 18 25 Q 20 23 22 26 Q 24 28 26 26 Q 28 24 30 25 Q 32 27 34 26 Q 36 24 38 25 Q 40 27 40 25',
+};
+
 export const ENVELOPE_SHAPE = {
     linear: 'M 10 34 L 40 16',
     exponential: 'M 10 34 Q 20 30 40 16',
