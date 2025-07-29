@@ -57,7 +57,7 @@ export const InfoModule = styled(Module)`
 `;
 
 export const MicrotonalModule = styled(Module)`
-    grid-column: 1 / -2;
+    grid-column: 2 / -2;
     width: 100%;
     max-width: none;
 `;

@@ -27,7 +27,42 @@ import {
     MicrotonalModule,
 } from './PolySynth.styled';
 
+
+// Arpeggiator mode SVG icons
+const ARPEGGIATOR_MODES = {
+    chord: 'M 12 15 L 12 35 M 20 15 L 20 35 M 28 15 L 28 35 M 36 15 L 36 35', // All notes at once (vertical lines)
+    up: 'M 12 35 L 20 28 L 28 21 L 36 14 M 32 18 L 36 14 L 32 10', // Arrow going up
+    down: 'M 12 14 L 20 21 L 28 28 L 36 35 M 32 31 L 36 35 L 32 39', // Arrow going down
+    upDown: 'M 12 35 L 20 21 L 28 14 L 36 21 M 32 17 L 36 21 L 32 25', // Up then down pattern
+    downUp: 'M 12 14 L 20 28 L 28 35 L 36 28 M 32 32 L 36 28 L 32 24', // Down then up pattern
+    random: 'M 12 30 L 16 15 L 20 35 L 24 20 L 28 25 L 32 10 L 36 32' // Random zigzag pattern
+};
+
+
 const BASE_CLASS_NAME = 'PolySynth';
+
+// Helper functions to convert between integer knob values and duration strings
+const integerToDurationString = (intValue) => {
+    const durationMap = {
+        '-2': 'sixteenth',
+        '-1': 'eighth',
+        '0': 'quarter',
+        '1': 'half',
+        '2': 'whole'
+    };
+    return durationMap[intValue.toString()] || 'quarter';
+};
+
+const durationStringToInteger = (durationString) => {
+    const integerMap = {
+        'sixteenth': -2,
+        'eighth': -1,
+        'quarter': 0,
+        'half': 1,
+        'whole': 2
+    };
+    return integerMap[durationString] || 0;
+};
 
 const AC = new AudioContext();
 const polyphony = 8;
@@ -224,8 +259,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [arpeggiatorMode, setArpeggiatorMode] = useState('chord'); // 'chord', 'up', 'down', 'random', 'upDown', 'downUp'
     const [arpeggiatorPlaying, setArpeggiatorPlaying] = useState(false);
     const arpeggiatorPlayingRef = useRef(false); // Immediate access to playing state
-    const [arpeggiatorDuration, setArpeggiatorDuration] = useState('quarter'); // 'whole', 'half', 'quarter', 'eighth', 'sixteenth'
-    const [arpeggiatorRate, setArpeggiatorRate] = useState('quarter'); // How often notes are triggered
+    const [arpeggiatorDuration, setArpeggiatorDuration] = useState(0); // Integer: -2=sixteenth, -1=eighth, 0=quarter, 1=half, 2=whole
+    const [arpeggiatorRate, setArpeggiatorRate] = useState(0); // Integer: -2=sixteenth, -1=eighth, 0=quarter, 1=half, 2=whole
     const arpeggiatorTimeoutId = useRef(null);
     const arpeggiatorCurrentIndex = useRef(0);
     const arpeggiatorDirection = useRef(1); // 1 for up, -1 for down (used for upDown/downUp modes)
@@ -532,19 +567,19 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (result.notes) {
             // Chord mode - play all notes at once
             console.log('🎹 Playing chord:', result.notes);
-            playNotesProgrammatic(result.notes, 70, getDurationInMs(arpeggiatorDuration));
+            playNotesProgrammatic(result.notes, 70, getDurationInMs(integerToDurationString(arpeggiatorDuration)));
         } else if (result.note) {
             // Single note mode - allow overlapping for proper musical timing
             console.log('🎵 Playing note:', result.note);
             
-            playNotesProgrammatic([result.note], 70, getDurationInMs(arpeggiatorDuration));
+            playNotesProgrammatic([result.note], 70, getDurationInMs(integerToDurationString(arpeggiatorDuration)));
         }
         
         // Schedule the next note based on rate
         try {
             metronome.initializeAudioContext();
             metronome.updateAudioContextOffset(); // Ensure audio context offset is set
-            const nextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+            const nextNoteTime = metronome.getNextNoteTime(integerToDurationString(arpeggiatorRate));
             const currentTime = metronome.getCurrentTime();
             const delay = Math.max(0, (nextNoteTime - currentTime) * 1000); // Convert to milliseconds
             
@@ -556,7 +591,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 // Wait for the small delay, then get the next proper beat timing
                 setTimeout(() => {
                     try {
-                        const newNextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+                        const newNextNoteTime = metronome.getNextNoteTime(integerToDurationString(arpeggiatorRate));
                         const newCurrentTime = metronome.getCurrentTime();
                         const newDelay = Math.max(0, (newNextNoteTime - newCurrentTime) * 1000);
                         
@@ -567,7 +602,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         }, newDelay);
                     } catch (error) {
                         console.error('❌ Error rescheduling arpeggiator note:', error);
-                        const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+                        const fallbackDelay = getRawDurationInMs(integerToDurationString(arpeggiatorRate));
                         console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
                         arpeggiatorTimeoutId.current = setTimeout(() => {
                             scheduleNextArpeggiatorNote();
@@ -584,7 +619,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         } catch (error) {
             console.error('❌ Error scheduling next arpeggiator note:', error);
             // Fallback to simple timing based on BPM
-            const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+            const fallbackDelay = getRawDurationInMs(integerToDurationString(arpeggiatorRate));
             console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
             arpeggiatorTimeoutId.current = setTimeout(() => {
                 scheduleNextArpeggiatorNote();
@@ -618,7 +653,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         try {
             metronome.initializeAudioContext();
             metronome.updateAudioContextOffset(); // Ensure audio context offset is set
-            const nextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+            const nextNoteTime = metronome.getNextNoteTime(integerToDurationString(arpeggiatorRate));
             const currentTime = metronome.getCurrentTime();
             const delay = Math.max(0, (nextNoteTime - currentTime) * 1000); // Convert to milliseconds
             
@@ -630,7 +665,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 // Wait for the small delay, then get the next proper beat timing
                 setTimeout(() => {
                     try {
-                        const newNextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+                        const newNextNoteTime = metronome.getNextNoteTime(integerToDurationString(arpeggiatorRate));
                         const newCurrentTime = metronome.getCurrentTime();
                         const newDelay = Math.max(0, (newNextNoteTime - newCurrentTime) * 1000);
                         
@@ -641,7 +676,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         }, newDelay);
                     } catch (error) {
                         console.error('❌ Error rescheduling arpeggiator start:', error);
-                        const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+                        const fallbackDelay = getRawDurationInMs(integerToDurationString(arpeggiatorRate));
                         console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
                         arpeggiatorTimeoutId.current = setTimeout(() => {
                             scheduleNextArpeggiatorNote();
@@ -658,7 +693,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         } catch (error) {
             console.error('❌ Error scheduling next arpeggiator note on beat:', error);
             // Fallback to simple timing based on BPM
-            const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+            const fallbackDelay = getRawDurationInMs(integerToDurationString(arpeggiatorRate));
             console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
             arpeggiatorTimeoutId.current = setTimeout(() => {
                 scheduleNextArpeggiatorNote();
@@ -1199,13 +1234,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         handleArpeggiatorTranspose,
         stopTransposedNotes,
         setArpeggiatorMode: (mode) => setArpeggiatorMode(mode),
-        setArpeggiatorDuration: (duration) => setArpeggiatorDuration(duration),
-        setArpeggiatorRate: (rate) => setArpeggiatorRate(rate),
+        setArpeggiatorDuration: (duration) => setArpeggiatorDuration(typeof duration === 'string' ? durationStringToInteger(duration) : duration),
+        setArpeggiatorRate: (rate) => setArpeggiatorRate(typeof rate === 'string' ? durationStringToInteger(rate) : rate),
         getArpeggiatorState: () => ({
             mode: arpeggiatorMode,
             playing: arpeggiatorPlayingRef.current,
-            duration: arpeggiatorDuration,
-            rate: arpeggiatorRate,
+            duration: integerToDurationString(arpeggiatorDuration),
+            rate: integerToDurationString(arpeggiatorRate),
             currentChord: arpeggiatorCurrentChord.current
         })
     }), [synthActive, pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
@@ -1962,301 +1997,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
-
-                <Module label="Chord Mode">
+                
+                <Module label="Information">
                     <KnobGrid columns={2} rows={1}>
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <button
-                                onClick={() => {
-                                    if (!chordModeCapture) {
-                                        // Get currently active notes from the global noteArray in index.js
-                                        const currentNotes = window.noteArray ? Object.keys(window.noteArray) : [];
-                                        setChordModeCapture(true);
-                                        chordModeCaptureRef.current = true; // Update ref immediately
-                                        startChordCapture(currentNotes);
-                                    } else {
-                                        // Cancel capture mode
-                                        console.log('❌ Cancelling chord capture mode');
-                                        setChordModeCapture(false);
-                                        chordModeCaptureRef.current = false; // Update ref immediately
-                                        isCapturing.current = false;
-                                        if (chordCaptureTimeout.current) {
-                                            clearTimeout(chordCaptureTimeout.current);
-                                            chordCaptureTimeout.current = null;
-                                        }
-                                    }
-                                }}
-                                style={{
-                                    padding: '8px 12px',
-                                    fontSize: '11px',
-                                    border: `2px solid ${chordModeCapture ? '#FF6B35' : '#666'}`,
-                                    borderRadius: '4px',
-                                    background: chordModeCapture ? '#FF6B35' : '#333',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                    minWidth: '60px',
-                                    fontWeight: 'bold'
-                                }}
-                                onMouseOver={(e) => {
-                                    if (chordModeCapture) {
-                                        e.target.style.background = '#E55A2B';
-                                    } else {
-                                        e.target.style.background = '#555';
-                                    }
-                                }}
-                                onMouseOut={(e) => {
-                                    e.target.style.background = chordModeCapture ? '#FF6B35' : '#333';
-                                }}
-                            >
-                                {chordModeCapture ? (isCapturing.current ? 'WAITING...' : 'CANCEL') : 'CAPTURE'}
-                            </button>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                {capturedChord.length > 0 ? `${capturedChord.length} notes` : 'No chord'}
-                            </span>
-                        </div>
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <button
-                                onClick={() => {
-                                    const newTransposeState = !chordModeTranspose;
-                                    console.log('🎛️ Transpose button clicked, current state:', chordModeTranspose);
-                                    console.log('🎛️ Captured chord:', capturedChord);
-                                    setChordModeTranspose(newTransposeState);
-                                    chordModeTransposeRef.current = newTransposeState; // Update ref immediately
-                                    console.log('🎛️ New transpose state will be:', newTransposeState);
-                                }}
-                                disabled={capturedChord.length === 0}
-                                style={{
-                                    padding: '8px 12px',
-                                    fontSize: '11px',
-                                    border: `2px solid ${chordModeTranspose ? '#4CAF50' : '#666'}`,
-                                    borderRadius: '4px',
-                                    background: chordModeTranspose ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
-                                    color: capturedChord.length === 0 ? '#666' : '#fff',
-                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
-                                    fontFamily: 'inherit',
-                                    minWidth: '60px',
-                                    fontWeight: 'bold',
-                                    opacity: capturedChord.length === 0 ? 0.5 : 1
-                                }}
-                                onMouseOver={(e) => {
-                                    if (capturedChord.length === 0) return;
-                                    if (chordModeTranspose) {
-                                        e.target.style.background = '#45a049';
-                                    } else {
-                                        e.target.style.background = '#555';
-                                    }
-                                }}
-                                onMouseOut={(e) => {
-                                    if (capturedChord.length === 0) return;
-                                    e.target.style.background = chordModeTranspose ? '#4CAF50' : '#333';
-                                }}
-                            >
-                                {chordModeTranspose ? 'ON' : 'OFF'}
-                            </button>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Transpose
-                            </span>
-                        </div>
-                    </KnobGrid>
-                </Module>
-
-                {/* Arpeggiator Module */}
-                <Module label="Arpeggiator">
-                    <KnobGrid columns={4}>
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <select
-                                value={arpeggiatorMode}
-                                onChange={(e) => setArpeggiatorMode(e.target.value)}
-                                style={{
-                                    padding: '4px 8px',
-                                    fontSize: '10px',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    background: '#333',
-                                    color: '#fff',
-                                    fontFamily: 'inherit',
-                                    minWidth: '80px'
-                                }}
-                            >
-                                <option value="chord">Chord</option>
-                                <option value="up">Up</option>
-                                <option value="down">Down</option>
-                                <option value="upDown">Up-Down</option>
-                                <option value="downUp">Down-Up</option>
-                                <option value="random">Random</option>
-                            </select>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Mode
-                            </span>
-                        </div>
-                        
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <select
-                                value={arpeggiatorRate}
-                                onChange={(e) => setArpeggiatorRate(e.target.value)}
-                                style={{
-                                    padding: '4px 8px',
-                                    fontSize: '10px',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    background: '#333',
-                                    color: '#fff',
-                                    fontFamily: 'inherit',
-                                    minWidth: '80px'
-                                }}
-                            >
-                                <option value="whole">Whole</option>
-                                <option value="half">Half</option>
-                                <option value="quarter">Quarter</option>
-                                <option value="eighth">Eighth</option>
-                                <option value="sixteenth">16th</option>
-                            </select>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Rate
-                            </span>
-                        </div>
-                        
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <select
-                                value={arpeggiatorDuration}
-                                onChange={(e) => setArpeggiatorDuration(e.target.value)}
-                                style={{
-                                    padding: '4px 8px',
-                                    fontSize: '10px',
-                                    border: '1px solid #666',
-                                    borderRadius: '4px',
-                                    background: '#333',
-                                    color: '#fff',
-                                    fontFamily: 'inherit',
-                                    minWidth: '80px'
-                                }}
-                            >
-                                <option value="whole">Whole</option>
-                                <option value="half">Half</option>
-                                <option value="quarter">Quarter</option>
-                                <option value="eighth">Eighth</option>
-                                <option value="sixteenth">16th</option>
-                            </select>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Duration
-                            </span>
-                        </div>
-                        
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <button
-                                onClick={toggleArpeggiator}
-                                disabled={capturedChord.length === 0}
-                                style={{
-                                    padding: '8px 12px',
-                                    fontSize: '11px',
-                                    border: `2px solid ${arpeggiatorPlaying ? '#4CAF50' : '#666'}`,
-                                    borderRadius: '4px',
-                                    background: arpeggiatorPlaying ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
-                                    color: capturedChord.length === 0 ? '#666' : '#fff',
-                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
-                                    fontFamily: 'inherit',
-                                    minWidth: '60px',
-                                    fontWeight: 'bold',
-                                    opacity: capturedChord.length === 0 ? 0.5 : 1
-                                }}
-                                onMouseOver={(e) => {
-                                    if (capturedChord.length === 0) return;
-                                    if (arpeggiatorPlaying) {
-                                        e.target.style.background = '#45a049';
-                                    } else {
-                                        e.target.style.background = '#555';
-                                    }
-                                }}
-                                onMouseOut={(e) => {
-                                    if (capturedChord.length === 0) return;
-                                    e.target.style.background = arpeggiatorPlaying ? '#4CAF50' : '#333';
-                                }}
-                            >
-                                {arpeggiatorPlaying ? 'STOP' : 'PLAY'}
-                            </button>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Play/Stop
-                            </span>
-                        </div>
-                    </KnobGrid>
-                </Module>
-
-                <InfoModule>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'space-between' }}>
-                        <InfoContainer style={{ marginBottom: 0 }}>
                             <Knob
                                 label="Master Vol"
                                 value={masterVolume}
                                 onUpdate={(val) => setMasterVolume(val)}
                             />
-                        </InfoContainer>
                         <InfoContainer style={{ marginBottom: 0 }}>
                             <PopText>Preset</PopText>
                             <InfoSelect
@@ -2286,9 +2034,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                 ))}
                             </InfoSelect>
                         </InfoContainer>
-                    </div>
-                    {/* <PeakMeter audioCtx={AC} sourceNode={masterGain} /> */}
-                </InfoModule>
+                    </KnobGrid>
+                </Module>
+
+
 
 
                 <Module label="Voicing">
@@ -2612,8 +2361,226 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+
                 <Module label="Spectrum">
                     <SpectrumAnalyzer audioCtx={AC} sourceNode={masterGain} />
+                </Module>
+                
+                {/* Arpeggiator Module */}
+                <Module label="Arpeggiator">
+                    <KnobGrid columns={3}>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <Select
+                                label="Mode"
+                                options={ARPEGGIATOR_MODES}
+                                value={arpeggiatorMode}
+                                onUpdate={(val) => setArpeggiatorMode(val)}
+                            />
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <Knob
+                                label="Rate"
+                                value={arpeggiatorRate}
+                                modifier={4}
+                                offset={-2}
+                                decimalPlaces={0}
+                                onUpdate={(val) => setArpeggiatorRate(Math.round(val))}
+                            />
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <Knob
+                                label="Duration"
+                                value={arpeggiatorDuration}
+                                modifier={4}
+                                offset={-2}
+                                decimalPlaces={0}
+                                onUpdate={(val) => setArpeggiatorDuration(Math.round(val))}
+                            />
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    if (!chordModeCapture) {
+                                        // Get currently active notes from the global noteArray in index.js
+                                        const currentNotes = window.noteArray ? Object.keys(window.noteArray) : [];
+                                        setChordModeCapture(true);
+                                        chordModeCaptureRef.current = true; // Update ref immediately
+                                        startChordCapture(currentNotes);
+                                    } else {
+                                        // Cancel capture mode
+                                        console.log('❌ Cancelling chord capture mode');
+                                        setChordModeCapture(false);
+                                        chordModeCaptureRef.current = false; // Update ref immediately
+                                        isCapturing.current = false;
+                                        if (chordCaptureTimeout.current) {
+                                            clearTimeout(chordCaptureTimeout.current);
+                                            chordCaptureTimeout.current = null;
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${chordModeCapture ? '#FF6B35' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: chordModeCapture ? '#FF6B35' : '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => {
+                                    if (chordModeCapture) {
+                                        e.target.style.background = '#E55A2B';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    e.target.style.background = chordModeCapture ? '#FF6B35' : '#333';
+                                }}
+                            >
+                                {chordModeCapture ? (isCapturing.current ? 'WAITING...' : 'CANCEL') : 'CAPTURE'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                {capturedChord.length > 0 ? `${capturedChord.length} notes` : 'No chord'}
+                            </span>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    const newTransposeState = !chordModeTranspose;
+                                    console.log('🎛️ Transpose button clicked, current state:', chordModeTranspose);
+                                    console.log('🎛️ Captured chord:', capturedChord);
+                                    setChordModeTranspose(newTransposeState);
+                                    chordModeTransposeRef.current = newTransposeState; // Update ref immediately
+                                    console.log('🎛️ New transpose state will be:', newTransposeState);
+                                }}
+                                disabled={capturedChord.length === 0}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${chordModeTranspose ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: chordModeTranspose ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
+                                    color: capturedChord.length === 0 ? '#666' : '#fff',
+                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold',
+                                    opacity: capturedChord.length === 0 ? 0.5 : 1
+                                }}
+                                onMouseOver={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    if (chordModeTranspose) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    e.target.style.background = chordModeTranspose ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {chordModeTranspose ? 'ON' : 'OFF'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Transpose
+                            </span>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={toggleArpeggiator}
+                                disabled={capturedChord.length === 0}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${arpeggiatorPlaying ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: arpeggiatorPlaying ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
+                                    color: capturedChord.length === 0 ? '#666' : '#fff',
+                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold',
+                                    opacity: capturedChord.length === 0 ? 0.5 : 1
+                                }}
+                                onMouseOver={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    if (arpeggiatorPlaying) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    e.target.style.background = arpeggiatorPlaying ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {arpeggiatorPlaying ? 'STOP' : 'PLAY'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Play/Stop
+                            </span>
+                        </div>
+                    </KnobGrid>
                 </Module>
 
                 {/* <Lines /> */}
