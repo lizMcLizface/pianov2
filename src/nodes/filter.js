@@ -39,9 +39,11 @@ class Filter {
             ? this.node.frequency.setTargetAtTime(freq, this.AC.currentTime, time)
             : this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
     }
-    setQ = q => {
+    setQ = (q, time = 0) => {
         if (q < 0 || q > MAX_Q) return false;
-        this.node.Q.setValueAtTime(q, this.AC.currentTime);
+        time
+            ? this.node.Q.setTargetAtTime(q, this.AC.currentTime, time)
+            : this.node.Q.setValueAtTime(q, this.AC.currentTime);
     }
     setGain = val => {
         this.node.gain.setValueAtTime(val, this.AC.currentTime);

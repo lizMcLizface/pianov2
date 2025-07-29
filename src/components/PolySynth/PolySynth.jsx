@@ -913,16 +913,31 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         });
     }, [voiceCount, detuneSpread, stereoSpread]);
 
+    // Split noise updates to avoid unnecessary operations
     useLayoutEffect(() => {
-        scheduleParameterUpdate('noise', () => {
+        scheduleParameterUpdate('noiseType', () => {
             synthArr.forEach((synth) => {
                 synth.setNoiseType(noiseType);
+            });
+        });
+    }, [noiseType]);
+
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('noiseMix', () => {
+            synthArr.forEach((synth) => {
                 synth.setNoiseMix(noiseMix);
+            });
+        });
+    }, [noiseMix]);
+
+    useLayoutEffect(() => {
+        scheduleParameterUpdate('noiseFilter', () => {
+            synthArr.forEach((synth) => {
                 synth.setNoiseFilterEnabled(noiseFilterEnabled);
                 synth.setNoiseFilterQ(noiseFilterQ);
             });
         });
-    }, [noiseType, noiseMix, noiseFilterEnabled, noiseFilterQ]);
+    }, [noiseFilterEnabled, noiseFilterQ]);
 
     useLayoutEffect(() => {
         scheduleParameterUpdate('effects', () => {

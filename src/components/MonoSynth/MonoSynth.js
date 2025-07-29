@@ -30,6 +30,9 @@ class MonoSynth {
         
         this.noiseGen = new NoiseGenerator(this.AC);
         this.noiseFilter = new Filter(this.AC); // Bandpass filter for noise
+        this.noiseFilterBypassGain = new Gain(this.AC); // For true bypass
+        this.noiseFilterGain = new Gain(this.AC); // For filtered path
+        this.noiseMixerOutput = new Gain(this.AC); // Combines filtered and bypass paths
         this.mixer = new OscNoiseMixer(this.AC);
         this.gain = new Gain(this.AC); // AHDSR Gain
         this.volume = new Gain(this.AC); // Volume
@@ -248,25 +251,30 @@ class MonoSynth {
     init() {
         console.log('MonoSynth init - connecting audio nodes');
         
-        // Set up noise filter as bandpass with bypass capability
+        // Set up noise filter as bandpass
         this.noiseFilter.setType('bandpass');
         this.noiseFilter.setFreq(440); // Default frequency
         this.noiseFilter.setQ(this.noiseFilterQ);
         
-        // Create a static audio routing that doesn't change:
-        // Noise -> NoiseFilter -> Mixer (always)
-        // We'll control the bypass via the filter's gain instead of reconnecting
-        this.noiseGen.connect(this.noiseFilter.getNode());
+        // Proper routing: NoiseGen -> [Split to Filter AND Bypass paths] -> NoiseMixerOutput -> Mixer
+        // Connect noise to both filter and bypass paths (they're controlled by gain nodes)
+        this.noiseGen.connect(this.noiseFilter.getNode()); // Goes to filter path
+        this.noiseFilter.connect(this.noiseFilterGain.getNode());
+        this.noiseFilterGain.connect(this.noiseMixerOutput.getNode());
+        
+        // Also connect noise directly to bypass path
+        this.noiseGen.connect(this.noiseFilterBypassGain.getNode()); // Direct bypass path
+        this.noiseFilterBypassGain.connect(this.noiseMixerOutput.getNode());
         
         // Connect main oscillators and sub oscillators to main oscillator mixer
         this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         this.subOscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         
-        // Connect main oscillator mixer and filtered noise to main mixer
+        // Connect main oscillator mixer and combined noise to main mixer
         this.mixer.connectOscillator(this.mainOscillatorMixer.getNode());
-        this.mixer.connectNoise(this.noiseFilter.getNode());
+        this.mixer.connectNoise(this.noiseMixerOutput.getNode());
         
-        console.log('Connected oscillator mixers and filtered noise to mixer');
+        console.log('Connected oscillator mixers and noise paths to mixer');
         
         // Start all main oscillators
         this.oscillators.forEach(osc => {
@@ -414,7 +422,15 @@ class MonoSynth {
     };
     setNoiseMix = (ratio) => {
         // console.log('MonoSynth setNoiseMix:', ratio);
-        this.mixer.setMixRatio(ratio);
+        try {
+            if (typeof ratio !== 'number' || !isFinite(ratio)) {
+                console.warn('MonoSynth: Invalid noise mix ratio:', ratio);
+                return;
+            }
+            this.mixer.setMixRatio(ratio);
+        } catch (error) {
+            console.error('MonoSynth: Error setting noise mix:', error);
+        }
     };
     setNoiseGain = (gain) => {
         // console.log('MonoSynth setNoiseGain:', gain);
@@ -429,20 +445,31 @@ class MonoSynth {
     
     setNoiseFilterQ = (q) => {
         this.noiseFilterQ = q;
-        this.noiseFilter.setQ(q);
+        if (this.noiseFilterEnabled) {
+            // Only update Q if filter is enabled, use smooth transition
+            this.noiseFilter.setQ(q, 0.01); // 10ms ramp
+        }
     };
     
     updateNoiseFilterBypass = () => {
+        const rampTime = 0.01; // 10ms ramp to prevent pops
+        const currentTime = this.AC.currentTime;
+        
         if (this.noiseFilterEnabled) {
-            // Enable filtering - set normal Q and frequency
-            this.noiseFilter.setQ(this.noiseFilterQ);
+            // Enable filtering - route through filter
+            this.noiseFilterGain.setGain(1, rampTime);
+            this.noiseFilterBypassGain.setGain(0, rampTime);
+            
+            // Set filter parameters
+            this.noiseFilter.setQ(this.noiseFilterQ, rampTime);
             this.updateNoiseFilterFrequency();
         } else {
-            // Bypass filtering - set very low Q and wide frequency to make filter transparent
-            this.noiseFilter.setQ(0.1); // Very low Q = very wide, transparent filter
-            this.noiseFilter.setFreq(1000); // Mid frequency when bypassed
+            // Bypass filtering - route directly
+            this.noiseFilterGain.setGain(0, rampTime);
+            this.noiseFilterBypassGain.setGain(1, rampTime);
         }
-        // console.log('Noise filter', this.noiseFilterEnabled ? 'enabled' : 'bypassed');
+        
+        console.log('Noise filter', this.noiseFilterEnabled ? 'enabled' : 'bypassed');
     };
     
     updateNoiseFilterFrequency = () => {

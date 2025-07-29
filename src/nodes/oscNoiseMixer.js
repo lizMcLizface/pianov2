@@ -20,21 +20,45 @@ class OscNoiseMixer {
     
     // Connect noise generator to mixer
     connectNoise(noiseNode) {
-        console.log('Mixer: connecting noise generator');
-        noiseNode.connect(this.noiseGain);
+        try {
+            console.log('Mixer: connecting noise generator');
+            if (!noiseNode) {
+                console.warn('OscNoiseMixer: Attempted to connect null noise node');
+                return;
+            }
+            noiseNode.connect(this.noiseGain);
+        } catch (error) {
+            console.error('OscNoiseMixer: Failed to connect noise node:', error);
+        }
     }
     
     // Set the mix ratio (0 = all oscillator, 1 = all noise)
     setMixRatio(ratio) {
+        // Prevent multiple rapid changes and invalid values
+        if (typeof ratio !== 'number' || !isFinite(ratio)) {
+            console.warn('Invalid mix ratio:', ratio);
+            return;
+        }
+        
         const clampedRatio = Math.max(0, Math.min(1, ratio));
         
         // Use equal power crossfade for smoother mixing
         const oscGain = Math.cos(clampedRatio * Math.PI / 2);
         const noiseGain = Math.sin(clampedRatio * Math.PI / 2);
         
+        // Validate calculated gains
+        if (!isFinite(oscGain) || !isFinite(noiseGain)) {
+            console.warn('Invalid calculated gains:', { oscGain, noiseGain, ratio: clampedRatio });
+            return;
+        }
+        
         try {
-            this.oscGain.gain.setValueAtTime(oscGain, this.AC.currentTime);
-            this.noiseGain.gain.setValueAtTime(noiseGain, this.AC.currentTime);
+            // Use a small ramp time to prevent clicks
+            const rampTime = 0.005; // 5ms
+            const currentTime = this.AC.currentTime;
+            
+            this.oscGain.gain.setTargetAtTime(oscGain, currentTime, rampTime);
+            this.noiseGain.gain.setTargetAtTime(noiseGain, currentTime, rampTime);
         } catch (error) {
             console.warn('Error setting mix ratio:', error, { ratio, oscGain, noiseGain });
         }

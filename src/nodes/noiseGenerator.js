@@ -8,6 +8,7 @@ class NoiseGenerator {
         this.usingFallback = false;
         this.silentGain = null; // Track silent connection for cleanup
         this.isChangingType = false; // Prevent race conditions
+        this.lastTypeChange = 0; // Timestamp to prevent rapid changes
         
         // Start with fallback immediately, then upgrade to worklet if available
         this.initializeFallback();
@@ -147,20 +148,43 @@ class NoiseGenerator {
     }
     
     setNoiseType(type) {
-        // Prevent race conditions
+        // Prevent race conditions and unnecessary changes
         if (this.isChangingType) {
             console.log('NoiseGenerator: Type change already in progress, ignoring');
             return;
         }
         
+        // Throttle rapid changes (minimum 50ms between changes)
+        const now = Date.now();
+        if (now - this.lastTypeChange < 50) {
+            console.log('NoiseGenerator: Type change too rapid, ignoring');
+            return;
+        }
+        this.lastTypeChange = now;
+        
+        // Don't recreate node if type hasn't changed
+        if (this.currentNoiseType === type && this.isInitialized) {
+            console.log('NoiseGenerator: Type unchanged, skipping recreation');
+            return;
+        }
+        
+        const oldType = this.currentNoiseType;
         this.currentNoiseType = type;
         
         if (!this.isInitialized) {
             return;
         }
         
+        console.log(`NoiseGenerator: Changing type from ${oldType} to ${type}`);
         this.isChangingType = true;
         
+        // Add small delay to prevent rapid changes
+        setTimeout(() => {
+            this.performTypeChange(type);
+        }, 10);
+    }
+    
+    performTypeChange(type) {
         try {
             // Clean up current node
             this.cleanupCurrentNode();
@@ -182,9 +206,10 @@ class NoiseGenerator {
             
             this.workletNode.connect(this.gainNode);
             this.usingFallback = false;
+            console.log(`NoiseGenerator: Successfully created ${type} worklet`);
         } catch (error) {
             // Fall back to ScriptProcessorNode if worklet fails
-            console.log('Worklet failed, using fallback for noise type:', type);
+            console.log('Worklet failed, using fallback for noise type:', type, error);
             this.initializeFallback();
         } finally {
             this.isChangingType = false;
