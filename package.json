@@ -15,7 +15,9 @@
   },
   "scripts": {
     "predeploy": "npm run build",
-    "deploy": "echo 'liz.moe' > ./build/CNAME && gh-pages -d build",
+    "deploy": "npm run deploy:cname && npm run deploy:gh-pages",
+    "deploy:cname": "echo liz.moe > ./build/CNAME",
+    "deploy:gh-pages": "gh-pages -d build",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
