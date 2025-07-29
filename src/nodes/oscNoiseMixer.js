@@ -32,21 +32,37 @@ class OscNoiseMixer {
         const oscGain = Math.cos(clampedRatio * Math.PI / 2);
         const noiseGain = Math.sin(clampedRatio * Math.PI / 2);
         
-        this.oscGain.gain.setValueAtTime(oscGain, this.AC.currentTime);
-        this.noiseGain.gain.setValueAtTime(noiseGain, this.AC.currentTime);
+        try {
+            this.oscGain.gain.setValueAtTime(oscGain, this.AC.currentTime);
+            this.noiseGain.gain.setValueAtTime(noiseGain, this.AC.currentTime);
+        } catch (error) {
+            console.warn('Error setting mix ratio:', error, { ratio, oscGain, noiseGain });
+        }
     }
     
     // Set overall output level
     setOutputGain(gain) {
-        this.outputGain.gain.setValueAtTime(gain, this.AC.currentTime);
+        try {
+            this.outputGain.gain.setValueAtTime(gain, this.AC.currentTime);
+        } catch (error) {
+            console.warn('Error setting output gain:', error);
+        }
     }
     
     connect(destination) {
-        this.outputGain.connect(destination);
+        try {
+            this.outputGain.connect(destination);
+        } catch (error) {
+            console.warn('Error connecting mixer output:', error);
+        }
     }
     
     disconnect() {
-        this.outputGain.disconnect();
+        try {
+            this.outputGain.disconnect();
+        } catch (error) {
+            console.warn('Error disconnecting mixer output:', error);
+        }
     }
     
     getNode() {

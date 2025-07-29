@@ -913,6 +913,48 @@ class MonoSynth {
             }
         });
     }
+    
+    // Cleanup method to properly dispose of resources
+    destroy() {
+        // Clear any running timeouts
+        this.clearTimeouts();
+        
+        // Stop any playing notes
+        this.noteStop();
+        
+        // Destroy noise generator
+        if (this.noiseGen) {
+            this.noiseGen.destroy();
+        }
+        
+        // Clean up oscillators
+        this.oscillators.forEach(osc => {
+            try {
+                osc.disconnect();
+            } catch (e) {
+                console.warn('Error disconnecting oscillator:', e);
+            }
+        });
+        
+        // Clean up sub oscillators
+        this.subOscillators.forEach(subOsc => {
+            try {
+                subOsc.disconnect();
+            } catch (e) {
+                console.warn('Error disconnecting sub oscillator:', e);
+            }
+        });
+        
+        // Clean up audio nodes
+        try {
+            this.mixer.disconnect();
+            this.gain.disconnect();
+            this.filter.disconnect();
+            this.volume.disconnect();
+        } catch (e) {
+            console.warn('Error disconnecting audio nodes:', e);
+        }
+    }
 }
 
 export default MonoSynth;

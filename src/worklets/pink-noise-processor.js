@@ -15,8 +15,16 @@ class PinkNoiseProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const output = outputs[0];
         
+        if (!output || output.length === 0) {
+            return true;
+        }
+        
         for (let channel = 0; channel < output.length; channel++) {
             const outputChannel = output[channel];
+            
+            if (!outputChannel) {
+                continue;
+            }
             
             for (let i = 0; i < outputChannel.length; i++) {
                 // Generate white noise
@@ -33,8 +41,17 @@ class PinkNoiseProcessor extends AudioWorkletProcessor {
                 const pink = this.b0 + this.b1 + this.b2 + this.b3 + this.b4 + this.b5 + this.b6 + white * 0.5362;
                 this.b6 = white * 0.115926;
                 
+                // Safety check for NaN/Infinity
+                const safeOutput = isFinite(pink) ? pink * 0.11 : 0;
+                
                 // Scale to roughly match white noise amplitude
-                outputChannel[i] = pink * 0.11;
+                outputChannel[i] = safeOutput;
+                
+                // Reset filter state if any component becomes non-finite
+                if (!isFinite(this.b0) || !isFinite(this.b1) || !isFinite(this.b2) || 
+                    !isFinite(this.b3) || !isFinite(this.b4) || !isFinite(this.b5) || !isFinite(this.b6)) {
+                    this.b0 = this.b1 = this.b2 = this.b3 = this.b4 = this.b5 = this.b6 = 0;
+                }
             }
         }
         

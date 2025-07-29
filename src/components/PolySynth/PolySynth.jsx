@@ -722,6 +722,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             synthArr.forEach(synth => {
                 synth.clearTimeouts();
                 synth.noteStop();
+                // Properly clean up each synth instance
+                if (synth.destroy) {
+                    synth.destroy();
+                }
             });
         };
     }, []);
