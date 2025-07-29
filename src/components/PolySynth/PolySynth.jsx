@@ -209,6 +209,16 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [filterEnvelopeDecayExponent, setFilterEnvelopeDecayExponent] = useState(2);
     const [filterEnvelopeReleaseExponent, setFilterEnvelopeReleaseExponent] = useState(2);
 
+    // Chord Mode State
+    const [chordModeCapture, setChordModeCapture] = useState(false);
+    const chordModeCaptureRef = useRef(false); // Immediate access to capture state
+    const [chordModeTranspose, setChordModeTranspose] = useState(false);
+    const chordModeTransposeRef = useRef(false); // Immediate access to transpose state
+    const [capturedChord, setCapturedChord] = useState([]);
+    const capturedChordRef = useRef([]); // Immediate access to captured chord
+    const chordCaptureTimeout = useRef(null);
+    const isCapturing = useRef(false);
+
     const octaveUp = () => {
         if (octaveMod < 7) {
             setOctaveMod(octaveMod + 1);
@@ -243,6 +253,152 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
     const resetSynthPos = () => synthPos = 0;
     const incrementSynthPos = () => synthPos = (synthPos + 1) % polyphonyGlobal;
+
+    // Chord Mode Functions
+    const startChordCapture = (currentNotes = []) => {
+        console.log('Starting chord capture with current notes:', currentNotes);
+        console.log('📝 Current notes detailed:', currentNotes.map(note => ({ 
+            original: note, 
+            parsed: parseNoteString(note) 
+        })));
+        isCapturing.current = true;
+        
+        if (currentNotes.length > 0) {
+            // If notes are currently held, capture them immediately
+            setCapturedChord([...currentNotes]);
+            capturedChordRef.current = [...currentNotes]; // Update ref immediately
+            setChordModeCapture(false);
+            chordModeCaptureRef.current = false; // Update ref immediately
+            isCapturing.current = false;
+            console.log('Captured chord immediately:', currentNotes);
+        } else {
+            // Clear any existing timeout
+            if (chordCaptureTimeout.current) {
+                clearTimeout(chordCaptureTimeout.current);
+            }
+            
+            console.log('Chord capture mode active - waiting for input...');
+            // Don't set a timeout here - let it latch until we get actual input
+        }
+    };
+
+    const handleChordCapture = (pressedNotes) => {
+        if (!isCapturing.current) return false;
+        
+        console.log('handleChordCapture called with notes:', pressedNotes);
+        console.log('📝 Pressed notes detailed:', pressedNotes.map(note => ({ 
+            original: note, 
+            parsed: parseNoteString(note) 
+        })));
+        
+        // Clear any existing timeout
+        if (chordCaptureTimeout.current) {
+            clearTimeout(chordCaptureTimeout.current);
+        }
+        
+        if (pressedNotes.length > 0) {
+            // Set timeout to capture the chord 100ms after the last key activity
+            // This gives time for the user to complete their chord input
+            chordCaptureTimeout.current = setTimeout(() => {
+                if (pressedNotes.length > 0) {
+                    setCapturedChord([...pressedNotes]);
+                    capturedChordRef.current = [...pressedNotes]; // Update ref immediately
+                    isCapturing.current = false;
+                    setChordModeCapture(false);
+                    chordModeCaptureRef.current = false; // Update ref immediately
+                    console.log('✅ Captured chord after timeout:', pressedNotes);
+                } else {
+                    console.log('No notes to capture, staying in capture mode');
+                }
+            }, 100);
+        } else {
+            // If no notes are pressed, don't complete the capture - stay in capture mode
+            console.log('No notes pressed, staying in capture mode');
+        }
+        
+        return true; // Indicates that the input was consumed by capture mode
+    };
+
+    const transposeChord = (rootNote) => {
+        console.log('🎵 transposeChord called with rootNote:', rootNote);
+        
+        if (capturedChordRef.current.length === 0 || !rootNote) {
+            console.log('❌ Cannot transpose - capturedChord:', capturedChordRef.current, 'rootNote:', rootNote);
+            return [];
+        }
+        
+        console.log('🎹 Original captured chord:', capturedChordRef.current);
+        
+        try {
+            // Validate all notes in captured chord before processing
+            const validNotes = capturedChordRef.current.filter(note => {
+                const parsed = parseNoteString(note);
+                if (!parsed) {
+                    console.warn('⚠️ Invalid note format in captured chord:', note);
+                    return false;
+                }
+                return true;
+            });
+            
+            if (validNotes.length === 0) {
+                console.error('❌ No valid notes found in captured chord');
+                return [];
+            }
+            
+            // Validate root note
+            const rootParsed = parseNoteString(rootNote);
+            if (!rootParsed) {
+                console.error('❌ Invalid root note format:', rootNote);
+                return [];
+            }
+            
+            // Sort captured chord to find the lowest note (root)
+            const sortedChord = [...validNotes].sort((a, b) => {
+                const aParsed = parseNoteString(a);
+                const bParsed = parseNoteString(b);
+                return aParsed.freq - bParsed.freq;
+            });
+            
+            const originalRoot = sortedChord[0];
+            const originalRootParsed = parseNoteString(originalRoot);
+            const originalRootFreq = originalRootParsed.freq;
+            const newRootFreq = rootParsed.freq;
+            const transposeRatio = newRootFreq / originalRootFreq;
+            
+            console.log('📊 Transposition details:');
+            console.log('   Original root note:', originalRoot, '@ freq:', originalRootFreq.toFixed(2), 'Hz');
+            console.log('   Target root note:', rootNote, '@ freq:', newRootFreq.toFixed(2), 'Hz');
+            console.log('   Transpose ratio:', transposeRatio.toFixed(4));
+            
+            // Transpose all notes in the chord
+            const transposedChord = validNotes.map((note, index) => {
+                const parsed = parseNoteString(note);
+                const originalFreq = parsed.freq;
+                const newFreq = originalFreq * transposeRatio;
+                
+                // Convert frequency back to note name
+                // This is a simplified approach - you might want to implement a more precise freq-to-note conversion
+                const newOctave = Math.round(Math.log(newFreq / 261.63) / Math.log(pitchEnv.Octave)) + 4; // C4 = 261.63 Hz
+                const semitoneRatio = Math.pow(2, 1/12);
+                const semitonesFromC = Math.round(Math.log(newFreq / (261.63 * Math.pow(pitchEnv.Octave, newOctave - 4))) / Math.log(semitoneRatio));
+                
+                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const noteIndex = ((semitonesFromC % 12) + 12) % 12;
+                
+                const transposedNote = `${noteNames[noteIndex]}${newOctave}`;
+                
+                console.log(`   Note ${index + 1}: ${note} (${originalFreq.toFixed(2)}Hz) → ${transposedNote} (${newFreq.toFixed(2)}Hz)`);
+                
+                return transposedNote;
+            });
+            
+            console.log('✅ Final transposed chord:', transposedChord);
+            return transposedChord;
+        } catch (error) {
+            console.error('❌ Error in transposeChord:', error);
+            return [];
+        }
+    };
 
     // Throttled parameter update to prevent audio interruption
     const activateSynth = () => {
@@ -497,13 +653,29 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         });
     };
 
-    // Helper function to parse note strings like "C4", "D#5", etc.
+    // Helper function to parse note strings like "C4", "D#5", "C/4", "D#/5", etc.
     const parseNoteString = (noteString) => {
-        const match = noteString.match(/^([A-G]#?)(\d+)$/);
-        if (!match) return null;
+        if (!noteString || typeof noteString !== 'string') {
+            console.warn('⚠️ parseNoteString received invalid input:', noteString);
+            return null;
+        }
+        
+        // Normalize the note string by removing any slashes
+        const normalizedNoteString = noteString.replace('/', '');
+        
+        const match = normalizedNoteString.match(/^([A-G]#?)(\d+)$/);
+        if (!match) {
+            console.warn('⚠️ parseNoteString: Invalid note format:', noteString, '(normalized:', normalizedNoteString, ')');
+            return null;
+        }
         
         const noteName = match[1];
         const octave = parseInt(match[2]);
+        
+        if (isNaN(octave) || octave < 0 || octave > 9) {
+            console.warn('⚠️ parseNoteString: Invalid octave:', octave, 'for note:', noteString);
+            return null;
+        }
         
         // Get base frequency and apply microtonal adjustments
         // const baseFreq = {
@@ -523,9 +695,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             'G#': baseFrequencies[8], 'A': baseFrequencies[9], 'A#': baseFrequencies[10], 'B': baseFrequencies[11]
         }[noteName];
 
-
-
-        if (!baseFreq) return null;
+        if (!baseFreq) {
+            console.warn('⚠️ parseNoteString: Unknown note name:', noteName, 'for note:', noteString);
+            return null;
+        }
         
         // Apply microtonal pitch adjustments
         const pitchAdjustments = {
@@ -619,10 +792,24 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             setPitchB(1.0);
             setOctaveRatio(2.0);
             setAllThemPitches(1.0);
+        },
+        // Chord mode functions
+        startChordCapture,
+        handleChordCapture,
+        transposeChord,
+        getChordModeState: () => {
+            const state = {
+                capture: chordModeCaptureRef.current, // Use ref for immediate access
+                transpose: chordModeTransposeRef.current, // Use ref for immediate access
+                capturedChord: capturedChordRef.current, // Use ref for immediate access
+                isCapturing: isCapturing.current
+            };
+            console.log('🔍 getChordModeState called, returning:', state);
+            return state;
         }
     }), [synthActive, pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
         pitchFSharp, pitchG, pitchGSharp, pitchA, pitchASharp, pitchB,
-        octaveRatio, allThemPitches]);
+        octaveRatio, allThemPitches, chordModeCapture, chordModeTranspose, capturedChord]);
 
     pitchEnv = {
         C: pitchC,
@@ -1311,6 +1498,126 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             value={bitCrushAmount}
                             onUpdate={(val) => setBitCrushAmount(val)}
                         />
+                    </KnobGrid>
+                </Module>
+
+                <Module label="Chord Mode">
+                    <KnobGrid columns={2} rows={1}>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    if (!chordModeCapture) {
+                                        // Get currently active notes from the global noteArray in index.js
+                                        const currentNotes = window.noteArray ? Object.keys(window.noteArray) : [];
+                                        setChordModeCapture(true);
+                                        chordModeCaptureRef.current = true; // Update ref immediately
+                                        startChordCapture(currentNotes);
+                                    } else {
+                                        // Cancel capture mode
+                                        console.log('❌ Cancelling chord capture mode');
+                                        setChordModeCapture(false);
+                                        chordModeCaptureRef.current = false; // Update ref immediately
+                                        isCapturing.current = false;
+                                        if (chordCaptureTimeout.current) {
+                                            clearTimeout(chordCaptureTimeout.current);
+                                            chordCaptureTimeout.current = null;
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${chordModeCapture ? '#FF6B35' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: chordModeCapture ? '#FF6B35' : '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => {
+                                    if (chordModeCapture) {
+                                        e.target.style.background = '#E55A2B';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    e.target.style.background = chordModeCapture ? '#FF6B35' : '#333';
+                                }}
+                            >
+                                {chordModeCapture ? (isCapturing.current ? 'WAITING...' : 'CANCEL') : 'CAPTURE'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                {capturedChord.length > 0 ? `${capturedChord.length} notes` : 'No chord'}
+                            </span>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    const newTransposeState = !chordModeTranspose;
+                                    console.log('🎛️ Transpose button clicked, current state:', chordModeTranspose);
+                                    console.log('🎛️ Captured chord:', capturedChord);
+                                    setChordModeTranspose(newTransposeState);
+                                    chordModeTransposeRef.current = newTransposeState; // Update ref immediately
+                                    console.log('🎛️ New transpose state will be:', newTransposeState);
+                                }}
+                                disabled={capturedChord.length === 0}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${chordModeTranspose ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: chordModeTranspose ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
+                                    color: capturedChord.length === 0 ? '#666' : '#fff',
+                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold',
+                                    opacity: capturedChord.length === 0 ? 0.5 : 1
+                                }}
+                                onMouseOver={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    if (chordModeTranspose) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    e.target.style.background = chordModeTranspose ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {chordModeTranspose ? 'ON' : 'OFF'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Transpose
+                            </span>
+                        </div>
                     </KnobGrid>
                 </Module>
 
