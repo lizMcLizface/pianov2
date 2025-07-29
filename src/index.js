@@ -50,6 +50,78 @@ const polySynthComponentRef = React.createRef();
 // Make polySynthRef globally accessible
 window.polySynthRef = null;
 
+// Make chord mode handling globally accessible
+window.handleChordModeInput = handleChordModeInput;
+
+// Centralized chord mode handling function
+function handleChordModeInput(noteName, velocity, isNoteOn) {
+    if (!polySynthRef || !$('#polySynthMidiBox') || !$('#polySynthMidiBox')[0].checked) {
+        return false; // Chord mode not active or PolySynth not available
+    }
+    
+    console.log('🎹 Chord mode input handling for:', noteName, 'velocity:', velocity, 'isNoteOn:', isNoteOn);
+    
+    // Get chord mode state
+    const chordModeState = polySynthRef.getChordModeState ? polySynthRef.getChordModeState() : null;
+    console.log('🔍 Chord mode state:', chordModeState);
+    
+    if (!chordModeState) {
+        return false; // No chord mode state available
+    }
+    
+    if (isNoteOn) {
+        // Note on handling
+        if (chordModeState.isCapturing) {
+            // If capturing, consume the input without playing sound
+            const currentNotes = Object.keys(noteArray).map(n => convertNoteNameToPolySynthFormat(n)).filter(n => n);
+            console.log('🎹 Key down in capture mode, current notes:', currentNotes);
+            polySynthRef.handleChordCapture(currentNotes);
+            return true; // Input consumed by chord mode
+        } else if (chordModeState.transpose && chordModeState.capturedChord.length > 0) {
+            // If transpose mode is active and we have a captured chord, transpose and play it
+            console.log('🎵 Transpose conditions met:', {
+                transpose: chordModeState.transpose,
+                capturedChordLength: chordModeState.capturedChord.length,
+                capturedChord: chordModeState.capturedChord
+            });
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                console.log('🎵 Triggering transpose with note:', noteWithOctave);
+                const transposedChord = polySynthRef.transposeChord(noteWithOctave);
+                if (transposedChord.length > 0) {
+                    const volume = Math.round((velocity / 100) * 100);
+                    console.log('🔊 Playing transposed chord:', transposedChord, 'at volume:', volume);
+                    playNote2(transposedChord, volume);
+                    return true; // Input consumed by chord mode
+                }
+            }
+        }
+    } else {
+        // Note off handling
+        if (chordModeState.isCapturing) {
+            // If capturing, update the capture with current notes
+            const currentNotes = Object.keys(noteArray).map(n => convertNoteNameToPolySynthFormat(n)).filter(n => n);
+            console.log('🎹 Key up in capture mode, remaining notes:', currentNotes);
+            polySynthRef.handleChordCapture(currentNotes);
+            return true; // Input consumed by chord mode
+        } else if (chordModeState.transpose && chordModeState.capturedChord.length > 0) {
+            // If transpose mode is active, stop the transposed chord
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                console.log('🔇 Stopping transposed chord for note:', noteWithOctave);
+                const transposedChord = polySynthRef.transposeChord(noteWithOctave);
+                if (transposedChord.length > 0) {
+                    console.log('🔇 Stopping notes:', transposedChord);
+                    stopNotes2(transposedChord);
+                    return true; // Input consumed by chord mode
+                }
+            }
+        }
+    }
+    
+    return false; // Input not consumed by chord mode, handle normally
+}
+
 // IntervalPractice wrapper component with styled-components theming
 const IntervalPracticeWithTheme = () => {
     const { theme, themes } = useTheme();
@@ -1821,43 +1893,18 @@ function onKeyPress(event, up) {
         // Use PolySynth for new note playing if available
         if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             console.log('🎹 PolySynth key handling activated for note:', noteName);
-            // Check chord mode first
-            const chordModeState = polySynthRef.getChordModeState ? polySynthRef.getChordModeState() : null;
-            console.log('🔍 Debug - Chord mode state:', chordModeState);
             
-            if (chordModeState && chordModeState.isCapturing) {
-                // If capturing, consume the input without playing sound
-                const currentNotes = Object.keys(noteArray).map(n => convertNoteNameToPolySynthFormat(n)).filter(n => n);
-                console.log('🎹 Key down in capture mode, current notes:', currentNotes);
-                polySynthRef.handleChordCapture(currentNotes);
-                return; // Don't play the note
-            } else if (chordModeState && chordModeState.transpose && chordModeState.capturedChord.length > 0) {
-                // If transpose mode is active and we have a captured chord, transpose and play it
-                console.log('🎵 Transpose conditions met:', {
-                    transpose: chordModeState.transpose,
-                    capturedChordLength: chordModeState.capturedChord.length,
-                    capturedChord: chordModeState.capturedChord
-                });
-                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-                if (noteWithOctave) {
-                    console.log('🎵 Triggering transpose with note:', noteWithOctave);
-                    const transposedChord = polySynthRef.transposeChord(noteWithOctave);
-                    if (transposedChord.length > 0) {
-                        const velocity = message.data[2];
-                        const volume = Math.round((velocity / 100) * 100);
-                        console.log('🔊 Playing transposed chord:', transposedChord, 'at volume:', volume);
-                        playNote2(transposedChord, volume);
-                        return; // Don't play the original note
-                    }
-                }
-            } else {
-                // Normal single note playing
-                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-                if (noteWithOctave) {
-                    const velocity = message.data[2];
-                    const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
-                    playNote2([noteWithOctave], volume);
-                }
+            // Check if chord mode handled the input
+            if (handleChordModeInput(noteName, message.data[2], true)) {
+                return; // Input was consumed by chord mode
+            }
+            
+            // Normal single note playing
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                const velocity = message.data[2];
+                const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
+                playNote2([noteWithOctave], volume);
             }
         }
 
@@ -1924,33 +1971,15 @@ function onKeyPress(event, up) {
         
         // Stop note in PolySynth if available
         if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
-            // Check chord mode first
-            const chordModeState = polySynthRef.getChordModeState ? polySynthRef.getChordModeState() : null;
+            // Check if chord mode handled the input
+            if (handleChordModeInput(noteName, 0, false)) {
+                return; // Input was consumed by chord mode
+            }
             
-            if (chordModeState && chordModeState.isCapturing) {
-                // If capturing, update the capture with current notes
-                const currentNotes = Object.keys(noteArray).map(n => convertNoteNameToPolySynthFormat(n)).filter(n => n);
-                console.log('🎹 Key up in capture mode, remaining notes:', currentNotes);
-                polySynthRef.handleChordCapture(currentNotes);
-                return; // Don't stop any notes
-            } else if (chordModeState && chordModeState.transpose && chordModeState.capturedChord.length > 0) {
-                // If transpose mode is active, stop the transposed chord
-                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-                if (noteWithOctave) {
-                    console.log('🔇 Stopping transposed chord for note:', noteWithOctave);
-                    const transposedChord = polySynthRef.transposeChord(noteWithOctave);
-                    if (transposedChord.length > 0) {
-                        console.log('🔇 Stopping notes:', transposedChord);
-                        stopNotes2(transposedChord);
-                        return; // Don't stop the original note
-                    }
-                }
-            } else {
-                // Normal single note stopping
-                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-                if (noteWithOctave) {
-                    stopNotes2([noteWithOctave]);
-                }
+            // Normal single note stopping
+            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+            if (noteWithOctave) {
+                stopNotes2([noteWithOctave]);
             }
         }
         // console.log('Note ', message.data[1])
@@ -2040,12 +2069,17 @@ function onMIDIMessage (message) {
         
         // Use PolySynth for new note playing if available
         if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
-            // Convert note name to format expected by PolySynth (e.g., "C4")
-            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-            if (noteWithOctave) {
-                const velocity = message.data[2];
-                const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
-                playNote2([noteWithOctave], volume);
+            // Check if chord mode handled the input
+            if (handleChordModeInput(noteName, message.data[2], true)) {
+                // Input was consumed by chord mode, skip normal processing
+            } else {
+                // Normal single note playing
+                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+                if (noteWithOctave) {
+                    const velocity = message.data[2];
+                    const volume = Math.round((velocity / 100) * 100); // Convert MIDI velocity to percentage
+                    playNote2([noteWithOctave], volume);
+                }
             }
         }
     }
@@ -2058,9 +2092,15 @@ function onMIDIMessage (message) {
         
         // Stop note in PolySynth if available
         if(polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
-            const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
-            if (noteWithOctave) {
-                stopNotes2([noteWithOctave]);
+            // Check if chord mode handled the input
+            if (handleChordModeInput(noteName, 0, false)) {
+                // Input was consumed by chord mode, skip normal processing
+            } else {
+                // Normal single note stopping
+                const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
+                if (noteWithOctave) {
+                    stopNotes2([noteWithOctave]);
+                }
             }
         }
         // console.log('Note ', message.data[1])

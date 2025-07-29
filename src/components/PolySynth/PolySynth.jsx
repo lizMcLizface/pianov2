@@ -377,15 +377,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 const newFreq = originalFreq * transposeRatio;
                 
                 // Convert frequency back to note name
-                // This is a simplified approach - you might want to implement a more precise freq-to-note conversion
-                const newOctave = Math.round(Math.log(newFreq / 261.63) / Math.log(pitchEnv.Octave)) + 4; // C4 = 261.63 Hz
-                const semitoneRatio = Math.pow(2, 1/12);
-                const semitonesFromC = Math.round(Math.log(newFreq / (261.63 * Math.pow(pitchEnv.Octave, newOctave - 4))) / Math.log(semitoneRatio));
-                
-                const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-                const noteIndex = ((semitonesFromC % 12) + 12) % 12;
-                
-                const transposedNote = `${noteNames[noteIndex]}${newOctave}`;
+                // Use a more robust frequency-to-note conversion that properly handles custom pitch environments
+                const transposedNote = frequencyToNoteString(newFreq);
                 
                 console.log(`   Note ${index + 1}: ${note} (${originalFreq.toFixed(2)}Hz) → ${transposedNote} (${newFreq.toFixed(2)}Hz)`);
                 
@@ -720,6 +713,66 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             oct: octave,
             freq: freq
         };
+    };
+
+    // Helper function to convert frequency back to note string
+    const frequencyToNoteString = (frequency) => {
+        if (!frequency || frequency <= 0) {
+            console.warn('⚠️ frequencyToNoteString received invalid frequency:', frequency);
+            return null;
+        }
+
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        // Calculate base frequencies for each note in octave 4 using current pitch environment
+        let baseFrequency = 261.63; // Default base frequency for C4
+        let baseFrequencies = [baseFrequency];
+        for(let i = 1; i < noteNames.length; i++) {
+            baseFrequencies.push(baseFrequencies[i - 1] * Math.pow(pitchEnv.Octave, 1/12));
+        }
+        
+        // Apply pitch adjustments to base frequencies
+        const pitchAdjustments = {
+            'C': pitchEnv.C, 'C#': pitchEnv.CSharp, 'D': pitchEnv.D, 'D#': pitchEnv.DSharp,
+            'E': pitchEnv.E, 'F': pitchEnv.F, 'F#': pitchEnv.FSharp, 'G': pitchEnv.G,
+            'G#': pitchEnv.GSharp, 'A': pitchEnv.A, 'A#': pitchEnv.ASharp, 'B': pitchEnv.B
+        };
+        
+        const adjustedBaseFreqs = baseFrequencies.map((freq, index) => 
+            freq * pitchAdjustments[noteNames[index]] * pitchEnv.AllThemPitches
+        );
+        
+        // Find the closest note and octave
+        let bestMatch = null;
+        let smallestError = Infinity;
+        
+        // Check octaves from 0 to 9
+        for (let octave = 0; octave <= 9; octave++) {
+            const octaveMultiplier = Math.pow(pitchEnv.Octave, octave - 4);
+            
+            for (let noteIndex = 0; noteIndex < noteNames.length; noteIndex++) {
+                const expectedFreq = adjustedBaseFreqs[noteIndex] * octaveMultiplier;
+                const error = Math.abs(frequency - expectedFreq);
+                
+                if (error < smallestError) {
+                    smallestError = error;
+                    bestMatch = {
+                        note: noteNames[noteIndex],
+                        octave: octave,
+                        expectedFreq: expectedFreq,
+                        error: error
+                    };
+                }
+            }
+        }
+        
+        if (bestMatch) {
+            // console.log(`Frequency ${frequency.toFixed(2)}Hz → ${bestMatch.note}${bestMatch.octave} (expected: ${bestMatch.expectedFreq.toFixed(2)}Hz, error: ${bestMatch.error.toFixed(2)}Hz)`);
+            return `${bestMatch.note}${bestMatch.octave}`;
+        }
+        
+        console.warn('⚠️ Could not find matching note for frequency:', frequency);
+        return null;
     };
 
     // Expose the programmatic functions to parent components
