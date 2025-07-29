@@ -96,6 +96,83 @@
         margin-left: 8px;
         line-height: 32px;
       }
+      
+      /* Help dropdown styles */
+      .help-dropdown-container {
+        position: relative;
+        display: inline-block;
+      }
+      
+      .help-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        min-width: 1200px;
+        max-width: 1200px;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        z-index: 10000;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        pointer-events: none;
+      }
+      
+      .help-dropdown-container:hover .help-dropdown {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      
+      .help-dropdown h4 {
+        margin: 0 0 15px 0;
+        color: #333;
+        border-bottom: 2px solid #2563eb;
+        padding-bottom: 10px;
+      }
+      
+      .help-section {
+        margin-bottom: 20px;
+      }
+      
+      .help-section h5 {
+        margin: 0 0 8px 0;
+        color: #2563eb;
+        font-size: 16px;
+      }
+      
+      .help-section p {
+        margin: 0 0 8px 0;
+        color: #666;
+        line-height: 1.5;
+      }
+      
+      .help-section ul {
+        margin: 0;
+        padding-left: 20px;
+        color: #666;
+      }
+      
+      .help-section li {
+        margin-bottom: 4px;
+      }
+      
+      .help-button {
+        cursor: pointer;
+        transition: background-color 0.2s;
+        border-radius: 4px;
+        padding: 4px 8px;
+      }
+      
+      .help-button:hover {
+        background-color: #f0f0f0;
+      }
     </style>
     <div class="tab" id="mainTabBar"
          onmouseenter="this.classList.add('expanded')"
@@ -172,109 +249,7 @@
         </span>
         <span class="full-label">Interval Practice</span>
       </button>
-
-
-      <button class="tablinks" onclick="openCity(event, 'CrossreferenceTab')" >
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="3" y="3" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="10" y="3" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="17" y="3" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="3" y="10" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="10" y="10" width="4" height="4" fill="currentColor"/>
-            <rect x="17" y="10" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="3" y="17" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="10" y="17" width="4" height="4" fill="none" stroke="currentColor"/>
-            <rect x="17" y="17" width="4" height="4" fill="none" stroke="currentColor"/>
-          </svg>
-        </span>
-        <span class="full-label">Cross</span>
-      </button>
-
-      <button class="tablinks active" onclick="openCity(event, 'Starting')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-        </span>
-        <span class="full-label">Starting Page</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Scale')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1"/>
-            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2"/>
-            <circle cx="18" cy="8" r="2"/>
-            <path d="M16.5 7.5L19.5 6.5" stroke="currentColor" stroke-width="1"/>
-          </svg>
-        </span>
-        <span class="full-label">Scale Settings</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Mode')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="2" y="18" width="3" height="4"/>
-            <rect x="6" y="15" width="3" height="7"/>
-            <rect x="10" y="12" width="3" height="10"/>
-            <rect x="14" y="9" width="3" height="13"/>
-            <rect x="18" y="6" width="3" height="16"/>
-          </svg>
-        </span>
-        <span class="full-label">Mode Progression</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Root')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
-            <circle cx="12" cy="12" r="4" fill="white"/>
-            <circle cx="12" cy="12" r="2" fill="currentColor"/>
-          </svg>
-        </span>
-        <span class="full-label">Root Progression</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Octave')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 20h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16v-2H4v2zm0-4h16V6H4v2zm0-4h16V2H4v2z"/>
-            <path d="M6 4l2 2 2-2 2 2 2-2 2 2 2-2" stroke="white" stroke-width="1" fill="none"/>
-          </svg>
-        </span>
-        <span class="full-label">Octave Progression</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Chord')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1"/>
-            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2"/>
-            <circle cx="6" cy="6" r="1"/>
-            <circle cx="12" cy="8" r="1"/>
-            <circle cx="18" cy="6" r="1"/>
-            <line x1="7" y1="6" x2="11" y2="8" stroke="currentColor" stroke-width="0.5"/>
-            <line x1="13" y1="8" x2="17" y2="6" stroke="currentColor" stroke-width="0.5"/>
-          </svg>
-        </span>
-        <span class="full-label">Chord Settings</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'General')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2l2.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="none" stroke="currentColor" stroke-width="1"/>
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 8v8M8 12h8" stroke="white" stroke-width="1"/>
-          </svg>
-        </span>
-        <span class="full-label">General Settings</span>
-      </button>
-      <button class="tablinks" onclick="openCity(event, 'Synth')">
-        <span class="short-label">
-          <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1"/>
-            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1"/>
-            <path d="M4 12h2l2-3 2 6 2-4 2 2 2-1h4" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-        </span>
-        <span class="full-label">Synthesizer Settings (Legacy)</span>
-      </button>
+      
     </div>
     <style>
       .main-content {
@@ -286,6 +261,75 @@
       <div class="selectionContainer" width='100%'>
         <span style="width:30%;text-align: left;" class="tableCell">
           <h3>Midiano v2</h3>
+        </span>
+        <span style="width:2%;text-align: left;" class="tableCell" id="helpButton">
+          <div class="help-dropdown-container">
+            <div class="help-button" style="display: flex; justify-content: center; align-items: center; height: 100%;">
+              <h3>Help</h3>
+            </div>
+            <div class="help-dropdown">
+              <h4>Synthesizer Help Guide</h4>
+              
+              <div class="help-section">
+                <h5>Getting Started</h5>
+                <p>Welcome to the ill-tempered piano! This synthesizer allows you to do fun things (hopefully) create sounds.</p>
+                <ul>
+                  <li>Use your computer keyboard or MIDI controller to play notes</li>
+                  <li>Navigate between different tabs using the sidebar on the left</li>
+                  <li>Experiment with different scales, chords, and progressions</li>
+                </ul>
+              </div>
+              
+              <div class="help-section">
+                <h5>Scales Tab</h5>
+                <p>Learn and practice different musical scales:</p>
+                <ul>
+                  <li>Select different scale modes (Major, Minor, etc.)</li>
+                  <li>Choose root notes and scale patterns</li>
+                  <li>Visual feedback on the piano keyboard</li>
+                  <li>Change selected scales with n/m keys root with ,/.</li>
+                </ul>
+              </div>
+              
+              <div class="help-section">
+                <h5>Chords Tab</h5>
+                <p>Explore chord shapes</p>
+              </div>
+              
+              <div class="help-section">
+                <h5>Progression Tab</h5>
+                <p>Explore chord progressions</p>
+              </div>
+              
+              <div class="help-section">
+                <h5>Synthesizer</h5>
+                <p>Shape your sound with synthesis controls:</p>
+                <ul>
+                  <li>Adjust oscillator waveforms and frequency</li>
+                  <li>Control envelope settings (ADSR)</li>
+                  <li>Apply filters and effects</li>
+                </ul>
+              </div>
+              
+              <div class="help-section">
+                <h5>Keyboard Controls</h5>
+                <p>Default keyboard mappings:</p>
+                <ul>
+                  <li>Piano keys: A-L row for white keys, Q-P row for black keys</li>
+                  <li>Octave controls: Z/X keys to change octave</li>
+                </ul>
+              </div>
+              
+              <div class="help-section">
+                <h5>Tips</h5>
+                <ul>
+                  <li>Enable staves to see musical notation</li>
+                  <li>Use the metronome for timing practice</li>
+                  <li>Experiment with different synthesis parameters</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </span>
         <span style="width:15%;text-align: left;" class="tableCell">
           <p>Current Scale:</p><div id="currentScaleNode" style="display: inline-block; font-weight: bold;">C Major</div>
