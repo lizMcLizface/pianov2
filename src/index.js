@@ -78,7 +78,7 @@ function handleChordModeInput(noteName, velocity, isNoteOn) {
             polySynthRef.handleChordCapture(currentNotes);
             return true; // Input consumed by chord mode
         } else if (chordModeState.transpose && chordModeState.capturedChord.length > 0) {
-            // If transpose mode is active and we have a captured chord, transpose and play it
+            // If transpose mode is active and we have a captured chord, transpose and play it via arpeggiator
             console.log('🎵 Transpose conditions met:', {
                 transpose: chordModeState.transpose,
                 capturedChordLength: chordModeState.capturedChord.length,
@@ -86,13 +86,21 @@ function handleChordModeInput(noteName, velocity, isNoteOn) {
             });
             const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
             if (noteWithOctave) {
-                console.log('🎵 Triggering transpose with note:', noteWithOctave);
-                const transposedChord = polySynthRef.transposeChord(noteWithOctave);
-                if (transposedChord.length > 0) {
-                    const volume = Math.round((velocity / 100) * 100);
-                    console.log('🔊 Playing transposed chord:', transposedChord, 'at volume:', volume);
-                    playNote2(transposedChord, volume);
+                console.log('🎵 Triggering arpeggiator transpose with note:', noteWithOctave);
+                
+                // Use the arpeggiator's transpose function
+                if (polySynthRef.handleArpeggiatorTranspose) {
+                    polySynthRef.handleArpeggiatorTranspose(noteWithOctave);
                     return true; // Input consumed by chord mode
+                } else {
+                    // Fallback to original behavior if arpeggiator not available
+                    const transposedChord = polySynthRef.transposeChord(noteWithOctave);
+                    if (transposedChord.length > 0) {
+                        const volume = Math.round((velocity / 100) * 100);
+                        console.log('🔊 Playing transposed chord:', transposedChord, 'at volume:', volume);
+                        playNote2(transposedChord, volume);
+                        return true; // Input consumed by chord mode
+                    }
                 }
             }
         }
@@ -105,16 +113,21 @@ function handleChordModeInput(noteName, velocity, isNoteOn) {
             polySynthRef.handleChordCapture(currentNotes);
             return true; // Input consumed by chord mode
         } else if (chordModeState.transpose && chordModeState.capturedChord.length > 0) {
-            // If transpose mode is active, stop the transposed chord
+            // If transpose mode is active, handle note off 
             const noteWithOctave = convertNoteNameToPolySynthFormat(noteName);
             if (noteWithOctave) {
-                console.log('🔇 Stopping transposed chord for note:', noteWithOctave);
-                const transposedChord = polySynthRef.transposeChord(noteWithOctave);
-                if (transposedChord.length > 0) {
-                    console.log('🔇 Stopping notes:', transposedChord);
-                    stopNotes2(transposedChord);
-                    return true; // Input consumed by chord mode
+                console.log('🔇 Note off in transpose mode for note:', noteWithOctave);
+                
+                // Check if arpeggiator is playing
+                const arpeggiatorState = polySynthRef.getArpeggiatorState?.();
+                if (!arpeggiatorState?.playing) {
+                    // If arpeggiator is not playing, stop the transposed notes
+                    // This allows notes to be held for key duration instead of arpeggiator duration
+                    if (polySynthRef.stopTransposedNotes) {
+                        polySynthRef.stopTransposedNotes();
+                    }
                 }
+                return true; // Input consumed by chord mode
             }
         }
     }

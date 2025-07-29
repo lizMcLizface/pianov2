@@ -13,6 +13,7 @@ import Select from './../Select';
 import presetData from '../../util/presetData';
 import { getNoteInfo, WAVEFORM, FILTER, REVERB, ENVELOPE_SHAPE, NOISE } from '../../util/util';
 import { THEMES } from '../../styles/themes';
+import { metronome } from '../../metronome';
 
 import {
     ModuleGridContainer,
@@ -219,6 +220,18 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const chordCaptureTimeout = useRef(null);
     const isCapturing = useRef(false);
 
+    // Arpeggiator State
+    const [arpeggiatorMode, setArpeggiatorMode] = useState('chord'); // 'chord', 'up', 'down', 'random', 'upDown', 'downUp'
+    const [arpeggiatorPlaying, setArpeggiatorPlaying] = useState(false);
+    const arpeggiatorPlayingRef = useRef(false); // Immediate access to playing state
+    const [arpeggiatorDuration, setArpeggiatorDuration] = useState('quarter'); // 'whole', 'half', 'quarter', 'eighth', 'sixteenth'
+    const [arpeggiatorRate, setArpeggiatorRate] = useState('quarter'); // How often notes are triggered
+    const arpeggiatorTimeoutId = useRef(null);
+    const arpeggiatorCurrentIndex = useRef(0);
+    const arpeggiatorDirection = useRef(1); // 1 for up, -1 for down (used for upDown/downUp modes)
+    const arpeggiatorCurrentChord = useRef([]); // Current chord being arpeggiated
+    const transposedChord = useRef([]); // Stores the current transposed chord to persist across mode changes
+
     const octaveUp = () => {
         if (octaveMod < 7) {
             setOctaveMod(octaveMod + 1);
@@ -390,6 +403,317 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         } catch (error) {
             console.error('❌ Error in transposeChord:', error);
             return [];
+        }
+    };
+
+    // Arpeggiator Functions
+    const getNextNoteFromChord = (chord, currentIndex, mode, direction = 1) => {
+        if (!chord || chord.length === 0) return { note: null, nextIndex: 0, nextDirection: direction };
+
+        const sortedChord = [...chord].sort((a, b) => {
+            const aParsed = parseNoteString(a);
+            const bParsed = parseNoteString(b);
+            return aParsed.freq - bParsed.freq;
+        });
+
+        switch (mode) {
+            case 'chord': // Play all notes at once
+                return { notes: sortedChord, nextIndex: 0, nextDirection: direction };
+            
+            case 'up':
+                const upIndex = currentIndex % sortedChord.length;
+                return { note: sortedChord[upIndex], nextIndex: upIndex + 1, nextDirection: direction };
+            
+            case 'down':
+                const downIndex = currentIndex % sortedChord.length;
+                return { note: sortedChord[sortedChord.length - 1 - downIndex], nextIndex: downIndex + 1, nextDirection: direction };
+            
+            case 'random':
+                const randomIndex = Math.floor(Math.random() * sortedChord.length);
+                return { note: sortedChord[randomIndex], nextIndex: currentIndex + 1, nextDirection: direction };
+            
+            case 'upDown':
+                let upDownIndex = currentIndex % (sortedChord.length * 2 - 2);
+                if (upDownIndex < sortedChord.length) {
+                    return { note: sortedChord[upDownIndex], nextIndex: currentIndex + 1, nextDirection: 1 };
+                } else {
+                    const reversedIndex = sortedChord.length - 2 - (upDownIndex - sortedChord.length);
+                    return { note: sortedChord[reversedIndex], nextIndex: currentIndex + 1, nextDirection: 1 };
+                }
+            
+            case 'downUp':
+                let downUpIndex = currentIndex % (sortedChord.length * 2 - 2);
+                if (downUpIndex < sortedChord.length) {
+                    return { note: sortedChord[sortedChord.length - 1 - downUpIndex], nextIndex: currentIndex + 1, nextDirection: -1 };
+                } else {
+                    const reversedIndex = downUpIndex - sortedChord.length + 1;
+                    return { note: sortedChord[reversedIndex], nextIndex: currentIndex + 1, nextDirection: -1 };
+                }
+            
+            default:
+                return { note: sortedChord[0], nextIndex: 1, nextDirection: direction };
+        }
+    };
+
+    const stopArpeggiator = () => {
+        console.log('🛑 Stopping arpeggiator');
+        setArpeggiatorPlaying(false);
+        arpeggiatorPlayingRef.current = false;
+        
+        if (arpeggiatorTimeoutId.current) {
+            clearTimeout(arpeggiatorTimeoutId.current);
+            arpeggiatorTimeoutId.current = null;
+        }
+        
+        // Stop all programmatic notes
+        stopAllNotesProgrammatic();
+        
+        // Reset arpeggiator state
+        arpeggiatorCurrentIndex.current = 0;
+        arpeggiatorDirection.current = 1;
+    };
+
+    const startArpeggiator = (chord = null) => {
+        console.log('▶️ Starting arpeggiator with chord:', chord || transposedChord.current || capturedChordRef.current);
+        
+        if (!synthActive) activateSynth();
+        
+        // Use provided chord, stored transposed chord, or captured chord
+        const chordToUse = chord || transposedChord.current.length > 0 ? transposedChord.current : capturedChordRef.current;
+        if (!chordToUse || chordToUse.length === 0) {
+            console.warn('⚠️ No chord to arpeggiate');
+            return;
+        }
+        
+        // Store the current chord being arpeggiated
+        arpeggiatorCurrentChord.current = [...chordToUse];
+        
+        // Stop any existing arpeggiator
+        stopArpeggiator();
+        
+        // Start the arpeggiator
+        setArpeggiatorPlaying(true);
+        arpeggiatorPlayingRef.current = true;
+        
+        // Initialize arpeggiator state
+        arpeggiatorCurrentIndex.current = 0;
+        arpeggiatorDirection.current = 1;
+        
+        // Schedule the first note on beat instead of playing immediately
+        scheduleNextArpeggiatorNoteOnBeat();
+    };
+
+    const scheduleNextArpeggiatorNote = () => {
+        if (!arpeggiatorPlayingRef.current) {
+            console.log('🔄 Arpeggiator stopped, exiting loop');
+            return;
+        }
+        
+        const chord = arpeggiatorCurrentChord.current;
+        if (!chord || chord.length === 0) {
+            console.warn('⚠️ No chord in arpeggiator, stopping');
+            stopArpeggiator();
+            return;
+        }
+        
+        // Get the next note(s) to play
+        const result = getNextNoteFromChord(
+            chord, 
+            arpeggiatorCurrentIndex.current, 
+            arpeggiatorMode, 
+            arpeggiatorDirection.current
+        );
+        
+        // Update state for next iteration
+        arpeggiatorCurrentIndex.current = result.nextIndex;
+        arpeggiatorDirection.current = result.nextDirection;
+        
+        // Play the note(s)
+        if (result.notes) {
+            // Chord mode - play all notes at once
+            console.log('🎹 Playing chord:', result.notes);
+            playNotesProgrammatic(result.notes, 70, getDurationInMs(arpeggiatorDuration));
+        } else if (result.note) {
+            // Single note mode - allow overlapping for proper musical timing
+            console.log('🎵 Playing note:', result.note);
+            
+            playNotesProgrammatic([result.note], 70, getDurationInMs(arpeggiatorDuration));
+        }
+        
+        // Schedule the next note based on rate
+        try {
+            metronome.initializeAudioContext();
+            metronome.updateAudioContextOffset(); // Ensure audio context offset is set
+            const nextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+            const currentTime = metronome.getCurrentTime();
+            const delay = Math.max(0, (nextNoteTime - currentTime) * 1000); // Convert to milliseconds
+            
+            // If delay is very small (less than 10ms), wait and get the next proper beat timing
+            const minDelay = 10; // Minimum threshold to detect timing issues
+            if (delay < minDelay) {
+                console.log('⏰ Delay too small (' + delay.toFixed(2) + 'ms), waiting and getting next beat...');
+                
+                // Wait for the small delay, then get the next proper beat timing
+                setTimeout(() => {
+                    try {
+                        const newNextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+                        const newCurrentTime = metronome.getCurrentTime();
+                        const newDelay = Math.max(0, (newNextNoteTime - newCurrentTime) * 1000);
+                        
+                        console.log('⏰ Next note rescheduled in', newDelay.toFixed(2), 'ms (proper beat timing)');
+                        
+                        arpeggiatorTimeoutId.current = setTimeout(() => {
+                            scheduleNextArpeggiatorNote();
+                        }, newDelay);
+                    } catch (error) {
+                        console.error('❌ Error rescheduling arpeggiator note:', error);
+                        const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+                        console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
+                        arpeggiatorTimeoutId.current = setTimeout(() => {
+                            scheduleNextArpeggiatorNote();
+                        }, fallbackDelay);
+                    }
+                }, delay);
+            } else {
+                console.log('⏰ Next note in', delay.toFixed(2), 'ms');
+                
+                arpeggiatorTimeoutId.current = setTimeout(() => {
+                    scheduleNextArpeggiatorNote();
+                }, delay);
+            }
+        } catch (error) {
+            console.error('❌ Error scheduling next arpeggiator note:', error);
+            // Fallback to simple timing based on BPM
+            const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+            console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
+            arpeggiatorTimeoutId.current = setTimeout(() => {
+                scheduleNextArpeggiatorNote();
+            }, fallbackDelay);
+        }
+    };
+
+    const getRawDurationInMs = (duration) => {
+        // Get BPM for timing calculations
+        const bpmSlider = document.querySelector('#bpmSlider');
+        const bpm = bpmSlider ? Number(bpmSlider.value) : 120;
+        const msPerBeat = (60 / bpm) * 1000; // Quarter note duration in ms
+        
+        switch (duration) {
+            case 'whole': return msPerBeat * 4;
+            case 'half': return msPerBeat * 2;
+            case 'quarter': return msPerBeat;
+            case 'eighth': return msPerBeat / 2;
+            case 'sixteenth': return msPerBeat / 4;
+            default: return msPerBeat; // Default to quarter note
+        }
+    };
+
+    const getDurationInMs = (duration) => {
+        const noteDuration = getRawDurationInMs(duration);
+        return Math.max(50, noteDuration); // Minimum 50ms duration
+    };
+
+    // Helper function to schedule next arpeggiator note on beat
+    const scheduleNextArpeggiatorNoteOnBeat = () => {
+        try {
+            metronome.initializeAudioContext();
+            metronome.updateAudioContextOffset(); // Ensure audio context offset is set
+            const nextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+            const currentTime = metronome.getCurrentTime();
+            const delay = Math.max(0, (nextNoteTime - currentTime) * 1000); // Convert to milliseconds
+            
+            // If delay is very small (less than 10ms), wait and get the next proper beat timing
+            const minDelay = 10; // Minimum threshold to detect timing issues
+            if (delay < minDelay) {
+                console.log('⏰ Initial delay too small (' + delay.toFixed(2) + 'ms), waiting and getting next beat...');
+                
+                // Wait for the small delay, then get the next proper beat timing
+                setTimeout(() => {
+                    try {
+                        const newNextNoteTime = metronome.getNextNoteTime(arpeggiatorRate);
+                        const newCurrentTime = metronome.getCurrentTime();
+                        const newDelay = Math.max(0, (newNextNoteTime - newCurrentTime) * 1000);
+                        
+                        console.log('⏰ Arpeggiator start rescheduled in', newDelay.toFixed(2), 'ms (proper beat timing)');
+                        
+                        arpeggiatorTimeoutId.current = setTimeout(() => {
+                            scheduleNextArpeggiatorNote();
+                        }, newDelay);
+                    } catch (error) {
+                        console.error('❌ Error rescheduling arpeggiator start:', error);
+                        const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+                        console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
+                        arpeggiatorTimeoutId.current = setTimeout(() => {
+                            scheduleNextArpeggiatorNote();
+                        }, fallbackDelay);
+                    }
+                }, delay);
+            } else {
+                console.log('⏰ Next arpeggiator note scheduled in', delay.toFixed(2), 'ms');
+                
+                arpeggiatorTimeoutId.current = setTimeout(() => {
+                    scheduleNextArpeggiatorNote();
+                }, delay);
+            }
+        } catch (error) {
+            console.error('❌ Error scheduling next arpeggiator note on beat:', error);
+            // Fallback to simple timing based on BPM
+            const fallbackDelay = getRawDurationInMs(arpeggiatorRate);
+            console.log('⏰ Using fallback timing:', fallbackDelay, 'ms');
+            arpeggiatorTimeoutId.current = setTimeout(() => {
+                scheduleNextArpeggiatorNote();
+            }, fallbackDelay);
+        }
+    };
+
+    const toggleArpeggiator = () => {
+        if (arpeggiatorPlayingRef.current) {
+            stopArpeggiator();
+        } else {
+            startArpeggiator();
+        }
+    };
+
+    // Handle transpose mode with arpeggiator
+    const handleArpeggiatorTranspose = (rootNote) => {
+        console.log('🔄 Transposing arpeggiator to root:', rootNote);
+        
+        if (capturedChordRef.current.length === 0) {
+            console.warn('⚠️ No captured chord to transpose');
+            return;
+        }
+        
+        // Transpose the chord
+        const newTransposedChord = transposeChord(rootNote);
+        
+        if (newTransposedChord && newTransposedChord.length > 0) {
+            // Store the transposed chord for persistence across mode changes
+            transposedChord.current = newTransposedChord;
+            // If arpeggiator is already playing, update the chord and continue
+            if (arpeggiatorPlayingRef.current) {
+                console.log('🎵 Updating arpeggiator with transposed chord:', newTransposedChord);
+                arpeggiatorCurrentChord.current = newTransposedChord;
+                // Reset index to start fresh with the new chord
+                arpeggiatorCurrentIndex.current = 0;
+                arpeggiatorDirection.current = 1;
+            } else {
+                // If arpeggiator is not playing, just play the chord once according to the current mode
+                console.log('� Playing transposed chord once in', arpeggiatorMode, 'mode');
+                
+                if (arpeggiatorMode === 'chord') {
+                    // Play all notes at once - for transpose mode, don't use arpeggiator duration
+                    // Instead, let notes play until key is released (handled by keyboard logic)
+                    playNotesProgrammatic(newTransposedChord, 70);
+                } else {
+                    // For other modes, just play the first note of the sequence
+                    const result = getNextNoteFromChord(newTransposedChord, 0, arpeggiatorMode, 1);
+                    if (result.notes) {
+                        playNotesProgrammatic(result.notes, 70);
+                    } else if (result.note) {
+                        playNotesProgrammatic([result.note], 70);
+                    }
+                }
+            }
         }
     };
 
@@ -775,6 +1099,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         return null;
     };
 
+    // Function to stop transposed notes when key is released
+    const stopTransposedNotes = () => {
+        if (transposedChord.current.length > 0) {
+            console.log('🛑 Stopping transposed notes:', transposedChord.current);
+            stopNotesProgrammatic(transposedChord.current);
+        }
+    };
+
     // Expose the programmatic functions to parent components
     useImperativeHandle(ref, () => ({
         playNotes: playNotesProgrammatic,
@@ -859,10 +1191,27 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             };
             console.log('🔍 getChordModeState called, returning:', state);
             return state;
-        }
+        },
+        // Arpeggiator functions
+        startArpeggiator,
+        stopArpeggiator,
+        toggleArpeggiator,
+        handleArpeggiatorTranspose,
+        stopTransposedNotes,
+        setArpeggiatorMode: (mode) => setArpeggiatorMode(mode),
+        setArpeggiatorDuration: (duration) => setArpeggiatorDuration(duration),
+        setArpeggiatorRate: (rate) => setArpeggiatorRate(rate),
+        getArpeggiatorState: () => ({
+            mode: arpeggiatorMode,
+            playing: arpeggiatorPlayingRef.current,
+            duration: arpeggiatorDuration,
+            rate: arpeggiatorRate,
+            currentChord: arpeggiatorCurrentChord.current
+        })
     }), [synthActive, pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF,
         pitchFSharp, pitchG, pitchGSharp, pitchA, pitchASharp, pitchB,
-        octaveRatio, allThemPitches, chordModeCapture, chordModeTranspose, capturedChord]);
+        octaveRatio, allThemPitches, chordModeCapture, chordModeTranspose, capturedChord,
+        arpeggiatorMode, arpeggiatorPlaying, arpeggiatorDuration, arpeggiatorRate]);
 
     pitchEnv = {
         C: pitchC,
@@ -950,6 +1299,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         
         // Cleanup function to prevent memory leaks
         return () => {
+            // Stop arpeggiator
+            stopArpeggiator();
+            
             // Clear batched parameter update timers
             if (batchedParameterUpdate.current.timer) {
                 clearTimeout(batchedParameterUpdate.current.timer);
@@ -1249,6 +1601,63 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         pitchC, pitchCSharp, pitchD, pitchDSharp, pitchE, pitchF, pitchFSharp,
         pitchG, pitchGSharp, pitchA, pitchASharp, pitchB, octaveRatio, allThemPitches
     ]);
+
+    // Clean up arpeggiator when chord modes change
+    useEffect(() => {
+        // When transpose mode is disabled, keep arpeggiator playing but clear the transposed chord reference
+        // so future operations don't use the old transposed chord
+        if (!chordModeTranspose) {
+            console.log('� Chord transpose mode disabled, clearing transposed chord reference but keeping arpeggiator');
+            // Don't stop the arpeggiator if it's playing - let it continue with current chord
+            // Just clear the reference so new transpose operations start fresh
+            transposedChord.current = [];
+        }
+    }, [chordModeTranspose]);
+
+    useEffect(() => {
+        // Stop arpeggiator when captured chord is cleared
+        if (capturedChord.length === 0 && arpeggiatorPlayingRef.current) {
+            console.log('🛑 Captured chord cleared, stopping arpeggiator');
+            stopArpeggiator();
+        }
+        // Clear transposed chord when captured chord changes
+        if (capturedChord.length === 0) {
+            transposedChord.current = [];
+        }
+    }, [capturedChord]);
+
+    // Update arpeggiator immediately when settings change
+    useEffect(() => {
+        if (arpeggiatorPlayingRef.current) {
+            console.log('🔄 Arpeggiator mode changed, updating without stopping');
+            // Just reset the index to start fresh with the new mode
+            arpeggiatorCurrentIndex.current = 0;
+            arpeggiatorDirection.current = 1;
+            
+            // Cancel the current timeout and reschedule on beat
+            if (arpeggiatorTimeoutId.current) {
+                clearTimeout(arpeggiatorTimeoutId.current);
+                arpeggiatorTimeoutId.current = null;
+            }
+            
+            // Schedule the next note with the new mode on beat
+            scheduleNextArpeggiatorNoteOnBeat();
+        }
+    }, [arpeggiatorMode]);
+
+    useEffect(() => {
+        if (arpeggiatorPlayingRef.current) {
+            console.log('⏰ Arpeggiator timing settings changed, updating timing');
+            // Cancel the current timeout and reschedule with new timing on beat
+            if (arpeggiatorTimeoutId.current) {
+                clearTimeout(arpeggiatorTimeoutId.current);
+                arpeggiatorTimeoutId.current = null;
+            }
+            
+            // Schedule the next note with the new timing on beat
+            scheduleNextArpeggiatorNoteOnBeat();
+        }
+    }, [arpeggiatorRate, arpeggiatorDuration]);
 
     // Needed to avoid stale hook state
     useEffect(() => {
@@ -1669,6 +2078,171 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                 lineHeight: '1.2'
                             }}>
                                 Transpose
+                            </span>
+                        </div>
+                    </KnobGrid>
+                </Module>
+
+                {/* Arpeggiator Module */}
+                <Module label="Arpeggiator">
+                    <KnobGrid columns={4}>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <select
+                                value={arpeggiatorMode}
+                                onChange={(e) => setArpeggiatorMode(e.target.value)}
+                                style={{
+                                    padding: '4px 8px',
+                                    fontSize: '10px',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    background: '#333',
+                                    color: '#fff',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px'
+                                }}
+                            >
+                                <option value="chord">Chord</option>
+                                <option value="up">Up</option>
+                                <option value="down">Down</option>
+                                <option value="upDown">Up-Down</option>
+                                <option value="downUp">Down-Up</option>
+                                <option value="random">Random</option>
+                            </select>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Mode
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <select
+                                value={arpeggiatorRate}
+                                onChange={(e) => setArpeggiatorRate(e.target.value)}
+                                style={{
+                                    padding: '4px 8px',
+                                    fontSize: '10px',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    background: '#333',
+                                    color: '#fff',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px'
+                                }}
+                            >
+                                <option value="whole">Whole</option>
+                                <option value="half">Half</option>
+                                <option value="quarter">Quarter</option>
+                                <option value="eighth">Eighth</option>
+                                <option value="sixteenth">16th</option>
+                            </select>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Rate
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <select
+                                value={arpeggiatorDuration}
+                                onChange={(e) => setArpeggiatorDuration(e.target.value)}
+                                style={{
+                                    padding: '4px 8px',
+                                    fontSize: '10px',
+                                    border: '1px solid #666',
+                                    borderRadius: '4px',
+                                    background: '#333',
+                                    color: '#fff',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px'
+                                }}
+                            >
+                                <option value="whole">Whole</option>
+                                <option value="half">Half</option>
+                                <option value="quarter">Quarter</option>
+                                <option value="eighth">Eighth</option>
+                                <option value="sixteenth">16th</option>
+                            </select>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Duration
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={toggleArpeggiator}
+                                disabled={capturedChord.length === 0}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${arpeggiatorPlaying ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: arpeggiatorPlaying ? '#4CAF50' : (capturedChord.length === 0 ? '#222' : '#333'),
+                                    color: capturedChord.length === 0 ? '#666' : '#fff',
+                                    cursor: capturedChord.length === 0 ? 'not-allowed' : 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold',
+                                    opacity: capturedChord.length === 0 ? 0.5 : 1
+                                }}
+                                onMouseOver={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    if (arpeggiatorPlaying) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    if (capturedChord.length === 0) return;
+                                    e.target.style.background = arpeggiatorPlaying ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {arpeggiatorPlaying ? 'STOP' : 'PLAY'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Play/Stop
                             </span>
                         </div>
                     </KnobGrid>
