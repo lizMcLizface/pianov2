@@ -1867,11 +1867,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             if (synth1.getOsc2Amount() !== osc2Amount) {
                 synthArr.forEach((synth) => synth.setOsc2Amount(osc2Amount));
                 
-                // If we're enabling osc2 (going from 0 to > 0), resynchronize all secondary oscillators
-                if (synth1.getOsc2Amount() === 0 && osc2Amount > 0) {
-                    const startTime = AC.currentTime + 0.001;
-                    synthArr.forEach((synth) => synth.resyncOsc2(startTime));
-                }
+                // Note: osc2 is always started during initialization with synchronized timing
+                // No need to resync here as phase alignment is maintained from init
             }
             if (synth1.getOsc2PhaseOffset() !== osc2PhaseOffset) {
                 // Capture single schedule time for synchronized phase offset changes

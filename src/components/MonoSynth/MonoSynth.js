@@ -323,6 +323,7 @@ class MonoSynth {
         // Start second oscillator with synchronized timing
         try {
             this.osc2.start(actualStartTime);
+            this.osc2Started = true; // Mark as started to prevent re-starting
         } catch (e) {
             console.warn('Second oscillator already started:', e);
         }
@@ -480,38 +481,11 @@ class MonoSynth {
     };
     getOsc2Detune = () => this.osc2Detune;
     setOsc2Amount = (amount) => {
-        const previousAmount = this.osc2Amount;
         this.osc2Amount = clamp(amount, 0, 1);
         this.osc2Gain.setGain(this.osc2Amount);
         
-        // If we're enabling osc2 (going from 0 to > 0) and it hasn't been started yet
-        if (previousAmount === 0 && this.osc2Amount > 0 && !this.osc2Started && this.isInitialized) {
-            try {
-                const startTime = this.AC.currentTime + 0.001;
-                this.osc2.start(startTime);
-                this.osc2Started = true;
-                
-                // Update frequency and phase delay if a note is playing
-                if (this.currentNoteInfo) {
-                    this.updateOsc2Frequency(startTime);
-                    this.updateOsc2PhaseDelay(startTime);
-                }
-                
-                // Reconnect vibrato if it was connected
-                if (this.vibratoLFO) {
-                    try {
-                        const osc2Node = this.osc2.getOscillatorNode();
-                        if (osc2Node && osc2Node.detune) {
-                            this.vibratoLFO.connect(osc2Node.detune);
-                        }
-                    } catch (e) {
-                        console.warn('Failed to connect vibrato to newly started second oscillator:', e);
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to start second oscillator:', e);
-            }
-        }
+        // Note: osc2 is always started during init() with synchronized timing
+        // We don't start it here to maintain phase synchronization across all synths
     };
     
     // Method to resynchronize secondary oscillator with specified start time
@@ -662,7 +636,6 @@ class MonoSynth {
     
     updateNoiseFilterBypass = () => {
         const rampTime = 0.01; // 10ms ramp to prevent pops
-        const currentTime = this.AC.currentTime;
         
         if (this.noiseFilterEnabled) {
             // Enable filtering - route through filter
@@ -693,7 +666,7 @@ class MonoSynth {
     updateNoteFrequency = (pitchEnv) => {
         if (!this.currentNoteInfo) return;
         
-        const { noteName, baseFreq_, octave } = this.currentNoteInfo;
+        const { noteName, octave } = this.currentNoteInfo;
         
         let noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         let baseFrequency = 261.63; // Default base frequency for C4
