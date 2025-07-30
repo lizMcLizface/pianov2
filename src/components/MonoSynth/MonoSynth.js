@@ -43,6 +43,7 @@ class MonoSynth {
         
         // Pre-create maximum number of additional oscillators for perfect phase alignment
         this.preCreateAdditionalOscillators(this.maxVoices - 1); // -1 because primary is separate
+        // this.connectVibratoToAll(this.vibratoLFO);
         
         // Initialize with one voice active (just the primary)
         this.setActiveVoiceCount(1);
@@ -72,6 +73,13 @@ class MonoSynth {
         
         // Track initialization state
         this.isInitialized = false;
+        
+        // Auto-resync mechanism
+        this.autoResyncEnabled = true; // Enable/disable auto-resync
+        this.autoResyncDelay = 5000; // 5 seconds of inactivity before auto-resync
+        this.lastActivityTime = Date.now(); // Track last note activity
+        this.autoResyncTimer = null; // Timer for auto-resync
+        this.isAutoResyncing = false; // Prevent multiple simultaneous auto-resyncs
     }
 
     preCreateAdditionalOscillators(maxAdditionalVoices) {
@@ -128,7 +136,7 @@ class MonoSynth {
         
         // Reconnect vibrato if it was previously connected
         if (this.vibratoLFO) {
-            this.connectVibratoToAll(this.vibratoLFO);
+            this.connectVibratoToAdditional(this.vibratoLFO);
         }
     }
 
@@ -314,13 +322,13 @@ class MonoSynth {
         
         // Connect main oscillators and sub oscillator to main oscillator mixer
         this.primaryOscillator.connect(this.primaryOscillatorPanner.getNode());
-        this.primaryOscillatorPanner.connect(this.oscillatorMixer.getNode());
+        this.primaryOscillatorPanner.connect(this.mainOscillatorMixer.getNode());
         
         this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         
         // Connect sub oscillator (always connected but controlled by gain)
-        this.subOscillator.connect(this.subOscillatorPanner.getNode());
-        this.subOscillatorPanner.connect(this.subOscillatorGain.getNode());
+        this.subOscillator.connect(this.subOscillatorGain.getNode());
+        // this.subOscillatorPanner.connect(this.subOscillatorGain.getNode());
         this.subOscillatorGain.connect(this.mainOscillatorMixer.getNode());
         
         // Connect second oscillator through delay node (always enabled for phase control)
@@ -426,6 +434,9 @@ class MonoSynth {
         // Mark as initialized
         this.isInitialized = true;
         
+        // Start auto-resync timer
+        this.updateActivityTime();
+        
         console.log('MonoSynth audio chain connected');
     }
 
@@ -480,6 +491,44 @@ class MonoSynth {
     }
 
     // Connect vibrato LFO to all oscillators
+    connectVibratoToAdditional(vibratoLFO) {
+        this.vibratoLFO = vibratoLFO; // Store reference for later use
+        
+        // Connect to primary oscillator
+        // try {
+        //     const primaryOscNode = this.primaryOscillator.getOscillatorNode();
+        //     if (primaryOscNode && primaryOscNode.detune) {
+        //         vibratoLFO.connect(primaryOscNode.detune);
+        //     }
+        // } catch (e) {
+        //     console.warn('Failed to connect vibrato to primary oscillator:', e);
+        // }
+        
+        // Connect to additional oscillators
+        this.additionalOscillators.forEach((osc, index) => {
+            try {
+                const oscNode = osc.getOscillatorNode();
+                if (oscNode && oscNode.detune) {
+                    vibratoLFO.connect(oscNode.detune);
+                }
+            } catch (e) {
+                console.warn('Failed to connect vibrato to additional oscillator', index, ':', e);
+            }
+        });
+        
+        // Connect to sub oscillator
+        // this.connectVibratoToSubOscillator(vibratoLFO);
+        
+        // Connect to second oscillator
+        // try {
+        //     const osc2Node = this.osc2.getOscillatorNode();
+        //     if (osc2Node && osc2Node.detune) {
+        //         vibratoLFO.connect(osc2Node.detune);
+        //     }
+        // } catch (e) {
+        //     console.warn('Failed to connect vibrato to second oscillator:', e);
+        // }
+    }
     connectVibratoToAll(vibratoLFO) {
         this.vibratoLFO = vibratoLFO; // Store reference for later use
         
@@ -493,17 +542,17 @@ class MonoSynth {
             console.warn('Failed to connect vibrato to primary oscillator:', e);
         }
         
-        // Connect to additional oscillators
-        this.additionalOscillators.forEach((osc, index) => {
-            try {
-                const oscNode = osc.getOscillatorNode();
-                if (oscNode && oscNode.detune) {
-                    vibratoLFO.connect(oscNode.detune);
-                }
-            } catch (e) {
-                console.warn('Failed to connect vibrato to additional oscillator', index, ':', e);
-            }
-        });
+        // // Connect to additional oscillators
+        // this.additionalOscillators.forEach((osc, index) => {
+        //     try {
+        //         const oscNode = osc.getOscillatorNode();
+        //         if (oscNode && oscNode.detune) {
+        //             vibratoLFO.connect(oscNode.detune);
+        //         }
+        //     } catch (e) {
+        //         console.warn('Failed to connect vibrato to additional oscillator', index, ':', e);
+        //     }
+        // });
         
         // Connect to sub oscillator
         this.connectVibratoToSubOscillator(vibratoLFO);
@@ -545,8 +594,271 @@ class MonoSynth {
     getFilterGain = () => this.filter.getGain();
     getCurrentNoteInfo = () => this.currentNoteInfo;
 
+    // Method to stop, disconnect, and recreate all oscillators with perfect synchronization
+    resynchronizeAllOscillators(startTime = null, isAutoResync = false) {
+        const logPrefix = isAutoResync ? 'MonoSynth AUTO-RESYNC:' : 'MonoSynth MANUAL RESYNC:';
+        console.log(`${logPrefix} disconnecting and recreating all oscillators`);
+        
+        if (!this.isInitialized) {
+            console.warn('MonoSynth not initialized, cannot resynchronize');
+            return;
+        }
+        
+        // Prevent multiple simultaneous auto-resyncs
+        if (isAutoResync && this.isAutoResyncing) {
+            console.log('MonoSynth: Auto-resync already in progress, skipping');
+            return;
+        }
+        
+        if (isAutoResync) {
+            this.isAutoResyncing = true;
+        }
+        
+        // Use provided start time or create one for synchronized oscillator recreation
+        const actualStartTime = startTime || (this.AC.currentTime + 0.1); // 100ms delay for clean recreation
+        
+        // Store current oscillator settings to restore them
+        const primaryType = this.primaryOscillator.getType();
+        const primaryDutyCycle = this.primaryOscillator.getDutyCycle();
+        const subType = this.subOscillator.getType();
+        const subDutyCycle = this.subOscillator.getDutyCycle();
+        const osc2Type = this.osc2.getType();
+        const osc2DutyCycle = this.osc2.getDutyCycle();
+        
+        // Store current playing state
+        const wasPlaying = !!this.currentNoteInfo;
+        const currentNoteInfo = this.currentNoteInfo;
+        
+        try {
+            // 1. Disconnect primary oscillator (don't stop - just disconnect and recreate)
+            this.primaryOscillator.disconnect();
+            this.primaryOscillatorPanner.disconnect();
+            
+            // 2. Disconnect additional oscillators
+            this.additionalOscillators.forEach((osc, index) => {
+                try {
+                    osc.disconnect();
+                    this.additionalOscillatorPanners[index].disconnect();
+                } catch (e) {
+                    console.warn('Failed to disconnect additional oscillator', index, ':', e);
+                }
+            });
+            
+            // 3. Disconnect sub oscillator
+            this.subOscillator.disconnect();
+            this.subOscillatorGain.disconnect();
+            
+            // 4. Disconnect second oscillator
+            this.osc2.disconnect();
+            this.osc2PhaseDelay.disconnect();
+            
+        } catch (e) {
+            console.warn('Error during oscillator disconnection phase:', e);
+        }
+        
+        // 5. Recreate all oscillators
+        try {
+            // Recreate primary oscillator
+            this.primaryOscillator = new Oscillator(this.AC);
+            this.primaryOscillatorPanner = new StereoPanner(this.AC);
+            
+            // Recreate additional oscillators
+            this.additionalOscillators = [];
+            this.additionalOscillatorPanners = [];
+            for (let i = 0; i < this.maxVoices - 1; i++) {
+                const osc = new Oscillator(this.AC);
+                const panner = new StereoPanner(this.AC);
+                
+                this.additionalOscillators.push(osc);
+                this.additionalOscillatorPanners.push(panner);
+                
+                // Connect oscillator to panner
+                osc.connect(panner.getNode());
+            }
+            
+            // Recreate sub oscillator
+            this.subOscillator = new Oscillator(this.AC);
+            
+            // Recreate second oscillator and delay
+            this.osc2 = new Oscillator(this.AC);
+            this.osc2PhaseDelay = this.AC.createDelay(0.1);
+            
+        } catch (e) {
+            console.error('Error during oscillator recreation:', e);
+            return;
+        }
+        
+        // 6. Reconnect audio routing with synchronized timing
+        try {
+            // Set base frequency for all oscillators BEFORE starting them
+            const baseFreq = 440; // A4 as reference frequency
+            
+            // Configure primary oscillator
+            this.primaryOscillator.setType(primaryType);
+            this.primaryOscillator.setDutyCycle(primaryDutyCycle);
+            this.primaryOscillator.setFreq(baseFreq, 0, actualStartTime);
+            
+            // Configure additional oscillators
+            this.additionalOscillators.forEach((osc, index) => {
+                try {
+                    osc.setType(primaryType); // Same as primary
+                    osc.setDutyCycle(primaryDutyCycle);
+                    osc.setFreq(baseFreq, 0, actualStartTime);
+                } catch (e) {
+                    console.warn('Failed to configure additional oscillator', index, ':', e);
+                }
+            });
+            
+            // Configure sub oscillator
+            this.subOscillator.setType(subType);
+            this.subOscillator.setDutyCycle(subDutyCycle);
+            this.subOscillator.setFreq(baseFreq, 0, actualStartTime);
+            
+            // Configure second oscillator
+            this.osc2.setType(osc2Type);
+            this.osc2.setDutyCycle(osc2DutyCycle);
+            this.osc2.setFreq(baseFreq, 0, actualStartTime);
+            
+            // Reconnect audio routing
+            this.primaryOscillator.connect(this.primaryOscillatorPanner.getNode());
+            this.primaryOscillatorPanner.connect(this.mainOscillatorMixer.getNode());
+            
+            this.subOscillator.connect(this.subOscillatorGain.getNode());
+            this.subOscillatorGain.connect(this.mainOscillatorMixer.getNode());
+            
+            this.osc2.connect(this.osc2PhaseDelay);
+            this.osc2PhaseDelay.connect(this.osc2Gain.getNode());
+            this.osc2Gain.connect(this.mainOscillatorMixer.getNode());
+            
+        } catch (e) {
+            console.error('Error during oscillator configuration:', e);
+            return;
+        }
+        
+        // 7. Start ALL oscillators with perfect synchronization
+        try {
+            this.primaryOscillator.start(actualStartTime);
+            
+            this.additionalOscillators.forEach((osc, index) => {
+                try {
+                    osc.start(actualStartTime);
+                } catch (e) {
+                    console.warn('Failed to start additional oscillator', index, ':', e);
+                }
+            });
+            
+            this.subOscillator.start(actualStartTime);
+            this.osc2.start(actualStartTime);
+            this.osc2Started = true;
+            
+        } catch (e) {
+            console.error('Error during oscillator starting:', e);
+            return;
+        }
+        
+        // 8. Restore active voice connections and settings
+        setTimeout(() => {
+            try {
+                // Restore active voice count connections
+                this.setActiveVoiceCount(this.voiceCount);
+                
+                // Reconnect vibrato if it was previously connected
+                if (this.vibratoLFO) {
+                    this.connectVibratoToAll(this.vibratoLFO);
+                }
+                
+                // If a note was playing, restore its frequency and detuning
+                if (wasPlaying && currentNoteInfo) {
+                    this.currentNoteInfo = currentNoteInfo;
+                    
+                    // Apply current frequencies with detuning
+                    const scheduleTime = this.AC.currentTime + 0.001;
+                    this.updateVoiceDetuning(scheduleTime, 0.001);
+                    this.updateSubOscillatorFrequency(scheduleTime, 0.001);
+                    this.updateOsc2Frequency(scheduleTime, 0.001);
+                    
+                    // Update stereo spread
+                    this.updateStereoSpread();
+                    this.updateSubOscillatorStereoSpread();
+                    
+                    // Update phase delay
+                    this.updateOsc2PhaseDelay();
+                }
+                
+                console.log(`${logPrefix} oscillator resynchronization completed successfully`);
+                
+                // Reset auto-resync flag
+                if (isAutoResync) {
+                    this.isAutoResyncing = false;
+                }
+                
+            } catch (e) {
+                console.error('Error during post-resync restoration:', e);
+                // Reset auto-resync flag even on error
+                if (isAutoResync) {
+                    this.isAutoResyncing = false;
+                }
+            }
+        }, (actualStartTime - this.AC.currentTime + 0.01) * 1000); // Wait for start time + small buffer
+    }
+
+    // Auto-resync management methods
+    updateActivityTime() {
+        this.lastActivityTime = Date.now();
+        this.resetAutoResyncTimer();
+    }
+
+    resetAutoResyncTimer() {
+        // Clear existing timer
+        if (this.autoResyncTimer) {
+            clearTimeout(this.autoResyncTimer);
+            this.autoResyncTimer = null;
+        }
+
+        // Only set new timer if auto-resync is enabled and synth is initialized
+        if (this.autoResyncEnabled && this.isInitialized) {
+            this.autoResyncTimer = setTimeout(() => {
+                // Check if we're still inactive and not currently playing a note
+                const timeSinceActivity = Date.now() - this.lastActivityTime;
+                
+                if (timeSinceActivity >= this.autoResyncDelay && !this.currentNote) {
+                    console.log(`MonoSynth: Auto-resync triggered after ${timeSinceActivity}ms of inactivity`);
+                    this.resynchronizeAllOscillators(null, true); // true indicates auto-resync
+                } else {
+                    // If there was recent activity or a note is playing, reset the timer
+                    this.resetAutoResyncTimer();
+                }
+            }, this.autoResyncDelay);
+        }
+    }
+
+    setAutoResyncEnabled(enabled) {
+        this.autoResyncEnabled = enabled;
+        if (enabled) {
+            this.updateActivityTime(); // Reset timer when enabling
+        } else {
+            // Clear timer when disabling
+            if (this.autoResyncTimer) {
+                clearTimeout(this.autoResyncTimer);
+                this.autoResyncTimer = null;
+            }
+        }
+        console.log(`MonoSynth auto-resync ${enabled ? 'enabled' : 'disabled'}`);
+    }
+
+    setAutoResyncDelay(delayMs) {
+        this.autoResyncDelay = Math.max(1000, delayMs); // Minimum 1 second
+        console.log(`MonoSynth auto-resync delay set to ${this.autoResyncDelay}ms`);
+        
+        // Reset timer with new delay if currently active
+        if (this.autoResyncEnabled) {
+            this.resetAutoResyncTimer();
+        }
+    }
+
     // Method to ensure oscillators stay synchronized after internal changes
     ensureOscillatorSynchronization() {
+        return;
         if (!this.isInitialized) return;
         
         const scheduleTime = this.AC.currentTime + 0.001;
@@ -645,7 +957,7 @@ class MonoSynth {
         
         this.subOscillator.setType(type);
         // Ensure synchronization is maintained after waveform change
-        this.ensureOscillatorSynchronization();
+        // this.ensureOscillatorSynchronization();
     };
     getSubOscWaveform = () => this.subOscillator.getType();
     setSubOscDutyCycle = (val) => this.subOscillator.setDutyCycle(val);
@@ -908,6 +1220,9 @@ class MonoSynth {
     noteOn = (noteInfo, synthProps) => {
         if (!noteInfo) return;
 
+        // Update activity time for auto-resync
+        this.updateActivityTime();
+
         // Clear any existing timeouts and generate new voice ID
         this.clearTimeouts();
         this.voiceId = ++this.voiceIdCounter;
@@ -997,7 +1312,8 @@ class MonoSynth {
         }
 
         // Set frequency for sub oscillator (no detuning, just octave offset)
-        if (this.subOscOctaveOffset !== 0) {
+        // if (this.subOscOctaveOffset !== 0) 
+            {
             const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
             const subBaseFreq = freq * octaveMultiplier;
             
@@ -1100,6 +1416,9 @@ class MonoSynth {
         return currentVoiceId; // Return voice ID for caller to track
     }
     noteOff = ({ gainEnv, filterEnv }, voiceId = null) => {
+        // Update activity time for auto-resync
+        this.updateActivityTime();
+        
         // If voiceId is provided, only process if it matches current voice
         if (voiceId !== null && this.voiceId !== voiceId) {
             console.log('MonoSynth noteOff ignored - voice ID mismatch. Current:', this.voiceId, 'Requested:', voiceId);
@@ -1161,6 +1480,9 @@ class MonoSynth {
         }
     }
     noteStop = (voiceId = null) => {
+        // Update activity time for auto-resync
+        this.updateActivityTime();
+        
         // If voiceId is provided, only process if it matches current voice
         if (voiceId !== null && this.voiceId !== voiceId) {
             console.log('MonoSynth noteStop ignored - voice ID mismatch. Current:', this.voiceId, 'Requested:', voiceId);
@@ -1315,6 +1637,23 @@ class MonoSynth {
         } catch (e) {
             console.warn('Error disconnecting audio nodes:', e);
         }
+    }
+
+    // Cleanup method to properly dispose of resources
+    destroy() {
+        // Clear auto-resync timer
+        if (this.autoResyncTimer) {
+            clearTimeout(this.autoResyncTimer);
+            this.autoResyncTimer = null;
+        }
+        
+        // Clear any running timeouts
+        this.clearTimeouts();
+        
+        // Stop any playing notes
+        this.noteStop();
+        
+        console.log('MonoSynth destroyed and resources cleaned up');
     }
 }
 

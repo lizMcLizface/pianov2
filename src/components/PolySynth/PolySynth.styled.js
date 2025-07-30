@@ -23,7 +23,7 @@ export const ModuleGridContainer = styled.div`
     display: grid;
     position: relative;
     width: fit-content;
-    grid-template-columns: 418px 320px 418px 226px 320px 226px 130px 130px 420px;
+    grid-template-columns: 418px 226px 226px 226px 226px 226px 226px 130px 130px 420px;
     gap: ${SPACING.m};
     justify-items: center;
     align-items: center;

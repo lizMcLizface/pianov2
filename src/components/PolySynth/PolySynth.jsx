@@ -603,6 +603,26 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setAllThemPitches(1.0);
     };
 
+    // Function to manually resynchronize all oscillators across all synths
+    const resynchronizeAllSynths = () => {
+        console.log('PolySynth: Manually triggering resynchronization of all synths');
+        
+        // Calculate synchronized start time for all synths
+        const syncStartTime = AC.currentTime + 0.2; // 200ms delay for clean resync
+        
+        // Resynchronize all synth instances
+        synthArr.forEach((synth, index) => {
+            try {
+                console.log(`Resynchronizing synth ${index + 1}/${synthArr.length}`);
+                synth.resynchronizeAllOscillators(syncStartTime, false); // false indicates manual resync
+            } catch (e) {
+                console.error(`Failed to resynchronize synth ${index}:`, e);
+            }
+        });
+        
+        console.log(`PolySynth: Initiated resynchronization of ${synthArr.length} synths at time ${syncStartTime}`);
+    };
+
     const resetSynthPos = () => synthPos = 0;
     const incrementSynthPos = () => synthPos = (synthPos + 1) % polyphonyGlobal;
 
@@ -2064,7 +2084,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             <ModuleGridContainer>
 
                 <Module label="VCO">
-                    <KnobGrid columns={4} rows={4}>
+                    <KnobGrid columns={4} rows={3}>
                         <Select
                             label="Waveform"
                             options={WAVEFORM}
@@ -2177,9 +2197,99 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label="Voicing">
+                    <KnobGrid columns={2} rows={3}>
+                        <Knob
+                            label="Polyphony"
+                            value={polyphony}
+                            modifier={7}
+                            offset={1}
+                            resetValue={8}
+                            isRounded
+                            onUpdate={(val) => {
+                                setPolyphony(val);
+                                resetSynthPos();
+                            }}
+                        />
+                        <Knob
+                            label="Portamento"
+                            value={portamentoSpeed}
+                            modifier={0.5}
+                            onUpdate={(val) => setPortamentoSpeed(val)}
+                            disabled={polyphony !== 1}
+                        />
+                        <Select
+                            label="Type"
+                            options={NOISE}
+                            value={noiseType}
+                            onUpdate={(val) => setNoiseType(val)}
+                        />
+                        <Knob
+                            label="Mix"
+                            value={noiseMix}
+                            modifier={1}
+                            min={0}
+                            max={1}
+                            onUpdate={(val) => setNoiseMix(val)}
+                        />
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => setNoiseFilterEnabled(!noiseFilterEnabled)}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: `2px solid ${noiseFilterEnabled ? '#4CAF50' : '#666'}`,
+                                    borderRadius: '4px',
+                                    background: noiseFilterEnabled ? '#4CAF50' : '#333',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '60px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => {
+                                    if (noiseFilterEnabled) {
+                                        e.target.style.background = '#45a049';
+                                    } else {
+                                        e.target.style.background = '#555';
+                                    }
+                                }}
+                                onMouseOut={(e) => {
+                                    e.target.style.background = noiseFilterEnabled ? '#4CAF50' : '#333';
+                                }}
+                            >
+                                {noiseFilterEnabled ? 'ON' : 'OFF'}
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Filter
+                            </span>
+                        </div>
+                        <Knob
+                            label="Filter Q"
+                            value={noiseFilterQ}
+                            modifier={10}
+                            min={0.1}
+                            max={30}
+                            disabled={!noiseFilterEnabled}
+                            onUpdate={(val) => setNoiseFilterQ(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                
 
                 <Module label="Gain Envelope">
-                    <KnobGrid columns={3} rows={2}>
+                    <KnobGrid columns={2} rows={3}>
                         <Knob
                             label="Attack"
                             value={gainAttack}
@@ -2220,158 +2330,188 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
 
-                <Module label="Filter">
-                    <KnobGrid columns={4} rows={2}>
+                
+                <Module label="Envelope Shape">
+                    <KnobGrid columns={2} rows={3}>
                         <Select
-                            label="Type"
-                            options={FILTER}
-                            value={filterType}
-                            onUpdate={(val) => setFilterType(val)}
+                            label="Attack"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeAttackShape}
+                            onUpdate={(val) => setEnvelopeAttackShape(val)}
+                        />
+                        <Select
+                            label="Decay"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeDecayShape}
+                            onUpdate={(val) => setEnvelopeDecayShape(val)}
+                        />
+                        <Select
+                            label="Release"
+                            options={ENVELOPE_SHAPE}
+                            value={envelopeReleaseShape}
+                            onUpdate={(val) => setEnvelopeReleaseShape(val)}
                         />
                         <Knob
-                            label="Cutoff"
-                            value={filterFreq}
-                            scalingType="logarithmic"
-                            minValue={20}
-                            maxValue={11020}
-                            resetValue={11000}
-                            isRounded
-                            onUpdate={(val) => setFilterFreq(val)}
+                            label="Attack Exp"
+                            value={envelopeAttackExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeAttackExponent(val)}
                         />
                         <Knob
-                            label="Q"
-                            value={filterQ}
-                            modifier={20}
-                            onUpdate={(val) => setFilterQ(val)}
+                            label="Decay Exp"
+                            value={envelopeDecayExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeDecayExponent(val)}
                         />
                         <Knob
-                            label="Gain"
+                            label="Release Exp"
+                            value={envelopeReleaseExponent}
+                            modifier={4}
+                            offset={0.1}
+                            resetValue={2}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setEnvelopeReleaseExponent(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                <Module label="Master Limiter">
+                    <KnobGrid columns={2} rows={3}>
+                        <Knob
+                            label="Threshold"
                             type="B"
-                            value={filterGain}
+                            value={masterLimiterThreshold}
+                            modifier={48}
+                            offset={-24}
+                            resetValue={-6}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setMasterLimiterThreshold(val)}
+                        />
+                        <Knob
+                            label="Ratio"
+                            value={masterLimiterRatio}
+                            modifier={19}
+                            offset={1}
+                            resetValue={20}
+                            isRounded
+                            onUpdate={(val) => setMasterLimiterRatio(val)}
+                        />
+                        <Knob
+                            label="Knee"
+                            value={masterLimiterKnee}
                             modifier={40}
-                            onUpdate={(val) => setFilterGain(val)}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setMasterLimiterKnee(val)}
                         />
                         <Knob
                             label="Attack"
-                            value={filterAttack}
-                            modifier={3}
-                            onUpdate={(val) => setFilterAttack(val)}
-                        />
-                        <Knob
-                            label="Decay"
-                            value={filterDecay}
-                            modifier={3}
-                            onUpdate={(val) => setFilterDecay(val)}
+                            value={masterLimiterAttack}
+                            scalingType="logarithmic"
+                            minValue={0.0001}
+                            maxValue={1}
+                            resetValue={0.005}
+                            decimalPlaces={4}
+                            onUpdate={(val) => setMasterLimiterAttack(val)}
                         />
                         <Knob
                             label="Release"
-                            value={filterRelease}
-                            modifier={3}
-                            onUpdate={(val) => setFilterRelease(val)}
-                        />
-                        <Knob
-                            label="Amount"
-                            type="A"
-                            modifier={11000}
-                            scalingType="symmetric-log"
-                            isRounded
-                            value={filterEnvAmount}
-                            onUpdate={(val) => setFilterEnvAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-                
-                <Module label="Delay">
-                    <KnobGrid columns={2} rows={2}>
-                        <Knob
-                            label="Time"
-                            value={delayTime}
-                            onUpdate={(val) => setDelayTime(val)}
-                        />
-                        <Knob
-                            label="Feedback"
-                            value={delayFeedback}
-                            onUpdate={(val) => setDelayFeedback(val)}
-                        />
-                        <Knob
-                            label="Tone"
-                            value={delayTone}
-                            modifier={11000}
-                            resetValue={4400}
-                            isRounded
-                            onUpdate={(val) => setDelayTone(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={delayAmount}
-                            onUpdate={(val) => setDelayAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-
-                <Module label="Ping Pong Delay">
-                    <KnobGrid columns={2} rows={2}>
-                        <Knob
-                            label="Time"
-                            value={pingPongDelayTime}
-                            onUpdate={(val) => setPingPongDelayTime(val)}
-                        />
-                        <Knob
-                            label="Feedback"
-                            value={pingPongFeedback}
-                            onUpdate={(val) => setPingPongFeedback(val)}
-                        />
-                        <Knob
-                            label="Tone"
-                            value={pingPongTone}
-                            modifier={11000}
-                            resetValue={4400}
-                            isRounded
-                            onUpdate={(val) => setPingPongTone(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={pingPongAmount}
-                            onUpdate={(val) => setPingPongAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-                
-
-                <Module label="Master Filter">
-                    <KnobGrid columns={2} rows={2}>
-                        <Select
-                            label="Type"
-                            options={FILTER}
-                            value={masterFilterType}
-                            onUpdate={(val) => setMasterFilterType(val)}
-                        />
-                        <Knob
-                            label="Cutoff"
-                            value={masterFilterFreq}
+                            value={masterLimiterRelease}
                             scalingType="logarithmic"
-                            minValue={20}
-                            maxValue={11020}
-                            resetValue={11000}
-                            isRounded
-                            onUpdate={(val) => setMasterFilterFreq(val)}
-                        />
-                        <Knob
-                            label="Q"
-                            value={masterFilterQ}
-                            modifier={20}
-                            onUpdate={(val) => setMasterFilterQ(val)}
-                        />
-                        <Knob
-                            label="Gain"
-                            type="B"
-                            value={masterFilterGain}
-                            modifier={40}
-                            onUpdate={(val) => setMasterFilterGain(val)}
+                            minValue={0.001}
+                            maxValue={3}
+                            resetValue={0.05}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setMasterLimiterRelease(val)}
                         />
                     </KnobGrid>
                 </Module>
+
+                
+                <Module label="Flanger">
+                    <KnobGrid columns={2} rows={3}>
+                        <Knob
+                            label="Delay"
+                            value={flangerDelay}
+                            decimalPlaces={5}
+                            modifier={0.015}
+                            offset={0.005}
+                            resetValue={0.01}
+                            onUpdate={(val) => setFlangerDelay(val)}
+                        />
+                        <Knob
+                            label="Depth"
+                            value={flangerDepth}
+                            decimalPlaces={5}
+                            modifier={0.005}
+                            onUpdate={(val) => setFlangerDepth(val)}
+                        />
+                        <Knob
+                            label="Rate"
+                            value={flangerRate}
+                            modifier={2}
+                            onUpdate={(val) => setFlangerRate(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={flangerFeedback}
+                            onUpdate={(val) => setFlangerFeedback(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={flangerAmount}
+                            onUpdate={(val) => setFlangerAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+                <Module label="Phaser">
+                    <KnobGrid columns={2} rows={3}>
+                        <Knob
+                            label="Rate"
+                            value={phaserRate}
+                            modifier={5}
+                            resetValue={0.5}
+                            decimalPlaces={2}
+                            onUpdate={(val) => setPhaserRate(val)}
+                        />
+                        <Knob
+                            label="Depth"
+                            value={phaserDepth}
+                            modifier={1000}
+                            resetValue={800}
+                            isRounded
+                            onUpdate={(val) => setPhaserDepth(val)}
+                        />
+                        <Knob
+                            label="Frequency"
+                            value={phaserFrequency}
+                            scalingType="logarithmic"
+                            minValue={200}
+                            maxValue={8000}
+                            resetValue={800}
+                            isRounded
+                            onUpdate={(val) => setPhaserFrequency(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={phaserFeedback}
+                            resetValue={0.3}
+                            onUpdate={(val) => setPhaserFeedback(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={phaserAmount}
+                            onUpdate={(val) => setPhaserAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                
 
 
                 <Module label="Drive">
@@ -2608,258 +2748,67 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
 
 
-                <Module label="Voicing">
-                    <KnobGrid columns={3} rows={2}>
-                        <Knob
-                            label="Polyphony"
-                            value={polyphony}
-                            modifier={7}
-                            offset={1}
-                            resetValue={8}
-                            isRounded
-                            onUpdate={(val) => {
-                                setPolyphony(val);
-                                resetSynthPos();
-                            }}
-                        />
-                        <Knob
-                            label="Portamento"
-                            value={portamentoSpeed}
-                            modifier={0.5}
-                            onUpdate={(val) => setPortamentoSpeed(val)}
-                            disabled={polyphony !== 1}
-                        />
+                <Module label="Filter">
+                    <KnobGrid columns={4} rows={2}>
                         <Select
                             label="Type"
-                            options={NOISE}
-                            value={noiseType}
-                            onUpdate={(val) => setNoiseType(val)}
+                            options={FILTER}
+                            value={filterType}
+                            onUpdate={(val) => setFilterType(val)}
                         />
                         <Knob
-                            label="Mix"
-                            value={noiseMix}
-                            modifier={1}
-                            min={0}
-                            max={1}
-                            onUpdate={(val) => setNoiseMix(val)}
-                        />
-                        <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            justifyContent: 'center'
-                        }}>
-                            <button
-                                onClick={() => setNoiseFilterEnabled(!noiseFilterEnabled)}
-                                style={{
-                                    padding: '8px 12px',
-                                    fontSize: '11px',
-                                    border: `2px solid ${noiseFilterEnabled ? '#4CAF50' : '#666'}`,
-                                    borderRadius: '4px',
-                                    background: noiseFilterEnabled ? '#4CAF50' : '#333',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                    minWidth: '60px',
-                                    fontWeight: 'bold'
-                                }}
-                                onMouseOver={(e) => {
-                                    if (noiseFilterEnabled) {
-                                        e.target.style.background = '#45a049';
-                                    } else {
-                                        e.target.style.background = '#555';
-                                    }
-                                }}
-                                onMouseOut={(e) => {
-                                    e.target.style.background = noiseFilterEnabled ? '#4CAF50' : '#333';
-                                }}
-                            >
-                                {noiseFilterEnabled ? 'ON' : 'OFF'}
-                            </button>
-                            <span style={{ 
-                                fontSize: '10px', 
-                                color: '#999',
-                                textAlign: 'center',
-                                lineHeight: '1.2'
-                            }}>
-                                Filter
-                            </span>
-                        </div>
-                        <Knob
-                            label="Filter Q"
-                            value={noiseFilterQ}
-                            modifier={10}
-                            min={0.1}
-                            max={30}
-                            disabled={!noiseFilterEnabled}
-                            onUpdate={(val) => setNoiseFilterQ(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-                
-                <Module label="Envelope Shape">
-                    <KnobGrid columns={3} rows={2}>
-                        <Select
-                            label="Attack"
-                            options={ENVELOPE_SHAPE}
-                            value={envelopeAttackShape}
-                            onUpdate={(val) => setEnvelopeAttackShape(val)}
-                        />
-                        <Select
-                            label="Decay"
-                            options={ENVELOPE_SHAPE}
-                            value={envelopeDecayShape}
-                            onUpdate={(val) => setEnvelopeDecayShape(val)}
-                        />
-                        <Select
-                            label="Release"
-                            options={ENVELOPE_SHAPE}
-                            value={envelopeReleaseShape}
-                            onUpdate={(val) => setEnvelopeReleaseShape(val)}
-                        />
-                        <Knob
-                            label="Attack Exp"
-                            value={envelopeAttackExponent}
-                            modifier={4}
-                            offset={0.1}
-                            resetValue={2}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setEnvelopeAttackExponent(val)}
-                        />
-                        <Knob
-                            label="Decay Exp"
-                            value={envelopeDecayExponent}
-                            modifier={4}
-                            offset={0.1}
-                            resetValue={2}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setEnvelopeDecayExponent(val)}
-                        />
-                        <Knob
-                            label="Release Exp"
-                            value={envelopeReleaseExponent}
-                            modifier={4}
-                            offset={0.1}
-                            resetValue={2}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setEnvelopeReleaseExponent(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-                
-                <Module label="Flanger">
-                    <KnobGrid columns={3} rows={2}>
-                        <Knob
-                            label="Delay"
-                            value={flangerDelay}
-                            decimalPlaces={5}
-                            modifier={0.015}
-                            offset={0.005}
-                            resetValue={0.01}
-                            onUpdate={(val) => setFlangerDelay(val)}
-                        />
-                        <Knob
-                            label="Depth"
-                            value={flangerDepth}
-                            decimalPlaces={5}
-                            modifier={0.005}
-                            onUpdate={(val) => setFlangerDepth(val)}
-                        />
-                        <Knob
-                            label="Rate"
-                            value={flangerRate}
-                            modifier={2}
-                            onUpdate={(val) => setFlangerRate(val)}
-                        />
-                        <Knob
-                            label="Feedback"
-                            value={flangerFeedback}
-                            onUpdate={(val) => setFlangerFeedback(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={flangerAmount}
-                            onUpdate={(val) => setFlangerAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Chorus">
-                    <KnobGrid columns={2} rows={2}>
-                        <Knob
-                            label="Rate"
-                            value={chorusRate}
-                            modifier={5}
-                            resetValue={0.6}
-                            decimalPlaces={2}
-                            onUpdate={(val) => setChorusRate(val)}
-                        />
-                        <Knob
-                            label="Depth"
-                            value={chorusDepth}
-                            modifier={0.01}
-                            resetValue={0.002}
-                            decimalPlaces={4}
-                            onUpdate={(val) => setChorusDepth(val)}
-                        />
-                        <Knob
-                            label="Feedback"
-                            value={chorusFeedback}
-                            onUpdate={(val) => setChorusFeedback(val)}
-                        />
-                        <Knob
-                            label="Dry/Wet"
-                            value={chorusAmount}
-                            onUpdate={(val) => setChorusAmount(val)}
-                        />
-                    </KnobGrid>
-                </Module>
-
-                <Module label="Phaser">
-                    <KnobGrid columns={3} rows={2}>
-                        <Knob
-                            label="Rate"
-                            value={phaserRate}
-                            modifier={5}
-                            resetValue={0.5}
-                            decimalPlaces={2}
-                            onUpdate={(val) => setPhaserRate(val)}
-                        />
-                        <Knob
-                            label="Depth"
-                            value={phaserDepth}
-                            modifier={1000}
-                            resetValue={800}
-                            isRounded
-                            onUpdate={(val) => setPhaserDepth(val)}
-                        />
-                        <Knob
-                            label="Frequency"
-                            value={phaserFrequency}
+                            label="Cutoff"
+                            value={filterFreq}
                             scalingType="logarithmic"
-                            minValue={200}
-                            maxValue={8000}
-                            resetValue={800}
+                            minValue={20}
+                            maxValue={11020}
+                            resetValue={11000}
                             isRounded
-                            onUpdate={(val) => setPhaserFrequency(val)}
+                            onUpdate={(val) => setFilterFreq(val)}
                         />
                         <Knob
-                            label="Feedback"
-                            value={phaserFeedback}
-                            resetValue={0.3}
-                            onUpdate={(val) => setPhaserFeedback(val)}
+                            label="Q"
+                            value={filterQ}
+                            modifier={20}
+                            onUpdate={(val) => setFilterQ(val)}
                         />
                         <Knob
-                            label="Dry/Wet"
-                            value={phaserAmount}
-                            onUpdate={(val) => setPhaserAmount(val)}
+                            label="Gain"
+                            type="B"
+                            value={filterGain}
+                            modifier={40}
+                            onUpdate={(val) => setFilterGain(val)}
+                        />
+                        <Knob
+                            label="Attack"
+                            value={filterAttack}
+                            modifier={3}
+                            onUpdate={(val) => setFilterAttack(val)}
+                        />
+                        <Knob
+                            label="Decay"
+                            value={filterDecay}
+                            modifier={3}
+                            onUpdate={(val) => setFilterDecay(val)}
+                        />
+                        <Knob
+                            label="Release"
+                            value={filterRelease}
+                            modifier={3}
+                            onUpdate={(val) => setFilterRelease(val)}
+                        />
+                        <Knob
+                            label="Amount"
+                            type="A"
+                            modifier={11000}
+                            scalingType="symmetric-log"
+                            isRounded
+                            value={filterEnvAmount}
+                            onUpdate={(val) => setFilterEnvAmount(val)}
                         />
                     </KnobGrid>
                 </Module>
-
-
-
+                
                 <Module label="EQ2">
                     <KnobGrid columns={2} rows={2}>
                         <Knob
@@ -2895,54 +2844,126 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                         />
                     </KnobGrid>
                 </Module>
-                <Module label="Master Limiter">
-                    <KnobGrid columns={3} rows={2}>
+                
+                <Module label="Delay">
+                    <KnobGrid columns={2} rows={2}>
                         <Knob
-                            label="Threshold"
-                            type="B"
-                            value={masterLimiterThreshold}
-                            modifier={48}
-                            offset={-24}
-                            resetValue={-6}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setMasterLimiterThreshold(val)}
+                            label="Time"
+                            value={delayTime}
+                            onUpdate={(val) => setDelayTime(val)}
                         />
                         <Knob
-                            label="Ratio"
-                            value={masterLimiterRatio}
-                            modifier={19}
-                            offset={1}
-                            resetValue={20}
+                            label="Feedback"
+                            value={delayFeedback}
+                            onUpdate={(val) => setDelayFeedback(val)}
+                        />
+                        <Knob
+                            label="Tone"
+                            value={delayTone}
+                            modifier={11000}
+                            resetValue={4400}
                             isRounded
-                            onUpdate={(val) => setMasterLimiterRatio(val)}
+                            onUpdate={(val) => setDelayTone(val)}
                         />
                         <Knob
-                            label="Knee"
-                            value={masterLimiterKnee}
+                            label="Dry/Wet"
+                            value={delayAmount}
+                            onUpdate={(val) => setDelayAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+
+
+                <Module label="Ping Pong Delay">
+                    <KnobGrid columns={2} rows={2}>
+                        <Knob
+                            label="Time"
+                            value={pingPongDelayTime}
+                            onUpdate={(val) => setPingPongDelayTime(val)}
+                        />
+                        <Knob
+                            label="Feedback"
+                            value={pingPongFeedback}
+                            onUpdate={(val) => setPingPongFeedback(val)}
+                        />
+                        <Knob
+                            label="Tone"
+                            value={pingPongTone}
+                            modifier={11000}
+                            resetValue={4400}
+                            isRounded
+                            onUpdate={(val) => setPingPongTone(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={pingPongAmount}
+                            onUpdate={(val) => setPingPongAmount(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                
+                <Module label="Master Filter">
+                    <KnobGrid columns={2} rows={2}>
+                        <Select
+                            label="Type"
+                            options={FILTER}
+                            value={masterFilterType}
+                            onUpdate={(val) => setMasterFilterType(val)}
+                        />
+                        <Knob
+                            label="Cutoff"
+                            value={masterFilterFreq}
+                            scalingType="logarithmic"
+                            minValue={20}
+                            maxValue={11020}
+                            resetValue={11000}
+                            isRounded
+                            onUpdate={(val) => setMasterFilterFreq(val)}
+                        />
+                        <Knob
+                            label="Q"
+                            value={masterFilterQ}
+                            modifier={20}
+                            onUpdate={(val) => setMasterFilterQ(val)}
+                        />
+                        <Knob
+                            label="Gain"
+                            type="B"
+                            value={masterFilterGain}
                             modifier={40}
-                            resetValue={0}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setMasterLimiterKnee(val)}
+                            onUpdate={(val) => setMasterFilterGain(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                
+
+                <Module label="Chorus">
+                    <KnobGrid columns={2} rows={2}>
+                        <Knob
+                            label="Rate"
+                            value={chorusRate}
+                            modifier={5}
+                            resetValue={0.6}
+                            decimalPlaces={2}
+                            onUpdate={(val) => setChorusRate(val)}
                         />
                         <Knob
-                            label="Attack"
-                            value={masterLimiterAttack}
-                            scalingType="logarithmic"
-                            minValue={0.0001}
-                            maxValue={1}
-                            resetValue={0.005}
+                            label="Depth"
+                            value={chorusDepth}
+                            modifier={0.01}
+                            resetValue={0.002}
                             decimalPlaces={4}
-                            onUpdate={(val) => setMasterLimiterAttack(val)}
+                            onUpdate={(val) => setChorusDepth(val)}
                         />
                         <Knob
-                            label="Release"
-                            value={masterLimiterRelease}
-                            scalingType="logarithmic"
-                            minValue={0.001}
-                            maxValue={3}
-                            resetValue={0.05}
-                            decimalPlaces={3}
-                            onUpdate={(val) => setMasterLimiterRelease(val)}
+                            label="Feedback"
+                            value={chorusFeedback}
+                            onUpdate={(val) => setChorusFeedback(val)}
+                        />
+                        <Knob
+                            label="Dry/Wet"
+                            value={chorusAmount}
+                            onUpdate={(val) => setChorusAmount(val)}
                         />
                     </KnobGrid>
                 </Module>
@@ -2964,6 +2985,10 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label=""></Module>
+
+
+
                 <Module label="Reverb">
                     <KnobGrid columns={1} rows={2}>
                         <Select
@@ -2981,9 +3006,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
 
-                <Module label="Spectrum">
-                    <SpectrumAnalyzer audioCtx={AC} sourceNode={masterGain} />
-                </Module>
                 
                 {/* Arpeggiator Module */}
                 <Module label="Arpeggiator">
@@ -3203,6 +3225,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
 
                 {/* <Lines /> */}
+                <Module label="Spectrum">
+                    <SpectrumAnalyzer audioCtx={AC} sourceNode={masterGain} />
+                </Module>
 
                 <MicrotonalModule label="Microtonal">
                     <KnobGrid columns={15} rows={1}>
@@ -3349,13 +3374,41 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                     background: '#333',
                                     color: '#fff',
                                     cursor: 'pointer',
-                                    fontFamily: 'inherit'
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px'
                                 }}
                                 onMouseOver={(e) => e.target.style.background = '#555'}
                                 onMouseOut={(e) => e.target.style.background = '#333'}
                             >
                                 Reset All
                             </button>
+                            <button 
+                                onClick={resynchronizeAllSynths}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '1px solid #FF6B35',
+                                    borderRadius: '4px',
+                                    background: '#FF6B35',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#e55a2b'}
+                                onMouseOut={(e) => e.target.style.background = '#FF6B35'}
+                            >
+                                Resync
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Oscillators
+                            </span>
                         </div>
                     </KnobGrid>
                 </MicrotonalModule>
