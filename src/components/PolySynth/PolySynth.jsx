@@ -158,6 +158,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [osc2DutyCycle, setOsc2DutyCycle] = useState(0.5);
     const [osc2Amount, setOsc2Amount] = useState(0);
     const [osc2PhaseOffset, setOsc2PhaseOffset] = useState(0);
+    const [osc2OctaveOffset, setOsc2OctaveOffset] = useState(0);
     
     // Voice Spreading and Detuning Parameters
     const [voiceCount, setVoiceCount] = useState(1);
@@ -329,6 +330,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             osc2DutyCycle,
             osc2Amount,
             osc2PhaseOffset,
+            osc2OctaveOffset,
             voiceCount,
             detuneSpread,
             stereoSpread,
@@ -477,6 +479,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             if (presetData.osc2DutyCycle !== undefined) setOsc2DutyCycle(presetData.osc2DutyCycle);
             if (presetData.osc2Amount !== undefined) setOsc2Amount(presetData.osc2Amount);
             if (presetData.osc2PhaseOffset !== undefined) setOsc2PhaseOffset(presetData.osc2PhaseOffset);
+            if (presetData.osc2OctaveOffset !== undefined) setOsc2OctaveOffset(presetData.osc2OctaveOffset);
             if (presetData.voiceCount !== undefined) setVoiceCount(presetData.voiceCount);
             if (presetData.detuneSpread !== undefined) setDetuneSpread(presetData.detuneSpread);
             if (presetData.stereoSpread !== undefined) setStereoSpread(presetData.stereoSpread);
@@ -1724,6 +1727,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setOsc2DutyCycle(preset.osc2DutyCycle || 0.5);
         setOsc2Amount(preset.osc2Amount || 0);
         setOsc2PhaseOffset(preset.osc2PhaseOffset || 0);
+        setOsc2OctaveOffset(preset.osc2OctaveOffset || 0);
         
         // Load voice spreading settings with defaults
         setVoiceCount(preset.voiceCount || 1);
@@ -1895,12 +1899,15 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 const scheduleTime = AC.currentTime + 0.001;
                 synthArr.forEach((synth) => synth.setOsc2PhaseOffset(osc2PhaseOffset, scheduleTime));
             }
+            if (synth1.getOsc2OctaveOffset() !== osc2OctaveOffset) {
+                synthArr.forEach((synth) => synth.setOsc2OctaveOffset(osc2OctaveOffset));
+            }
             if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
             if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
             if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));
             if (synth1.getFilterGain() !== filterGain) synthArr.forEach((synth) => synth.setFilterGain(filterGain));
         });
-    }, [vcoType, vcoDutyCycle, subOscOctaveOffset, subOscType, osc2Type, osc2DutyCycle, osc2Detune, osc2Amount, osc2PhaseOffset, filterType, filterFreq, filterQ, filterGain]);
+    }, [vcoType, vcoDutyCycle, subOscOctaveOffset, subOscType, osc2Type, osc2DutyCycle, osc2Detune, osc2Amount, osc2PhaseOffset, osc2OctaveOffset, filterType, filterFreq, filterQ, filterGain]);
 
     useLayoutEffect(() => {
         scheduleParameterUpdate('voices', () => {
@@ -2142,6 +2149,15 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             onUpdate={(val) => setOsc2Detune(val)}
                         />
                         <Knob
+                            label="Osc2 Octave"
+                            value={osc2OctaveOffset}
+                            modifier={6}
+                            offset={-3}
+                            decimalPlaces={0}
+                            disabled={osc2Type === 'off'}
+                            onUpdate={(val) => setOsc2OctaveOffset(Math.round(val))}
+                        />
+                        <Knob
                             label="Osc2 Amount"
                             value={osc2Amount}
                             modifier={1}
@@ -2151,37 +2167,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             decimalPlaces={2}
                             disabled={osc2Type === 'off'}
                             onUpdate={(val) => setOsc2Amount(val)}
-                        />
-                        <Knob
-                            label="Voices"
-                            value={voiceCount}
-                            modifier={8}
-                            offset={1}
-                            min={1}
-                            max={8}
-                            resetValue={1}
-                            decimalPlaces={0}
-                            onUpdate={(val) => setVoiceCount(Math.round(val))}
-                        />
-                        <Knob
-                            label="Detune Spread"
-                            value={detuneSpread}
-                            modifier={100}
-                            min={0}
-                            max={100}
-                            resetValue={0}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setDetuneSpread(val)}
-                        />
-                        <Knob
-                            label="Stereo Spread"
-                            value={stereoSpread}
-                            modifier={100}
-                            min={0}
-                            max={100}
-                            resetValue={0}
-                            decimalPlaces={1}
-                            onUpdate={(val) => setStereoSpread(val)}
                         />
                         <Knob
                             label="Osc2 Phase"
@@ -2968,6 +2953,41 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
+                <Module label="Voices">
+                    <KnobGrid columns={2} rows={2}>
+                        <Knob
+                            label="Voices"
+                            value={voiceCount}
+                            modifier={8}
+                            offset={1}
+                            min={1}
+                            max={8}
+                            resetValue={1}
+                            decimalPlaces={0}
+                            onUpdate={(val) => setVoiceCount(Math.round(val))}
+                        />
+                        <Knob
+                            label="Detune Spread"
+                            value={detuneSpread}
+                            modifier={100}
+                            min={0}
+                            max={100}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setDetuneSpread(val)}
+                        />
+                        <Knob
+                            label="Stereo Spread"
+                            value={stereoSpread}
+                            modifier={100}
+                            min={0}
+                            max={100}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setStereoSpread(val)}
+                        />
+                        </KnobGrid>
+                        </Module>
                 <Module label="Vibrato">
                     <KnobGrid columns={1} rows={2}>
                         <Knob
@@ -2985,7 +3005,6 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                     </KnobGrid>
                 </Module>
 
-                <Module label=""></Module>
 
 
 

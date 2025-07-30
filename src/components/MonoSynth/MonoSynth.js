@@ -27,6 +27,7 @@ class MonoSynth {
         this.osc2Detune = 0; // Detune in cents
         this.osc2Amount = 0; // Mix amount (0-1)
         this.osc2PhaseOffset = 0; // Phase offset in degrees (0-360)
+        this.osc2OctaveOffset = 0; // Range: -3 to +3 octaves
         this.osc2Started = false; // Track if osc2 has been started
         
         // Primary voice oscillator (always active)
@@ -1050,6 +1051,16 @@ class MonoSynth {
     };
     getOsc2PhaseOffset = () => this.osc2PhaseOffset;
     
+    setOsc2OctaveOffset = (octaveOffset) => {
+        const clampedOffset = Math.max(-3, Math.min(3, octaveOffset));
+        this.osc2OctaveOffset = clampedOffset;
+        
+        // Update frequency if a note is currently playing
+        this.updateOsc2Frequency();
+    };
+    
+    getOsc2OctaveOffset = () => this.osc2OctaveOffset;
+    
     // Method to update phase delay based on current frequency and phase offset
     updateOsc2PhaseDelay = (scheduleTime = null) => {
         // Use provided schedule time or current time for synchronized updates
@@ -1087,14 +1098,18 @@ class MonoSynth {
         // Use provided schedule time or create one for UI changes
         const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
         
-        // Apply detune in cents
+        // Apply octave offset first
+        const octaveMultiplier = Math.pow(2, this.osc2OctaveOffset);
+        const octaveShiftedFreq = baseFreq_ * octaveMultiplier;
+        
+        // Then apply detune in cents
         const detuneRatio = Math.pow(2, this.osc2Detune / 1200);
-        const detunedFreq = baseFreq_ * detuneRatio;
+        const finalFreq = octaveShiftedFreq * detuneRatio;
         
         // Validate frequency and update to keep it tracking
-        if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
+        if (isFinite(finalFreq) && finalFreq > 0 && finalFreq <= 20000) {
             try {
-                this.osc2.setFreq(detunedFreq, rampTime, actualScheduleTime);
+                this.osc2.setFreq(finalFreq, rampTime, actualScheduleTime);
                 // Update phase delay whenever frequency changes
                 this.updateOsc2PhaseDelay();
             } catch (e) {
