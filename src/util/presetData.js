@@ -56,7 +56,7 @@ export default {
         masterLimiterAttack: 0.005,
         masterLimiterRelease: 0.05,
         subOscType: 'sine',
-        osc2Type: 'off',
+        osc2Type: 'sine',
         osc2Detune: 0,
         osc2DutyCycle: 0.5,
         osc2Amount: 0,

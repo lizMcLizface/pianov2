@@ -115,8 +115,14 @@ class MonoSynth {
             // Start the new oscillator only if init has already been called
             if (this.isInitialized) {
                 try {
-                    // Use a small future time for phase alignment with existing oscillators
+                    // Set base frequency before starting for phase alignment
                     const startTime = this.AC.currentTime + 0.001;
+                    osc.setFreq(440, 0, startTime); // Set to reference frequency
+                    
+                    // Set waveform to match existing oscillators
+                    const existingWaveform = this.oscillators.length > 1 ? this.oscillators[0].getType() : 'sine';
+                    osc.setType(existingWaveform);
+                    
                     osc.start(startTime);
                 } catch (e) {
                     console.warn('Failed to start oscillator:', e);
@@ -302,6 +308,58 @@ class MonoSynth {
         
         console.log('Connected oscillator mixers and noise paths to mixer');
         
+        // Set all oscillators to the same base frequency BEFORE starting them
+        // This ensures consistent phase alignment regardless of when frequencies are later changed
+        const baseFreq = 440; // A4 as reference frequency
+        
+        // Set frequency for all main oscillators
+        this.oscillators.forEach(osc => {
+            try {
+                osc.setFreq(baseFreq, 0, actualStartTime);
+            } catch (e) {
+                console.warn('Failed to set main oscillator base frequency:', e);
+            }
+        });
+        
+        // Set frequency for all sub oscillators
+        this.subOscillators.forEach(subOsc => {
+            try {
+                subOsc.setFreq(baseFreq, 0, actualStartTime);
+            } catch (e) {
+                console.warn('Failed to set sub oscillator base frequency:', e);
+            }
+        });
+        
+        // Set frequency for second oscillator
+        try {
+            this.osc2.setFreq(baseFreq, 0, actualStartTime);
+        } catch (e) {
+            console.warn('Failed to set second oscillator base frequency:', e);
+        }
+        
+        // Set default waveforms for all oscillators to ensure consistent initialization
+        this.oscillators.forEach(osc => {
+            try {
+                osc.setType('sine'); // Default to sine wave
+            } catch (e) {
+                console.warn('Failed to set main oscillator default waveform:', e);
+            }
+        });
+        
+        this.subOscillators.forEach(subOsc => {
+            try {
+                subOsc.setType('sine'); // Default to sine wave
+            } catch (e) {
+                console.warn('Failed to set sub oscillator default waveform:', e);
+            }
+        });
+        
+        try {
+            this.osc2.setType('sine'); // Default to sine wave
+        } catch (e) {
+            console.warn('Failed to set second oscillator default waveform:', e);
+        }
+        
         // Start all main oscillators with synchronized timing
         this.oscillators.forEach(osc => {
             try {
@@ -447,10 +505,74 @@ class MonoSynth {
     getFilterGain = () => this.filter.getGain();
     getCurrentNoteInfo = () => this.currentNoteInfo;
 
+    // Method to ensure oscillators stay synchronized after internal changes
+    ensureOscillatorSynchronization() {
+        if (!this.isInitialized) return;
+        
+        const scheduleTime = this.AC.currentTime + 0.001;
+        const baseFreq = this.currentNoteInfo ? this.currentNoteInfo.baseFreq_ : 440;
+        
+        // Resync all main oscillators to the same frequency
+        this.oscillators.forEach(osc => {
+            try {
+                osc.setFreq(baseFreq, 0.001, scheduleTime);
+            } catch (e) {
+                console.warn('Failed to resync main oscillator:', e);
+            }
+        });
+        
+        // Resync all sub oscillators
+        if (this.subOscOctaveOffset !== 0 && this.currentNoteInfo) {
+            const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
+            const subBaseFreq = baseFreq * octaveMultiplier;
+            this.subOscillators.forEach(subOsc => {
+                try {
+                    subOsc.setFreq(subBaseFreq, 0.001, scheduleTime);
+                } catch (e) {
+                    console.warn('Failed to resync sub oscillator:', e);
+                }
+            });
+        } else {
+            this.subOscillators.forEach(subOsc => {
+                try {
+                    subOsc.setFreq(440, 0.001, scheduleTime);
+                } catch (e) {
+                    console.warn('Failed to resync sub oscillator:', e);
+                }
+            });
+        }
+        
+        // Resync second oscillator
+        try {
+            this.osc2.setFreq(baseFreq, 0.001, scheduleTime);
+        } catch (e) {
+            console.warn('Failed to resync second oscillator:', e);
+        }
+        
+        // Update detuning and phase relationships
+        setTimeout(() => {
+            this.updateVoiceDetuning();
+            this.updateOsc2Frequency();
+        }, 10);
+    }
+
     // Parameter setters - apply to all oscillators
     setVolume = (val) => this.volume.setGain(clamp(val, 0, 1));
     setWaveform = (type) => {
+        // Handle "off" waveform by setting gain to 0 instead of changing oscillator type
+        if (type === 'off') {
+            this.oscillatorMixer.setGain(0);
+            return;
+        } else {
+            // Restore normal gain when not "off"
+            const count = this.oscillators.length;
+            const gainReduction = count === 1 ? 1.0 : 1.0 / (1 + (count - 1) * 0.2);
+            this.oscillatorMixer.setGain(gainReduction);
+        }
+        
         this.oscillators.forEach(osc => osc.setType(type));
+        // Ensure synchronization is maintained after waveform change
+        this.ensureOscillatorSynchronization();
         // Note: Sub oscillators now have independent waveform control
     };
     setDutyCycle = (val) => {
@@ -460,13 +582,35 @@ class MonoSynth {
     
     // Sub oscillator waveform control
     setSubOscWaveform = (type) => {
+        // Handle "off" waveform by setting gain to 0 instead of changing oscillator type
+        if (type === 'off') {
+            this.subOscillatorMixer.setGain(0);
+            return;
+        } else {
+            // Restore normal gain when not "off" (but only if sub osc offset is not 0)
+            this.updateSubOscillatorMix();
+        }
+        
         this.subOscillators.forEach(subOsc => subOsc.setType(type));
+        // Ensure synchronization is maintained after waveform change
+        this.ensureOscillatorSynchronization();
     };
     getSubOscWaveform = () => this.subOscillators[0]?.getType() || 'sine';
     
     // Second oscillator controls
     setOsc2Waveform = (type) => {
+        // Handle "off" waveform by setting gain to 0 instead of changing oscillator type
+        if (type === 'off') {
+            this.osc2Gain.setGain(0);
+            return;
+        } else {
+            // Restore the user-set osc2Amount when not "off"
+            this.osc2Gain.setGain(this.osc2Amount);
+        }
+        
         this.osc2.setType(type);
+        // Ensure synchronization is maintained after waveform change
+        this.ensureOscillatorSynchronization();
         // Update phase delay when waveform changes
         this.updateOsc2PhaseDelay();
     };
@@ -1020,8 +1164,14 @@ class MonoSynth {
             // Start the new sub oscillator only if init has already been called
             if (this.isInitialized) {
                 try {
-                    // Use a small future time for phase alignment with existing oscillators
+                    // Set base frequency before starting for phase alignment
                     const startTime = this.AC.currentTime + 0.001;
+                    subOsc.setFreq(440, 0, startTime); // Set to reference frequency
+                    
+                    // Set waveform to match existing sub oscillators
+                    const existingWaveform = this.subOscillators.length > 1 ? this.subOscillators[0].getType() : 'sine';
+                    subOsc.setType(existingWaveform);
+                    
                     subOsc.start(startTime);
                 } catch (e) {
                     console.warn('Failed to start sub oscillator:', e);

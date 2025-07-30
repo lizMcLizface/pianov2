@@ -1067,7 +1067,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         if (synthInitialized.current) return;
         
         // Capture a single start time for all oscillators to ensure perfect phase alignment
-        const startTime = AC.currentTime + 0.001; // 1ms offset for stable scheduling
+        const startTime = AC.currentTime + 0.01; // 1ms offset for stable scheduling
         
         synthArr.forEach(synth => {
             synth.connect(synthMix.getNode());
