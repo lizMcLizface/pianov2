@@ -17,12 +17,22 @@ class MonoSynth {
         this.subOscillatorPanners = [];
         this.subOscillatorMixer = new Gain(this.AC); // Mix sub oscillators
         
+        // Second oscillator for monosynth  
+        this.osc2 = new Oscillator(this.AC);
+        this.osc2PhaseDelay = this.AC.createDelay(0.1); // Small delay for phase offset
+        this.osc2Gain = new Gain(this.AC);
+        this.osc2Gain.setGain(0); // Initialize to 0 to prevent sound on startup
+        this.osc2Detune = 0; // Detune in cents
+        this.osc2Amount = 0; // Mix amount (0-1)
+        this.osc2PhaseOffset = 0; // Phase offset in degrees (0-360)
+        this.osc2IsBypassed = true; // Track if delay is bypassed (true when phase offset = 0)
+        
         // Multiple oscillators for voice spreading
         this.oscillators = [];
         this.oscillatorPanners = [];
         this.oscillatorMixer = new Gain(this.AC); // Mix multiple oscillators
         
-        // Main oscillator mixer (combines main oscs and sub oscs)
+        // Main oscillator mixer (combines main oscs, sub oscs, and osc2)
         this.mainOscillatorMixer = new Gain(this.AC);
         
         // Initialize with one oscillator
@@ -266,9 +276,13 @@ class MonoSynth {
         this.noiseGen.connect(this.noiseFilterBypassGain.getNode()); // Direct bypass path
         this.noiseFilterBypassGain.connect(this.noiseMixerOutput.getNode());
         
-        // Connect main oscillators and sub oscillators to main oscillator mixer
+        // Connect main oscillators, sub oscillators, and second oscillator to main oscillator mixer
         this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         this.subOscillatorMixer.connect(this.mainOscillatorMixer.getNode());
+        
+        // Connect second oscillator - initially bypassed (direct connection)
+        this.osc2.connect(this.osc2Gain.getNode()); // Direct connection for bypass
+        this.osc2Gain.connect(this.mainOscillatorMixer.getNode());
         
         // Connect main oscillator mixer and combined noise to main mixer
         this.mixer.connectOscillator(this.mainOscillatorMixer.getNode());
@@ -293,6 +307,13 @@ class MonoSynth {
                 console.warn('Sub oscillator already started:', e);
             }
         });
+        
+        // Start second oscillator
+        try {
+            this.osc2.start();
+        } catch (e) {
+            console.warn('Second oscillator already started:', e);
+        }
         
         // Connect mixer to gain and filter chain
         this.mixer.connect(this.gain.getNode());
@@ -372,6 +393,16 @@ class MonoSynth {
         
         // Also connect to sub oscillators
         this.connectVibratoToSubOscillators(vibratoLFO);
+        
+        // Connect to second oscillator
+        try {
+            const osc2Node = this.osc2.getOscillatorNode();
+            if (osc2Node && osc2Node.detune) {
+                vibratoLFO.connect(osc2Node.detune);
+            }
+        } catch (e) {
+            console.warn('Failed to connect vibrato to second oscillator:', e);
+        }
     }
 
     connect = (destination) => {
@@ -404,12 +435,117 @@ class MonoSynth {
     setVolume = (val) => this.volume.setGain(clamp(val, 0, 1));
     setWaveform = (type) => {
         this.oscillators.forEach(osc => osc.setType(type));
-        this.subOscillators.forEach(subOsc => subOsc.setType(type));
+        // Note: Sub oscillators now have independent waveform control
     };
     setDutyCycle = (val) => {
         this.oscillators.forEach(osc => osc.setDutyCycle(val));
-        this.subOscillators.forEach(subOsc => subOsc.setDutyCycle(val));
+        // Note: Sub oscillators and osc2 have independent duty cycle control
     };
+    
+    // Sub oscillator waveform control
+    setSubOscWaveform = (type) => {
+        this.subOscillators.forEach(subOsc => subOsc.setType(type));
+    };
+    getSubOscWaveform = () => this.subOscillators[0]?.getType() || 'sine';
+    
+    // Second oscillator controls
+    setOsc2Waveform = (type) => {
+        this.osc2.setType(type);
+        // Update bypass state when waveform changes to/from 'off'
+        this.updateOsc2PhaseDelay();
+    };
+    getOsc2Waveform = () => this.osc2.getType();
+    setOsc2DutyCycle = (val) => this.osc2.setDutyCycle(val);
+    getOsc2DutyCycle = () => this.osc2.getDutyCycle();
+    setOsc2Detune = (cents) => {
+        this.osc2Detune = cents;
+        this.updateOsc2Frequency();
+    };
+    getOsc2Detune = () => this.osc2Detune;
+    setOsc2Amount = (amount) => {
+        this.osc2Amount = clamp(amount, 0, 1);
+        this.osc2Gain.setGain(this.osc2Amount);
+    };
+    getOsc2Amount = () => this.osc2Amount;
+    setOsc2PhaseOffset = (degrees) => {
+        this.osc2PhaseOffset = clamp(degrees, 0, 360);
+        this.updateOsc2PhaseDelay();
+    };
+    getOsc2PhaseOffset = () => this.osc2PhaseOffset;
+    
+    // Method to update phase delay based on current frequency and phase offset
+    updateOsc2PhaseDelay = () => {
+        const shouldBypass = this.osc2PhaseOffset === 0 || this.osc2.getType() === 'off';
+        
+        if (shouldBypass && !this.osc2IsBypassed) {
+            // Switch to bypass mode - connect directly
+            try {
+                this.osc2.disconnect();
+                this.osc2PhaseDelay.disconnect();
+                this.osc2.connect(this.osc2Gain.getNode()); // Direct connection
+                this.osc2IsBypassed = true;
+                console.log('Osc2 phase delay bypassed (direct connection)');
+            } catch (e) {
+                console.warn('Failed to bypass osc2 phase delay:', e);
+            }
+            return;
+        }
+        
+        if (!shouldBypass && this.osc2IsBypassed) {
+            // Switch to delay mode - connect through delay node
+            try {
+                this.osc2.disconnect();
+                this.osc2.connect(this.osc2PhaseDelay);
+                this.osc2PhaseDelay.connect(this.osc2Gain.getNode());
+                this.osc2IsBypassed = false;
+                console.log('Osc2 phase delay enabled');
+            } catch (e) {
+                console.warn('Failed to enable osc2 phase delay:', e);
+            }
+        }
+        
+        // Only calculate delay time if we're using the delay node and have valid note info
+        if (!shouldBypass && this.currentNoteInfo) {
+            const { baseFreq_ } = this.currentNoteInfo;
+            const detuneMultiplier = Math.pow(2, this.osc2Detune / 1200);
+            const actualFreq = baseFreq_ * detuneMultiplier;
+            
+            // Convert phase offset from degrees to seconds
+            // Phase offset in radians = degrees * π / 180
+            // Time delay = phase_radians / (2π * frequency)
+            const phaseRadians = (this.osc2PhaseOffset * Math.PI) / 180;
+            const delayTime = phaseRadians / (2 * Math.PI * actualFreq);
+            
+            // Clamp delay time to valid range (0 to 0.1 seconds for our delay node)
+            const clampedDelay = Math.max(0, Math.min(delayTime, 0.1));
+            
+            this.osc2PhaseDelay.delayTime.setValueAtTime(clampedDelay, this.AC.currentTime);
+        }
+    };
+    
+    // Method to update second oscillator frequency based on current note and detune
+    updateOsc2Frequency = () => {
+        if (!this.currentNoteInfo) return;
+        
+        const { baseFreq_ } = this.currentNoteInfo;
+        if (!baseFreq_ || !isFinite(baseFreq_)) return;
+        
+        // Apply detune in cents
+        const detuneRatio = Math.pow(2, this.osc2Detune / 1200);
+        const detunedFreq = baseFreq_ * detuneRatio;
+        
+        // Validate frequency and update even when 'off' to keep it tracking
+        if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
+            try {
+                this.osc2.setFreq(detunedFreq, 0.001);
+                // Update phase delay whenever frequency changes (even if amount is 0 or off)
+                this.updateOsc2PhaseDelay();
+            } catch (e) {
+                console.warn('Failed to set second oscillator frequency:', e);
+            }
+        }
+    };
+    
     setFilterType = (val) => this.filter.setType(val);
     setFilterFreq = (val) => this.filter.setFreq(val);
     setFilterQ = (val) => this.filter.setQ(val);
@@ -596,6 +732,9 @@ class MonoSynth {
                 console.warn('Invalid sub oscillator frequency:', subBaseFreq);
             }
         }
+        
+        // Update second oscillator frequency with detune
+        this.updateOsc2Frequency();
 
         // console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
         

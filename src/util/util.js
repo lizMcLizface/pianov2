@@ -53,6 +53,7 @@ export const getNoteInfo = (key, octaveMod = 4) => {
 
 // - SVG Path Maps -
 export const WAVEFORM = {
+    off: 'M 15 25 L 35 25 M 20 20 L 20 30 M 30 20 L 30 30', // Off symbol (line with two bars)
     sine: 'M 10 25 Q 18 10 25 25 Q 32 40 40 25',
     triangle: 'M 10 25 L 19 16 L 31 34 L 40 25',
     square: 'M 10 32 L 10 18 L 25 18 L 25 32 L 40 32 L 40 18',

@@ -3,7 +3,7 @@ const MAX_FREQ = 44100;
 class Oscillator {
     constructor(AC) {
         this.AC = AC;
-        this.WAVEFORMS = ['sine', 'triangle', 'square', 'sawtooth', 'square_dc'];
+        this.WAVEFORMS = ['off', 'sine', 'triangle', 'square', 'sawtooth', 'square_dc'];
         this.node = this.AC.createOscillator();
         this.waveShaper = null;
         
@@ -62,7 +62,18 @@ class Oscillator {
         
         this.currentType = type;
         
-        if (type === 'square_dc') {
+        if (type === 'off') {
+            // Disconnect everything when off
+            this.node.disconnect();
+            if (this.waveShaper) {
+                this.waveShaper.disconnect();
+            }
+            // Set gain to 0 to silence the oscillator
+            this.outputBuffer.gain.value = 0;
+        } else if (type === 'square_dc') {
+            // Ensure gain is back to 1 when not off
+            this.outputBuffer.gain.value = 1.0;
+            
             // Use waveshaper for duty cycle control
             if (!this.waveShaper) {
                 this.waveShaper = this.AC.createWaveShaper();
@@ -80,6 +91,9 @@ class Oscillator {
             this.waveShaper.disconnect(); // Clear any existing connections
             this.waveShaper.connect(this.outputBuffer);
         } else {
+            // Ensure gain is back to 1 when not off
+            this.outputBuffer.gain.value = 1.0;
+            
             // Use built-in waveforms
             // Disconnect waveshaper if it exists
             if (this.waveShaper) {
