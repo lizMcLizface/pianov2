@@ -50,6 +50,11 @@ export default {
         eqHighGain: 0,
         eqLowFreq: 320,
         eqHighFreq: 3200,
+        masterLimiterThreshold: -6,
+        masterLimiterRatio: 20,
+        masterLimiterKnee: 0,
+        masterLimiterAttack: 0.005,
+        masterLimiterRelease: 0.05,
     },
     'Dreary': {
         masterVolume: 0.75,
@@ -627,4 +632,5 @@ export default {
         eqLowFreq: 320,
         eqHighFreq: 3200,
     },
+    
 };

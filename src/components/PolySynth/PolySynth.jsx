@@ -207,6 +207,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     const [eqLowFreq, setEqLowFreq] = useState(320);
     const [eqHighFreq, setEqHighFreq] = useState(3200);
 
+    // Master Limiter state
+    const [masterLimiterThreshold, setMasterLimiterThreshold] = useState(-6);
+    const [masterLimiterRatio, setMasterLimiterRatio] = useState(20);
+    const [masterLimiterKnee, setMasterLimiterKnee] = useState(0);
+    const [masterLimiterAttack, setMasterLimiterAttack] = useState(0.005);
+    const [masterLimiterRelease, setMasterLimiterRelease] = useState(0.05);
+
     // Noise state
     const [noiseType, setNoiseType] = useState('white');
     const [noiseMix, setNoiseMix] = useState(0);
@@ -279,6 +286,285 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             setOctaveMod(octaveMod - 1);
             synthArr.forEach(synth => synthNoteOff(synth));
             regularActiveNotes.current.clear(); // Clear regular note tracking
+        }
+    };
+
+    // Custom preset management
+    const [customPresets, setCustomPresets] = useState({});
+    
+    // Load custom presets from localStorage on mount
+    useLayoutEffect(() => {
+        const savedCustomPresets = localStorage.getItem('PolySynth-CustomPresets');
+        if (savedCustomPresets) {
+            try {
+                setCustomPresets(JSON.parse(savedCustomPresets));
+            } catch (error) {
+                console.error('Error loading custom presets:', error);
+            }
+        }
+    }, []);
+    
+    // Function to collect current synth state into a preset object
+    const getCurrentPresetState = () => {
+        return {
+            masterVolume,
+            polyphony,
+            portamentoSpeed,
+            masterFilterType,
+            masterFilterFreq,
+            masterFilterQ,
+            masterFilterGain,
+            vcoType,
+            vcoDutyCycle,
+            subOscOctaveOffset,
+            voiceCount,
+            detuneSpread,
+            stereoSpread,
+            gainAttack,
+            gainDecay,
+            gainSustain,
+            gainRelease,
+            gainHold,
+            gainHoldLevel,
+            filterType,
+            filterFreq,
+            filterQ,
+            filterGain,
+            filterAttack,
+            filterDecay,
+            filterRelease,
+            filterEnvAmount,
+            distortionAmount,
+            distortionDist,
+            reverbType,
+            reverbAmount,
+            flangerAmount,
+            flangerDepth,
+            flangerRate,
+            flangerFeedback,
+            flangerDelay,
+            chorusAmount,
+            chorusRate,
+            chorusDepth,
+            chorusFeedback,
+            phaserAmount,
+            phaserRate,
+            phaserDepth,
+            phaserFeedback,
+            phaserFrequency,
+            delayTime,
+            delayFeedback,
+            delayTone,
+            delayAmount,
+            pingPongDelayTime,
+            pingPongFeedback,
+            pingPongTone,
+            pingPongAmount,
+            vibratoDepth,
+            vibratoRate,
+            bitCrushDepth,
+            bitCrushAmount,
+            eqLowGain,
+            eqHighGain,
+            eqLowFreq,
+            eqHighFreq,
+            masterLimiterThreshold,
+            masterLimiterRatio,
+            masterLimiterKnee,
+            masterLimiterAttack,
+            masterLimiterRelease,
+            noiseType,
+            noiseMix,
+            noiseFilterEnabled,
+            noiseFilterQ,
+            pitchC,
+            pitchCSharp,
+            pitchD,
+            pitchDSharp,
+            pitchE,
+            pitchF,
+            pitchFSharp,
+            pitchG,
+            pitchGSharp,
+            pitchA,
+            pitchASharp,
+            pitchB,
+            octaveRatio,
+            allThemPitches,
+            envelopeAttackShape,
+            envelopeDecayShape,
+            envelopeReleaseShape,
+            envelopeAttackExponent,
+            envelopeDecayExponent,
+            envelopeReleaseExponent,
+            filterEnvelopeAttackShape,
+            filterEnvelopeDecayShape,
+            filterEnvelopeReleaseShape,
+            filterEnvelopeAttackExponent,
+            filterEnvelopeDecayExponent,
+            filterEnvelopeReleaseExponent
+        };
+    };
+    
+    // Function to save current state as a custom preset
+    const saveCustomPreset = () => {
+        const presetName = prompt('Enter a name for this preset:');
+        if (presetName && presetName.trim()) {
+            const trimmedName = presetName.trim();
+            const currentState = getCurrentPresetState();
+            const updatedCustomPresets = {
+                ...customPresets,
+                [trimmedName]: currentState
+            };
+            setCustomPresets(updatedCustomPresets);
+            localStorage.setItem('PolySynth-CustomPresets', JSON.stringify(updatedCustomPresets));
+            alert(`Preset "${trimmedName}" saved successfully!`);
+        }
+    };
+    
+    // Function to copy current preset to clipboard
+    const copyPresetToClipboard = async () => {
+        const currentState = getCurrentPresetState();
+        const presetString = JSON.stringify(currentState, null, 4);
+        try {
+            await navigator.clipboard.writeText(presetString);
+            alert('Current preset copied to clipboard!');
+        } catch (error) {
+            console.error('Failed to copy to clipboard:', error);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = presetString;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('Current preset copied to clipboard!');
+        }
+    };
+    
+    // Function to paste and load preset from clipboard
+    const pastePresetFromClipboard = async () => {
+        try {
+            const clipboardText = await navigator.clipboard.readText();
+            const presetData = JSON.parse(clipboardText);
+            
+            // Apply the preset data to all state variables
+            if (presetData.masterVolume !== undefined) setMasterVolume(presetData.masterVolume);
+            if (presetData.polyphony !== undefined) setPolyphony(presetData.polyphony);
+            if (presetData.portamentoSpeed !== undefined) setPortamentoSpeed(presetData.portamentoSpeed);
+            if (presetData.masterFilterType !== undefined) setMasterFilterType(presetData.masterFilterType);
+            if (presetData.masterFilterFreq !== undefined) setMasterFilterFreq(presetData.masterFilterFreq);
+            if (presetData.masterFilterQ !== undefined) setMasterFilterQ(presetData.masterFilterQ);
+            if (presetData.masterFilterGain !== undefined) setMasterFilterGain(presetData.masterFilterGain);
+            if (presetData.vcoType !== undefined) setVcoType(presetData.vcoType);
+            if (presetData.vcoDutyCycle !== undefined) setVcoDutyCycle(presetData.vcoDutyCycle);
+            if (presetData.subOscOctaveOffset !== undefined) setSubOscOctaveOffset(presetData.subOscOctaveOffset);
+            if (presetData.voiceCount !== undefined) setVoiceCount(presetData.voiceCount);
+            if (presetData.detuneSpread !== undefined) setDetuneSpread(presetData.detuneSpread);
+            if (presetData.stereoSpread !== undefined) setStereoSpread(presetData.stereoSpread);
+            if (presetData.gainAttack !== undefined) setGainAttack(presetData.gainAttack);
+            if (presetData.gainDecay !== undefined) setGainDecay(presetData.gainDecay);
+            if (presetData.gainSustain !== undefined) setGainSustain(presetData.gainSustain);
+            if (presetData.gainRelease !== undefined) setGainRelease(presetData.gainRelease);
+            if (presetData.gainHold !== undefined) setGainHold(presetData.gainHold);
+            if (presetData.gainHoldLevel !== undefined) setGainHoldLevel(presetData.gainHoldLevel);
+            if (presetData.filterType !== undefined) setFilterType(presetData.filterType);
+            if (presetData.filterFreq !== undefined) setFilterFreq(presetData.filterFreq);
+            if (presetData.filterQ !== undefined) setFilterQ(presetData.filterQ);
+            if (presetData.filterGain !== undefined) setFilterGain(presetData.filterGain);
+            if (presetData.filterAttack !== undefined) setFilterAttack(presetData.filterAttack);
+            if (presetData.filterDecay !== undefined) setFilterDecay(presetData.filterDecay);
+            if (presetData.filterRelease !== undefined) setFilterRelease(presetData.filterRelease);
+            if (presetData.filterEnvAmount !== undefined) setFilterEnvAmount(presetData.filterEnvAmount);
+            if (presetData.distortionAmount !== undefined) setDistortionAmount(presetData.distortionAmount);
+            if (presetData.distortionDist !== undefined) setDistortionDist(presetData.distortionDist);
+            if (presetData.reverbType !== undefined) setReverbType(presetData.reverbType);
+            if (presetData.reverbAmount !== undefined) setReverbAmount(presetData.reverbAmount);
+            if (presetData.flangerAmount !== undefined) setFlangerAmount(presetData.flangerAmount);
+            if (presetData.flangerDepth !== undefined) setFlangerDepth(presetData.flangerDepth);
+            if (presetData.flangerRate !== undefined) setFlangerRate(presetData.flangerRate);
+            if (presetData.flangerFeedback !== undefined) setFlangerFeedback(presetData.flangerFeedback);
+            if (presetData.flangerDelay !== undefined) setFlangerDelay(presetData.flangerDelay);
+            if (presetData.chorusAmount !== undefined) setChorusAmount(presetData.chorusAmount);
+            if (presetData.chorusRate !== undefined) setChorusRate(presetData.chorusRate);
+            if (presetData.chorusDepth !== undefined) setChorusDepth(presetData.chorusDepth);
+            if (presetData.chorusFeedback !== undefined) setChorusFeedback(presetData.chorusFeedback);
+            if (presetData.phaserAmount !== undefined) setPhaserAmount(presetData.phaserAmount);
+            if (presetData.phaserRate !== undefined) setPhaserRate(presetData.phaserRate);
+            if (presetData.phaserDepth !== undefined) setPhaserDepth(presetData.phaserDepth);
+            if (presetData.phaserFeedback !== undefined) setPhaserFeedback(presetData.phaserFeedback);
+            if (presetData.phaserFrequency !== undefined) setPhaserFrequency(presetData.phaserFrequency);
+            if (presetData.delayTime !== undefined) setDelayTime(presetData.delayTime);
+            if (presetData.delayFeedback !== undefined) setDelayFeedback(presetData.delayFeedback);
+            if (presetData.delayTone !== undefined) setDelayTone(presetData.delayTone);
+            if (presetData.delayAmount !== undefined) setDelayAmount(presetData.delayAmount);
+            if (presetData.pingPongDelayTime !== undefined) setPingPongDelayTime(presetData.pingPongDelayTime);
+            if (presetData.pingPongFeedback !== undefined) setPingPongFeedback(presetData.pingPongFeedback);
+            if (presetData.pingPongTone !== undefined) setPingPongTone(presetData.pingPongTone);
+            if (presetData.pingPongAmount !== undefined) setPingPongAmount(presetData.pingPongAmount);
+            if (presetData.vibratoDepth !== undefined) setVibratoDepth(presetData.vibratoDepth);
+            if (presetData.vibratoRate !== undefined) setVibratoRate(presetData.vibratoRate);
+            if (presetData.bitCrushDepth !== undefined) setBitCrushDepth(presetData.bitCrushDepth);
+            if (presetData.bitCrushAmount !== undefined) setBitCrushAmount(presetData.bitCrushAmount);
+            if (presetData.eqLowGain !== undefined) setEqLowGain(presetData.eqLowGain);
+            if (presetData.eqHighGain !== undefined) setEqHighGain(presetData.eqHighGain);
+            if (presetData.eqLowFreq !== undefined) setEqLowFreq(presetData.eqLowFreq);
+            if (presetData.eqHighFreq !== undefined) setEqHighFreq(presetData.eqHighFreq);
+            if (presetData.masterLimiterThreshold !== undefined) setMasterLimiterThreshold(presetData.masterLimiterThreshold);
+            if (presetData.masterLimiterRatio !== undefined) setMasterLimiterRatio(presetData.masterLimiterRatio);
+            if (presetData.masterLimiterKnee !== undefined) setMasterLimiterKnee(presetData.masterLimiterKnee);
+            if (presetData.masterLimiterAttack !== undefined) setMasterLimiterAttack(presetData.masterLimiterAttack);
+            if (presetData.masterLimiterRelease !== undefined) setMasterLimiterRelease(presetData.masterLimiterRelease);
+            if (presetData.noiseType !== undefined) setNoiseType(presetData.noiseType);
+            if (presetData.noiseMix !== undefined) setNoiseMix(presetData.noiseMix);
+            if (presetData.noiseFilterEnabled !== undefined) setNoiseFilterEnabled(presetData.noiseFilterEnabled);
+            if (presetData.noiseFilterQ !== undefined) setNoiseFilterQ(presetData.noiseFilterQ);
+            if (presetData.pitchC !== undefined) setPitchC(presetData.pitchC);
+            if (presetData.pitchCSharp !== undefined) setPitchCSharp(presetData.pitchCSharp);
+            if (presetData.pitchD !== undefined) setPitchD(presetData.pitchD);
+            if (presetData.pitchDSharp !== undefined) setPitchDSharp(presetData.pitchDSharp);
+            if (presetData.pitchE !== undefined) setPitchE(presetData.pitchE);
+            if (presetData.pitchF !== undefined) setPitchF(presetData.pitchF);
+            if (presetData.pitchFSharp !== undefined) setPitchFSharp(presetData.pitchFSharp);
+            if (presetData.pitchG !== undefined) setPitchG(presetData.pitchG);
+            if (presetData.pitchGSharp !== undefined) setPitchGSharp(presetData.pitchGSharp);
+            if (presetData.pitchA !== undefined) setPitchA(presetData.pitchA);
+            if (presetData.pitchASharp !== undefined) setPitchASharp(presetData.pitchASharp);
+            if (presetData.pitchB !== undefined) setPitchB(presetData.pitchB);
+            if (presetData.octaveRatio !== undefined) setOctaveRatio(presetData.octaveRatio);
+            if (presetData.allThemPitches !== undefined) setAllThemPitches(presetData.allThemPitches);
+            if (presetData.envelopeAttackShape !== undefined) setEnvelopeAttackShape(presetData.envelopeAttackShape);
+            if (presetData.envelopeDecayShape !== undefined) setEnvelopeDecayShape(presetData.envelopeDecayShape);
+            if (presetData.envelopeReleaseShape !== undefined) setEnvelopeReleaseShape(presetData.envelopeReleaseShape);
+            if (presetData.envelopeAttackExponent !== undefined) setEnvelopeAttackExponent(presetData.envelopeAttackExponent);
+            if (presetData.envelopeDecayExponent !== undefined) setEnvelopeDecayExponent(presetData.envelopeDecayExponent);
+            if (presetData.envelopeReleaseExponent !== undefined) setEnvelopeReleaseExponent(presetData.envelopeReleaseExponent);
+            if (presetData.filterEnvelopeAttackShape !== undefined) setFilterEnvelopeAttackShape(presetData.filterEnvelopeAttackShape);
+            if (presetData.filterEnvelopeDecayShape !== undefined) setFilterEnvelopeDecayShape(presetData.filterEnvelopeDecayShape);
+            if (presetData.filterEnvelopeReleaseShape !== undefined) setFilterEnvelopeReleaseShape(presetData.filterEnvelopeReleaseShape);
+            if (presetData.filterEnvelopeAttackExponent !== undefined) setFilterEnvelopeAttackExponent(presetData.filterEnvelopeAttackExponent);
+            if (presetData.filterEnvelopeDecayExponent !== undefined) setFilterEnvelopeDecayExponent(presetData.filterEnvelopeDecayExponent);
+            if (presetData.filterEnvelopeReleaseExponent !== undefined) setFilterEnvelopeReleaseExponent(presetData.filterEnvelopeReleaseExponent);
+            
+            alert('Preset loaded from clipboard successfully!');
+        } catch (error) {
+            console.error('Failed to paste from clipboard:', error);
+            alert('Failed to load preset from clipboard. Please ensure the clipboard contains valid preset data.');
+        }
+    };
+    
+    // Function to delete a custom preset
+    const deleteCustomPreset = (presetName) => {
+        if (window.confirm(`Are you sure you want to delete the preset "${presetName}"?`)) {
+            const updatedCustomPresets = { ...customPresets };
+            delete updatedCustomPresets[presetName];
+            setCustomPresets(updatedCustomPresets);
+            localStorage.setItem('PolySynth-CustomPresets', JSON.stringify(updatedCustomPresets));
+            
+            // If the deleted preset was currently selected, reset to INIT
+            if (currentPreset === presetName) {
+                setCurrentPreset('- INIT -');
+            }
         }
     };
 
@@ -1359,7 +1645,14 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
 
     // Load Preset
     useLayoutEffect(() => {
-        const preset = presetData[currentPreset];
+        // Try to get preset from built-in presets first, then custom presets
+        const preset = presetData[currentPreset] || customPresets[currentPreset];
+        
+        if (!preset) {
+            console.warn(`Preset "${currentPreset}" not found`);
+            return;
+        }
+        
         synthArr.forEach(synth => synth.noteStop());
 
         setPolyphony(preset.polyphony);
@@ -1427,6 +1720,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setEqLowFreq(preset.eqLowFreq);
         setEqHighFreq(preset.eqHighFreq);
 
+        // Load master limiter settings with defaults
+        setMasterLimiterThreshold(preset.masterLimiterThreshold || -6);
+        setMasterLimiterRatio(preset.masterLimiterRatio || 20);
+        setMasterLimiterKnee(preset.masterLimiterKnee || 0);
+        setMasterLimiterAttack(preset.masterLimiterAttack || 0.005);
+        setMasterLimiterRelease(preset.masterLimiterRelease || 0.05);
+
         // Load noise settings with defaults
         setNoiseType(preset.noiseType || 'white');
         setNoiseMix(preset.noiseMix || 0);
@@ -1465,7 +1765,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         setOctaveRatio(preset.octaveRatio || 2.0);
 
         resetSynthPos();
-    }, [currentPreset]);
+    }, [currentPreset, customPresets]);
 
     // Batched async parameter updates to prevent audio crackling
     const batchedParameterUpdate = useRef({
@@ -1611,12 +1911,19 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             if (masterEQ2.getHighGain() !== eqHighGain) masterEQ2.setHighGain(eqHighGain);
             if (masterEQ2.getLowFreq() !== eqLowFreq) masterEQ2.setLowFreq(eqLowFreq);
             if (masterEQ2.getHighFreq() !== eqHighFreq) masterEQ2.setHighFreq(eqHighFreq);
+            
+            if (masterLimiter.getThreshold() !== masterLimiterThreshold) masterLimiter.setThreshold(masterLimiterThreshold);
+            if (masterLimiter.getRatio() !== masterLimiterRatio) masterLimiter.setRatio(masterLimiterRatio);
+            masterLimiter.setKnee(masterLimiterKnee);
+            masterLimiter.setAttack(masterLimiterAttack);
+            masterLimiter.setRelease(masterLimiterRelease);
         });
     }, [
         distortionAmount, distortionDist, reverbType, reverbAmount, 
         delayTime, delayFeedback, delayTone, delayAmount, 
         vibratoDepth, vibratoRate, bitCrushDepth, bitCrushAmount, 
         eqLowGain, eqHighGain, eqLowFreq, eqHighFreq,
+        masterLimiterThreshold, masterLimiterRatio, masterLimiterKnee, masterLimiterAttack, masterLimiterRelease,
         pingPongAmount, pingPongFeedback, pingPongDelayTime, pingPongTone,
         flangerAmount, flangerDelay, flangerDepth, flangerFeedback, flangerRate,
         chorusAmount, chorusRate, chorusDepth, chorusFeedback,
@@ -1999,7 +2306,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                 </Module>
                 
                 <Module label="Information">
-                    <KnobGrid columns={2} rows={1}>
+                    <KnobGrid columns={3} rows={3}>
                             <Knob
                                 label="Master Vol"
                                 value={masterVolume}
@@ -2014,9 +2321,18 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                     e.target.blur();
                                 }}
                             >
+                                {/* Built-in presets */}
                                 {Object.keys(presetData).map((preset) => (
                                     <option key={`Preset_${preset}`} value={preset}>{preset}</option>
                                 ))}
+                                {/* Custom presets */}
+                                {Object.keys(customPresets).length > 0 && (
+                                    <optgroup label="Custom Presets">
+                                        {Object.keys(customPresets).map((preset) => (
+                                            <option key={`CustomPreset_${preset}`} value={preset}>{preset}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </InfoSelect>
                         </InfoContainer>
                         <InfoContainer style={{ marginBottom: 0 }}>
@@ -2034,6 +2350,154 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                                 ))}
                             </InfoSelect>
                         </InfoContainer>
+                        
+                        {/* Preset Management Buttons */}
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={saveCustomPreset}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '2px solid #4CAF50',
+                                    borderRadius: '4px',
+                                    background: '#4CAF50',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#45a049'}
+                                onMouseOut={(e) => e.target.style.background = '#4CAF50'}
+                            >
+                                Save
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                Custom Preset
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={copyPresetToClipboard}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '2px solid #2196F3',
+                                    borderRadius: '4px',
+                                    background: '#2196F3',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#1976D2'}
+                                onMouseOut={(e) => e.target.style.background = '#2196F3'}
+                            >
+                                Copy
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                To Clipboard
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={pastePresetFromClipboard}
+                                style={{
+                                    padding: '8px 12px',
+                                    fontSize: '11px',
+                                    border: '2px solid #FF9800',
+                                    borderRadius: '4px',
+                                    background: '#FF9800',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    minWidth: '80px',
+                                    fontWeight: 'bold'
+                                }}
+                                onMouseOver={(e) => e.target.style.background = '#F57C00'}
+                                onMouseOut={(e) => e.target.style.background = '#FF9800'}
+                            >
+                                Paste
+                            </button>
+                            <span style={{ 
+                                fontSize: '10px', 
+                                color: '#999',
+                                textAlign: 'center',
+                                lineHeight: '1.2'
+                            }}>
+                                From Clipboard
+                            </span>
+                        </div>
+                        
+                        {/* Delete Custom Preset Button - only show if current preset is custom */}
+                        {customPresets[currentPreset] && (
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '4px',
+                                justifyContent: 'center'
+                            }}>
+                                <button
+                                    onClick={() => deleteCustomPreset(currentPreset)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        fontSize: '11px',
+                                        border: '2px solid #f44336',
+                                        borderRadius: '4px',
+                                        background: '#f44336',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        fontFamily: 'inherit',
+                                        minWidth: '80px',
+                                        fontWeight: 'bold'
+                                    }}
+                                    onMouseOver={(e) => e.target.style.background = '#d32f2f'}
+                                    onMouseOut={(e) => e.target.style.background = '#f44336'}
+                                >
+                                    Delete
+                                </button>
+                                <span style={{ 
+                                    fontSize: '10px', 
+                                    color: '#999',
+                                    textAlign: 'center',
+                                    lineHeight: '1.2'
+                                }}>
+                                    Custom Preset
+                                </span>
+                            </div>
+                        )}
                     </KnobGrid>
                 </Module>
 
@@ -2324,6 +2788,57 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
                             isRounded
                             value={eqHighFreq}
                             onUpdate={(val) => setEqHighFreq(val)}
+                        />
+                    </KnobGrid>
+                </Module>
+                <Module label="Master Limiter">
+                    <KnobGrid columns={3} rows={2}>
+                        <Knob
+                            label="Threshold"
+                            type="B"
+                            value={masterLimiterThreshold}
+                            modifier={48}
+                            offset={-24}
+                            resetValue={-6}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setMasterLimiterThreshold(val)}
+                        />
+                        <Knob
+                            label="Ratio"
+                            value={masterLimiterRatio}
+                            modifier={19}
+                            offset={1}
+                            resetValue={20}
+                            isRounded
+                            onUpdate={(val) => setMasterLimiterRatio(val)}
+                        />
+                        <Knob
+                            label="Knee"
+                            value={masterLimiterKnee}
+                            modifier={40}
+                            resetValue={0}
+                            decimalPlaces={1}
+                            onUpdate={(val) => setMasterLimiterKnee(val)}
+                        />
+                        <Knob
+                            label="Attack"
+                            value={masterLimiterAttack}
+                            scalingType="logarithmic"
+                            minValue={0.0001}
+                            maxValue={1}
+                            resetValue={0.005}
+                            decimalPlaces={4}
+                            onUpdate={(val) => setMasterLimiterAttack(val)}
+                        />
+                        <Knob
+                            label="Release"
+                            value={masterLimiterRelease}
+                            scalingType="logarithmic"
+                            minValue={0.001}
+                            maxValue={3}
+                            resetValue={0.05}
+                            decimalPlaces={3}
+                            onUpdate={(val) => setMasterLimiterRelease(val)}
                         />
                     </KnobGrid>
                 </Module>
