@@ -7,15 +7,17 @@ class MonoSynth {
         this.AC = AC;
 
         // Voice spreading parameters
-        this.voiceCount = 1;
+        this.voiceCount = 8;
+        this.maxVoices = 8; // Maximum number of voices to pre-create
         this.detuneSpread = 0;
         this.stereoSpread = 0;
         
-        // Sub oscillator parameters
+        // Sub oscillator parameters - single always-connected sub oscillator
         this.subOscOctaveOffset = 0; // Range: -3 to +3 octaves
-        this.subOscillators = [];
-        this.subOscillatorPanners = [];
-        this.subOscillatorMixer = new Gain(this.AC); // Mix sub oscillators
+        this.subOscillator = new Oscillator(this.AC);
+        this.subOscillatorPanner = new StereoPanner(this.AC);
+        this.subOscillatorGain = new Gain(this.AC); // Gain control for sub oscillator
+        this.subOscillatorGain.setGain(0); // Initialize to 0 to prevent sound on startup
         
         // Second oscillator for monosynth  
         this.osc2 = new Oscillator(this.AC);
@@ -27,16 +29,23 @@ class MonoSynth {
         this.osc2PhaseOffset = 0; // Phase offset in degrees (0-360)
         this.osc2Started = false; // Track if osc2 has been started
         
-        // Multiple oscillators for voice spreading
-        this.oscillators = [];
-        this.oscillatorPanners = [];
-        this.oscillatorMixer = new Gain(this.AC); // Mix multiple oscillators
+        // Primary voice oscillator (always active)
+        this.primaryOscillator = new Oscillator(this.AC);
+        this.primaryOscillatorPanner = new StereoPanner(this.AC);
+        
+        // Additional voices for voice spreading
+        this.additionalOscillators = [];
+        this.additionalOscillatorPanners = [];
+        this.oscillatorMixer = new Gain(this.AC); // Mix all oscillators
         
         // Main oscillator mixer (combines main oscs, sub oscs, and osc2)
         this.mainOscillatorMixer = new Gain(this.AC);
         
-        // Initialize with one oscillator
-        this.initializeOscillators(1);
+        // Pre-create maximum number of additional oscillators for perfect phase alignment
+        this.preCreateAdditionalOscillators(this.maxVoices - 1); // -1 because primary is separate
+        
+        // Initialize with one voice active (just the primary)
+        this.setActiveVoiceCount(1);
         
         this.noiseGen = new NoiseGenerator(this.AC);
         this.noiseFilter = new Filter(this.AC); // Bandpass filter for noise
@@ -65,80 +74,53 @@ class MonoSynth {
         this.isInitialized = false;
     }
 
-    initializeOscillators(count) {
-        // If we need fewer oscillators, disconnect and clean up the extras
-        if (count < this.oscillators.length) {
-            for (let i = count; i < this.oscillators.length; i++) {
-                try {
-                    // Disconnect oscillator from panner first
-                    if (this.oscillators[i] && this.oscillatorPanners[i]) {
-                        this.oscillators[i].disconnect();
-                    }
-                } catch (e) {
-                    console.warn('Failed to disconnect oscillator:', e);
-                }
-                
-                try {
-                    // Disconnect panner from mixer
-                    if (this.oscillatorPanners[i]) {
-                        this.oscillatorPanners[i].disconnect();
-                    }
-                } catch (e) {
-                    console.warn('Failed to disconnect panner:', e);
-                }
-                
-                try {
-                    // Reset frequency of disconnected oscillators to prevent weird states
-                    if (this.oscillators[i]) {
-                        this.oscillators[i].setFreq(440, 0, this.AC.currentTime + 0.001);
-                    }
-                } catch (e) {
-                    console.warn('Failed to reset oscillator frequency:', e);
-                }
-            }
-            this.oscillators = this.oscillators.slice(0, count);
-            this.oscillatorPanners = this.oscillatorPanners.slice(0, count);
-        }
+    preCreateAdditionalOscillators(maxAdditionalVoices) {
+        // Pre-create all additional oscillators and panners but don't connect them yet
+        this.additionalOscillators = [];
+        this.additionalOscillatorPanners = [];
         
-        // If we need more oscillators, create them
-        while (this.oscillators.length < count) {
+        for (let i = 0; i < maxAdditionalVoices; i++) {
             const osc = new Oscillator(this.AC);
             const panner = new StereoPanner(this.AC);
             
-            this.oscillators.push(osc);
-            this.oscillatorPanners.push(panner);
+            this.additionalOscillators.push(osc);
+            this.additionalOscillatorPanners.push(panner);
             
-            // Connect: oscillator -> panner -> mixer
+            // Connect oscillator to panner, but don't connect panner to mixer yet
             osc.connect(panner.getNode());
-            panner.connect(this.oscillatorMixer.getNode());
-            
-            // Start the new oscillator only if init has already been called
-            if (this.isInitialized) {
-                try {
-                    // Set base frequency before starting for phase alignment
-                    const startTime = this.AC.currentTime + 0.001;
-                    osc.setFreq(440, 0, startTime); // Set to reference frequency
-                    
-                    // Set waveform to match existing oscillators
-                    const existingWaveform = this.oscillators.length > 1 ? this.oscillators[0].getType() : 'sine';
-                    osc.setType(existingWaveform);
-                    
-                    osc.start(startTime);
-                } catch (e) {
-                    console.warn('Failed to start oscillator:', e);
-                }
+        }
+    }
+
+    setActiveVoiceCount(count) {
+        const clampedCount = Math.max(1, Math.min(this.maxVoices, Math.round(count)));
+        
+        // Disconnect all additional oscillator panners first
+        this.additionalOscillatorPanners.forEach(panner => {
+            try {
+                panner.disconnect();
+            } catch (e) {
+                // Already disconnected, ignore
+            }
+        });
+        
+        // Connect only the required additional voices (count - 1 because primary is always connected)
+        const additionalVoicesNeeded = clampedCount - 1;
+        for (let i = 0; i < additionalVoicesNeeded; i++) {
+            try {
+                this.additionalOscillatorPanners[i].connect(this.oscillatorMixer.getNode());
+            } catch (e) {
+                console.warn('Failed to connect additional voice', i, ':', e);
             }
         }
         
         // Adjust mixer gain based on voice count to prevent clipping
-        // Use a gentler gain reduction - only reduce by 20% per additional voice after the first
-        const gainReduction = count === 1 ? 1.0 : 1.0 / (1 + (count - 1) * 0.2);
+        const gainReduction = clampedCount === 1 ? 1.0 : 1.0 / (1 + (clampedCount - 1) * 0.2);
         this.oscillatorMixer.setGain(gainReduction);
         
-        this.voiceCount = count;
+        this.voiceCount = clampedCount;
         
-        // Initialize sub oscillators with the same count
-        this.initializeSubOscillators(count);
+        // Update sub oscillator mix
+        this.updateSubOscillatorMix();
         
         // Force immediate update of detuning and stereo spread
         this.updateVoiceDetuning();
@@ -154,41 +136,62 @@ class MonoSynth {
         // Use provided schedule time or create one for standalone calls
         const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
         
-        if (this.oscillators.length <= 1) {
-            // Single oscillator, ensure it's not detuned
-            if (this.oscillators[0]) {
-                if (this.currentNoteInfo) {
-                    // If a note is playing, set to base frequency with no detune
-                    this.setOscillatorFrequency(this.oscillators[0], 0, rampTime, actualScheduleTime);
-                } else {
-                    // If no note is playing, reset to a standard frequency to clear any detune
-                    // Use smooth ramp to prevent clicks
-                    try {
-                        this.oscillators[0].setFreq(440, Math.max(rampTime, 0.002), actualScheduleTime); // Minimum 2ms ramp for reset
-                    } catch (e) {
-                        console.warn('Failed to reset single oscillator frequency:', e);
-                    }
+        if (this.voiceCount <= 1) {
+            // Single oscillator (primary only), ensure it's not detuned
+            if (this.currentNoteInfo) {
+                // If a note is playing, set to base frequency with no detune
+                this.setOscillatorFrequency(this.primaryOscillator, 0, rampTime, actualScheduleTime);
+            } else {
+                // If no note is playing, reset to a standard frequency to clear any detune
+                // Use smooth ramp to prevent clicks
+                try {
+                    this.primaryOscillator.setFreq(440, Math.max(rampTime, 0.002), actualScheduleTime); // Minimum 2ms ramp for reset
+                } catch (e) {
+                    console.warn('Failed to reset primary oscillator frequency:', e);
                 }
             }
             return;
         }
 
         // Calculate detune values for multiple oscillators
-        const centerIndex = (this.oscillators.length - 1) / 2;
+        const centerIndex = (this.voiceCount - 1) / 2;
         
-        this.oscillators.forEach((osc, index) => {
-            if (!this.currentNoteInfo) return;
-            
-            // Calculate detune offset from center
-            // For even number of oscillators, spread them symmetrically
+        // Primary oscillator (index 0)
+        if (this.currentNoteInfo) {
             let detuneOffset = 0;
-            if (this.oscillators.length > 1 && this.detuneSpread > 0) {
-                if (this.oscillators.length === 2) {
+            if (this.voiceCount > 1 && this.detuneSpread > 0) {
+                if (this.voiceCount === 2) {
                     // Special case for 2 oscillators: -spread/2 and +spread/2
-                    detuneOffset = (index - 0.5) * this.detuneSpread;
+                    detuneOffset = (0 - 0.5) * this.detuneSpread;
                 } else {
                     // For 3+ oscillators: spread evenly across the range
-                    detuneOffset = (index - centerIndex) * (this.detuneSpread / centerIndex);
+                    detuneOffset = (0 - centerIndex) * (this.detuneSpread / centerIndex);
+                }
+            }
+            
+            // Clamp detune to reasonable range to prevent frequency issues
+            detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset)); // ±1 octave max
+            
+            this.setOscillatorFrequency(this.primaryOscillator, detuneOffset, rampTime, actualScheduleTime);
+        }
+        
+        // Additional oscillators (indices 1 to voiceCount-1)
+        const additionalVoicesNeeded = this.voiceCount - 1;
+        for (let i = 0; i < additionalVoicesNeeded; i++) {
+            if (!this.currentNoteInfo) return;
+            
+            const osc = this.additionalOscillators[i];
+            const actualIndex = i + 1; // Since primary is index 0
+            
+            // Calculate detune offset from center
+            let detuneOffset = 0;
+            if (this.voiceCount > 1 && this.detuneSpread > 0) {
+                if (this.voiceCount === 2) {
+                    // Special case for 2 oscillators: -spread/2 and +spread/2
+                    detuneOffset = (actualIndex - 0.5) * this.detuneSpread;
+                } else {
+                    // For 3+ oscillators: spread evenly across the range
+                    detuneOffset = (actualIndex - centerIndex) * (this.detuneSpread / centerIndex);
                 }
             }
             
@@ -196,43 +199,59 @@ class MonoSynth {
             detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset)); // ±1 octave max
             
             this.setOscillatorFrequency(osc, detuneOffset, rampTime, actualScheduleTime);
-        });
+        }
     }
 
     updateStereoSpread() {
-        if (this.oscillatorPanners.length <= 1) {
-            // Single oscillator, ensure it's centered
-            if (this.oscillatorPanners[0]) {
-                try {
-                    this.oscillatorPanners[0].setPan(0); // Force center position
-                } catch (e) {
-                    console.warn('Failed to center single oscillator pan:', e);
-                }
+        if (this.voiceCount <= 1) {
+            // Single oscillator (primary only), ensure it's centered
+            try {
+                this.primaryOscillatorPanner.setPan(0); // Force center position
+            } catch (e) {
+                console.warn('Failed to center primary oscillator pan:', e);
             }
             return;
         }
 
         // Distribute oscillators across the stereo field
-        this.oscillatorPanners.forEach((panner, index) => {
-            let panPosition = 0;
+        // Primary oscillator (index 0)
+        let panPosition = 0;
+        if (this.voiceCount === 2) {
+            panPosition = (0 - 0.5) * 2; // -1
+        } else {
+            panPosition = (0 / (this.voiceCount - 1) - 0.5) * 2;
+        }
+        
+        let scaledPan = panPosition * (this.stereoSpread / 100);
+        let clampedPan = Math.max(-1, Math.min(1, scaledPan));
+        
+        try {
+            this.primaryOscillatorPanner.setPan(clampedPan);
+        } catch (e) {
+            console.warn('Failed to set primary oscillator pan position:', e);
+        }
+        
+        // Additional oscillators (indices 1 to voiceCount-1)
+        const additionalVoicesNeeded = this.voiceCount - 1;
+        for (let i = 0; i < additionalVoicesNeeded; i++) {
+            const panner = this.additionalOscillatorPanners[i];
+            const actualIndex = i + 1; // Since primary is index 0
             
-            if (this.oscillatorPanners.length === 2) {
-                // Special case for 2 oscillators: -0.5 and +0.5
-                panPosition = (index - 0.5) * 2; // -1 and +1
+            if (this.voiceCount === 2) {
+                panPosition = (actualIndex - 0.5) * 2; // +1
             } else {
-                // For 3+ oscillators: spread evenly from -1 to +1
-                panPosition = (index / (this.oscillatorPanners.length - 1) - 0.5) * 2;
+                panPosition = (actualIndex / (this.voiceCount - 1) - 0.5) * 2;
             }
             
-            const scaledPan = panPosition * (this.stereoSpread / 100); // Scale by spread amount
-            const clampedPan = Math.max(-1, Math.min(1, scaledPan)); // Clamp to valid range
+            scaledPan = panPosition * (this.stereoSpread / 100);
+            clampedPan = Math.max(-1, Math.min(1, scaledPan));
             
             try {
                 panner.setPan(clampedPan);
             } catch (e) {
-                console.warn('Failed to set pan position:', e);
+                console.warn('Failed to set additional oscillator pan position:', e);
             }
-        });
+        }
     }
 
     setOscillatorFrequency(oscillator, detuneInCents, rampTime = 0.002, scheduleTime = null) {
@@ -293,9 +312,16 @@ class MonoSynth {
         this.noiseGen.connect(this.noiseFilterBypassGain.getNode()); // Direct bypass path
         this.noiseFilterBypassGain.connect(this.noiseMixerOutput.getNode());
         
-        // Connect main oscillators, sub oscillators, and second oscillator to main oscillator mixer
+        // Connect main oscillators and sub oscillator to main oscillator mixer
+        this.primaryOscillator.connect(this.primaryOscillatorPanner.getNode());
+        this.primaryOscillatorPanner.connect(this.oscillatorMixer.getNode());
+        
         this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
-        this.subOscillatorMixer.connect(this.mainOscillatorMixer.getNode());
+        
+        // Connect sub oscillator (always connected but controlled by gain)
+        this.subOscillator.connect(this.subOscillatorPanner.getNode());
+        this.subOscillatorPanner.connect(this.subOscillatorGain.getNode());
+        this.subOscillatorGain.connect(this.mainOscillatorMixer.getNode());
         
         // Connect second oscillator through delay node (always enabled for phase control)
         this.osc2.connect(this.osc2PhaseDelay);
@@ -312,23 +338,23 @@ class MonoSynth {
         // This ensures consistent phase alignment regardless of when frequencies are later changed
         const baseFreq = 440; // A4 as reference frequency
         
-        // Set frequency for all main oscillators
-        this.oscillators.forEach(osc => {
+        // Set frequency for all oscillators
+        this.primaryOscillator.setFreq(baseFreq, 0, actualStartTime);
+        
+        this.additionalOscillators.forEach(osc => {
             try {
                 osc.setFreq(baseFreq, 0, actualStartTime);
             } catch (e) {
-                console.warn('Failed to set main oscillator base frequency:', e);
+                console.warn('Failed to set additional oscillator base frequency:', e);
             }
         });
         
-        // Set frequency for all sub oscillators
-        this.subOscillators.forEach(subOsc => {
-            try {
-                subOsc.setFreq(baseFreq, 0, actualStartTime);
-            } catch (e) {
-                console.warn('Failed to set sub oscillator base frequency:', e);
-            }
-        });
+        // Set frequency for sub oscillator
+        try {
+            this.subOscillator.setFreq(baseFreq, 0, actualStartTime);
+        } catch (e) {
+            console.warn('Failed to set sub oscillator base frequency:', e);
+        }
         
         // Set frequency for second oscillator
         try {
@@ -338,21 +364,21 @@ class MonoSynth {
         }
         
         // Set default waveforms for all oscillators to ensure consistent initialization
-        this.oscillators.forEach(osc => {
+        this.primaryOscillator.setType('sine'); // Default to sine wave
+        
+        this.additionalOscillators.forEach(osc => {
             try {
                 osc.setType('sine'); // Default to sine wave
             } catch (e) {
-                console.warn('Failed to set main oscillator default waveform:', e);
+                console.warn('Failed to set additional oscillator default waveform:', e);
             }
         });
         
-        this.subOscillators.forEach(subOsc => {
-            try {
-                subOsc.setType('sine'); // Default to sine wave
-            } catch (e) {
-                console.warn('Failed to set sub oscillator default waveform:', e);
-            }
-        });
+        try {
+            this.subOscillator.setType('sine'); // Default to sine wave
+        } catch (e) {
+            console.warn('Failed to set sub oscillator default waveform:', e);
+        }
         
         try {
             this.osc2.setType('sine'); // Default to sine wave
@@ -360,23 +386,23 @@ class MonoSynth {
             console.warn('Failed to set second oscillator default waveform:', e);
         }
         
-        // Start all main oscillators with synchronized timing
-        this.oscillators.forEach(osc => {
+        // Start ALL oscillators with synchronized timing for perfect phase alignment
+        this.primaryOscillator.start(actualStartTime);
+        
+        this.additionalOscillators.forEach((osc, index) => {
             try {
                 osc.start(actualStartTime);
             } catch (e) {
-                console.warn('Main oscillator already started:', e);
+                console.warn('Additional oscillator', index, 'already started:', e);
             }
         });
         
-        // Start all sub oscillators with synchronized timing
-        this.subOscillators.forEach(subOsc => {
-            try {
-                subOsc.start(actualStartTime);
-            } catch (e) {
-                console.warn('Sub oscillator already started:', e);
-            }
-        });
+        // Start sub oscillator with synchronized timing
+        try {
+            this.subOscillator.start(actualStartTime);
+        } catch (e) {
+            console.warn('Sub oscillator already started:', e);
+        }
         
         // Start second oscillator with synchronized timing
         try {
@@ -405,15 +431,9 @@ class MonoSynth {
 
     // Voice spreading methods
     setVoiceCount(count) {
-        const clampedCount = Math.max(1, Math.min(8, Math.round(count))); // Limit to 1-8 voices
+        const clampedCount = Math.max(1, Math.min(this.maxVoices, Math.round(count))); // Limit to 1-maxVoices
         if (clampedCount !== this.voiceCount) {
-            this.initializeOscillators(clampedCount);
-            
-            // Reset oscillator states to prevent detuned artifacts
-            // Use a small delay to ensure oscillator initialization is complete
-            setTimeout(() => {
-                this.resetOscillatorStates();
-            }, 10);
+            this.setActiveVoiceCount(clampedCount);
         }
     }
 
@@ -429,19 +449,28 @@ class MonoSynth {
         this.updateSubOscillatorStereoSpread();
     }
 
-    // Method to reset all oscillators to clean state (useful when switching voice counts)
+    // Method to reset all active oscillators to clean state
     resetOscillatorStates() {
         // Capture scheduling time once for all oscillators to ensure phase alignment
         const scheduleTime = this.AC.currentTime + 0.001; // 1ms offset for stable scheduling
         
-        this.oscillators.forEach(osc => {
+        // Reset primary oscillator
+        try {
+            this.primaryOscillator.setFreq(440, 0.005, scheduleTime); // 5ms ramp
+        } catch (e) {
+            console.warn('Failed to reset primary oscillator state:', e);
+        }
+        
+        // Reset active additional oscillators
+        const additionalVoicesNeeded = this.voiceCount - 1;
+        for (let i = 0; i < additionalVoicesNeeded; i++) {
             try {
                 // Reset to standard frequency with smooth ramp to prevent clicks
-                osc.setFreq(440, 0.005, scheduleTime); // 5ms ramp
+                this.additionalOscillators[i].setFreq(440, 0.005, scheduleTime); // 5ms ramp
             } catch (e) {
-                console.warn('Failed to reset oscillator state:', e);
+                console.warn('Failed to reset additional oscillator state:', e);
             }
-        });
+        }
         
         // Small delay to allow frequency ramp to complete, then update detuning
         setTimeout(() => {
@@ -453,20 +482,31 @@ class MonoSynth {
     // Connect vibrato LFO to all oscillators
     connectVibratoToAll(vibratoLFO) {
         this.vibratoLFO = vibratoLFO; // Store reference for later use
-        this.oscillators.forEach(osc => {
+        
+        // Connect to primary oscillator
+        try {
+            const primaryOscNode = this.primaryOscillator.getOscillatorNode();
+            if (primaryOscNode && primaryOscNode.detune) {
+                vibratoLFO.connect(primaryOscNode.detune);
+            }
+        } catch (e) {
+            console.warn('Failed to connect vibrato to primary oscillator:', e);
+        }
+        
+        // Connect to additional oscillators
+        this.additionalOscillators.forEach((osc, index) => {
             try {
                 const oscNode = osc.getOscillatorNode();
-                // Disconnect any existing vibrato connections first
                 if (oscNode && oscNode.detune) {
                     vibratoLFO.connect(oscNode.detune);
                 }
             } catch (e) {
-                console.warn('Failed to connect vibrato to oscillator:', e);
+                console.warn('Failed to connect vibrato to additional oscillator', index, ':', e);
             }
         });
         
-        // Also connect to sub oscillators
-        this.connectVibratoToSubOscillators(vibratoLFO);
+        // Connect to sub oscillator
+        this.connectVibratoToSubOscillator(vibratoLFO);
         
         // Connect to second oscillator
         try {
@@ -495,10 +535,10 @@ class MonoSynth {
     }
 
     // Getters
-    getNode = () => this.oscillatorMixer.getNode(); // Return the oscillator mixer instead of single osc
-    getOscillatorNode = () => this.oscillators[0]?.getOscillatorNode(); // Return first oscillator for compatibility
-    getWaveform = () => this.oscillators[0]?.getType() || 'sine';
-    getDutyCycle = () => this.oscillators[0]?.getDutyCycle() || 0.5;
+    getNode = () => this.oscillatorMixer.getNode(); // Return the oscillator mixer
+    getOscillatorNode = () => this.primaryOscillator.getOscillatorNode(); // Return primary oscillator for compatibility
+    getWaveform = () => this.primaryOscillator.getType();
+    getDutyCycle = () => this.primaryOscillator.getDutyCycle();
     getFilterType = () => this.filter.getType();
     getFilterFreq = () => this.filter.getFreq();
     getFilterQ = () => this.filter.getQ();
@@ -512,34 +552,37 @@ class MonoSynth {
         const scheduleTime = this.AC.currentTime + 0.001;
         const baseFreq = this.currentNoteInfo ? this.currentNoteInfo.baseFreq_ : 440;
         
-        // Resync all main oscillators to the same frequency
-        this.oscillators.forEach(osc => {
+        // Resync primary oscillator
+        try {
+            this.primaryOscillator.setFreq(baseFreq, 0.001, scheduleTime);
+        } catch (e) {
+            console.warn('Failed to resync primary oscillator:', e);
+        }
+        
+        // Resync additional oscillators
+        this.additionalOscillators.forEach((osc, index) => {
             try {
                 osc.setFreq(baseFreq, 0.001, scheduleTime);
             } catch (e) {
-                console.warn('Failed to resync main oscillator:', e);
+                console.warn('Failed to resync additional oscillator', index, ':', e);
             }
         });
         
-        // Resync all sub oscillators
+        // Resync sub oscillator
         if (this.subOscOctaveOffset !== 0 && this.currentNoteInfo) {
             const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
             const subBaseFreq = baseFreq * octaveMultiplier;
-            this.subOscillators.forEach(subOsc => {
-                try {
-                    subOsc.setFreq(subBaseFreq, 0.001, scheduleTime);
-                } catch (e) {
-                    console.warn('Failed to resync sub oscillator:', e);
-                }
-            });
+            try {
+                this.subOscillator.setFreq(subBaseFreq, 0.001, scheduleTime);
+            } catch (e) {
+                console.warn('Failed to resync sub oscillator:', e);
+            }
         } else {
-            this.subOscillators.forEach(subOsc => {
-                try {
-                    subOsc.setFreq(440, 0.001, scheduleTime);
-                } catch (e) {
-                    console.warn('Failed to resync sub oscillator:', e);
-                }
-            });
+            try {
+                this.subOscillator.setFreq(440, 0.001, scheduleTime);
+            } catch (e) {
+                console.warn('Failed to resync sub oscillator:', e);
+            }
         }
         
         // Resync second oscillator
@@ -565,37 +608,48 @@ class MonoSynth {
             return;
         } else {
             // Restore normal gain when not "off"
-            const count = this.oscillators.length;
+            const count = this.voiceCount;
             const gainReduction = count === 1 ? 1.0 : 1.0 / (1 + (count - 1) * 0.2);
             this.oscillatorMixer.setGain(gainReduction);
         }
         
-        this.oscillators.forEach(osc => osc.setType(type));
+        // Set waveform for primary oscillator
+        this.primaryOscillator.setType(type);
+        
+        // Set waveform for additional oscillators
+        this.additionalOscillators.forEach(osc => osc.setType(type));
+        
         // Ensure synchronization is maintained after waveform change
         this.ensureOscillatorSynchronization();
-        // Note: Sub oscillators now have independent waveform control
     };
     setDutyCycle = (val) => {
-        this.oscillators.forEach(osc => osc.setDutyCycle(val));
-        // Note: Sub oscillators and osc2 have independent duty cycle control
+        // Set duty cycle for primary oscillator
+        this.primaryOscillator.setDutyCycle(val);
+        
+        // Set duty cycle for additional oscillators
+        this.additionalOscillators.forEach(osc => osc.setDutyCycle(val));
+        
+        // Note: Sub oscillator and osc2 have independent duty cycle control
     };
     
     // Sub oscillator waveform control
     setSubOscWaveform = (type) => {
         // Handle "off" waveform by setting gain to 0 instead of changing oscillator type
         if (type === 'off') {
-            this.subOscillatorMixer.setGain(0);
+            this.subOscillatorGain.setGain(0);
             return;
         } else {
             // Restore normal gain when not "off" (but only if sub osc offset is not 0)
             this.updateSubOscillatorMix();
         }
         
-        this.subOscillators.forEach(subOsc => subOsc.setType(type));
+        this.subOscillator.setType(type);
         // Ensure synchronization is maintained after waveform change
         this.ensureOscillatorSynchronization();
     };
-    getSubOscWaveform = () => this.subOscillators[0]?.getType() || 'sine';
+    getSubOscWaveform = () => this.subOscillator.getType();
+    setSubOscDutyCycle = (val) => this.subOscillator.setDutyCycle(val);
+    getSubOscDutyCycle = () => this.subOscillator.getDutyCycle();
     
     // Second oscillator controls
     setOsc2Waveform = (type) => {
@@ -845,8 +899,8 @@ class MonoSynth {
         // Update all oscillator frequencies with synchronized timing
         this.updateVoiceDetuning(scheduleTime, rampTime);
         
-        // Also update sub oscillators and osc2 with the same schedule time and ramp time
-        this.updateSubOscillatorFrequencies(scheduleTime, rampTime);
+        // Also update sub oscillator and osc2 with the same schedule time and ramp time
+        this.updateSubOscillatorFrequency(scheduleTime, rampTime);
         this.updateOsc2Frequency(scheduleTime, rampTime);
     };
 
@@ -886,51 +940,70 @@ class MonoSynth {
         // Use provided schedule time or capture one for all oscillators to ensure phase alignment
         const actualScheduleTime = scheduleTime || (this.AC.currentTime + 0.001); // 1ms offset for stable scheduling
         
-        // Set frequency for all oscillators with detuning and portamento
-        this.oscillators.forEach((osc, index) => {
-            if (this.oscillators.length <= 1) {
-                // Single oscillator, no detuning
-                osc.setFreq(freq, portamentoSpeed, actualScheduleTime);
-            } else {
-                // Multiple oscillators with detuning
-                let detuneOffset = 0;
-                if (this.detuneSpread > 0) {
-                    if (this.oscillators.length === 2) {
-                        // Special case for 2 oscillators: -spread/2 and +spread/2
-                        detuneOffset = (index - 0.5) * this.detuneSpread;
-                    } else {
-                        // For 3+ oscillators: spread evenly across the range
-                        const centerIndex = (this.oscillators.length - 1) / 2;
-                        detuneOffset = (index - centerIndex) * (this.detuneSpread / centerIndex);
-                    }
-                }
-                
-                // Clamp detune to reasonable range
-                detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset));
-                
-                const detuneRatio = Math.pow(2, detuneOffset / 1200);
-                const detunedFreq = freq * detuneRatio;
-                
-                // Validate frequency before setting
-                if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
-                    osc.setFreq(detunedFreq, portamentoSpeed, actualScheduleTime);
+        // Set frequency for primary oscillator with detuning and portamento
+        if (this.voiceCount <= 1) {
+            // Single oscillator (primary only), no detuning
+            this.primaryOscillator.setFreq(freq, portamentoSpeed, actualScheduleTime);
+        } else {
+            // Primary oscillator with detuning (index 0)
+            let detuneOffset = 0;
+            if (this.detuneSpread > 0) {
+                if (this.voiceCount === 2) {
+                    detuneOffset = (0 - 0.5) * this.detuneSpread;
                 } else {
-                    console.warn('Invalid detuned frequency in noteOn:', detunedFreq);
-                    osc.setFreq(freq, portamentoSpeed, actualScheduleTime); // Fallback to base frequency
+                    const centerIndex = (this.voiceCount - 1) / 2;
+                    detuneOffset = (0 - centerIndex) * (this.detuneSpread / centerIndex);
                 }
             }
-        });
+            
+            detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset));
+            const detuneRatio = Math.pow(2, detuneOffset / 1200);
+            const detunedFreq = freq * detuneRatio;
+            
+            if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
+                this.primaryOscillator.setFreq(detunedFreq, portamentoSpeed, actualScheduleTime);
+            } else {
+                console.warn('Invalid primary oscillator detuned frequency in noteOn:', detunedFreq);
+                this.primaryOscillator.setFreq(freq, portamentoSpeed, actualScheduleTime);
+            }
+        }
 
-        // Set frequency for all sub oscillators (no detuning, just octave offset)
+        // Set frequency for additional oscillators with detuning
+        const additionalVoicesNeeded = this.voiceCount - 1;
+        for (let i = 0; i < additionalVoicesNeeded; i++) {
+            const osc = this.additionalOscillators[i];
+            const actualIndex = i + 1; // Since primary is index 0
+            
+            let detuneOffset = 0;
+            if (this.detuneSpread > 0) {
+                if (this.voiceCount === 2) {
+                    detuneOffset = (actualIndex - 0.5) * this.detuneSpread;
+                } else {
+                    const centerIndex = (this.voiceCount - 1) / 2;
+                    detuneOffset = (actualIndex - centerIndex) * (this.detuneSpread / centerIndex);
+                }
+            }
+            
+            detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset));
+            const detuneRatio = Math.pow(2, detuneOffset / 1200);
+            const detunedFreq = freq * detuneRatio;
+            
+            if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
+                osc.setFreq(detunedFreq, portamentoSpeed, actualScheduleTime);
+            } else {
+                console.warn('Invalid additional oscillator detuned frequency in noteOn:', detunedFreq);
+                osc.setFreq(freq, portamentoSpeed, actualScheduleTime);
+            }
+        }
+
+        // Set frequency for sub oscillator (no detuning, just octave offset)
         if (this.subOscOctaveOffset !== 0) {
             const octaveMultiplier = Math.pow(2, this.subOscOctaveOffset);
             const subBaseFreq = freq * octaveMultiplier;
             
             // Validate sub frequency
             if (isFinite(subBaseFreq) && subBaseFreq > 0 && subBaseFreq <= 20000) {
-                this.subOscillators.forEach(subOsc => {
-                    subOsc.setFreq(subBaseFreq, portamentoSpeed, actualScheduleTime);
-                });
+                this.subOscillator.setFreq(subBaseFreq, portamentoSpeed, actualScheduleTime);
             } else {
                 console.warn('Invalid sub oscillator frequency:', subBaseFreq);
             }
@@ -1125,86 +1198,18 @@ class MonoSynth {
         }
     }
 
-    initializeSubOscillators(count) {
-        // Clean up existing sub oscillators if we need fewer
-        if (count < this.subOscillators.length) {
-            for (let i = count; i < this.subOscillators.length; i++) {
-                try {
-                    if (this.subOscillators[i] && this.subOscillatorPanners[i]) {
-                        this.subOscillators[i].disconnect();
-                    }
-                } catch (e) {
-                    console.warn('Failed to disconnect sub oscillator:', e);
-                }
-                
-                try {
-                    if (this.subOscillatorPanners[i]) {
-                        this.subOscillatorPanners[i].disconnect();
-                    }
-                } catch (e) {
-                    console.warn('Failed to disconnect sub oscillator panner:', e);
-                }
-            }
-            this.subOscillators = this.subOscillators.slice(0, count);
-            this.subOscillatorPanners = this.subOscillatorPanners.slice(0, count);
-        }
-        
-        // Create new sub oscillators if we need more
-        while (this.subOscillators.length < count) {
-            const subOsc = new Oscillator(this.AC);
-            const subPanner = new StereoPanner(this.AC);
-            
-            this.subOscillators.push(subOsc);
-            this.subOscillatorPanners.push(subPanner);
-            
-            // Connect: sub oscillator -> panner -> sub mixer
-            subOsc.connect(subPanner.getNode());
-            subPanner.connect(this.subOscillatorMixer.getNode());
-            
-            // Start the new sub oscillator only if init has already been called
-            if (this.isInitialized) {
-                try {
-                    // Set base frequency before starting for phase alignment
-                    const startTime = this.AC.currentTime + 0.001;
-                    subOsc.setFreq(440, 0, startTime); // Set to reference frequency
-                    
-                    // Set waveform to match existing sub oscillators
-                    const existingWaveform = this.subOscillators.length > 1 ? this.subOscillators[0].getType() : 'sine';
-                    subOsc.setType(existingWaveform);
-                    
-                    subOsc.start(startTime);
-                } catch (e) {
-                    console.warn('Failed to start sub oscillator:', e);
-                }
-            }
-        }
-        
-        // Update sub oscillator mixer gain and bypass
-        this.updateSubOscillatorMix();
-        
-        // Update sub oscillator frequencies and stereo spread
-        this.updateSubOscillatorFrequencies();
-        this.updateSubOscillatorStereoSpread();
-        
-        // Reconnect vibrato if it was previously connected
-        if (this.vibratoLFO) {
-            this.connectVibratoToSubOscillators(this.vibratoLFO);
-        }
-    }
-
     updateSubOscillatorMix() {
-        // When subOscOctaveOffset is 0, bypass the sub oscillators completely
+        // When subOscOctaveOffset is 0, set gain to 0 to bypass the sub oscillator
         if (this.subOscOctaveOffset === 0) {
-            this.subOscillatorMixer.setGain(0);
+            this.subOscillatorGain.setGain(0);
         } else {
-            // Gentle gain reduction to prevent clipping when sub oscillators are active
-            const count = this.subOscillators.length;
-            const gainReduction = count === 1 ? 0.5 : 0.5 / (1 + (count - 1) * 0.2);
-            this.subOscillatorMixer.setGain(gainReduction);
+            // Gentle gain reduction to prevent clipping when sub oscillator is active
+            const gainReduction = 0.5; // Fixed gain for single sub oscillator
+            this.subOscillatorGain.setGain(gainReduction);
         }
     }
 
-    updateSubOscillatorFrequencies(scheduleTime = null, rampTime = 0.001) {
+    updateSubOscillatorFrequency(scheduleTime = null, rampTime = 0.001) {
         if (!this.currentNoteInfo || this.subOscOctaveOffset === 0) return;
         
         const { baseFreq_ } = this.currentNoteInfo;
@@ -1220,48 +1225,22 @@ class MonoSynth {
         // Use provided schedule time or create one for standalone calls
         const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
         
-        this.subOscillators.forEach((subOsc, index) => {
-            try {
-                // Sub oscillators don't get detuning - they stay pitched at exact octave intervals
-                subOsc.setFreq(subBaseFreq, rampTime, actualScheduleTime);
-            } catch (e) {
-                console.warn('Failed to set sub oscillator frequency:', e);
-            }
-        });
+        try {
+            // Sub oscillator doesn't get detuning - it stays pitched at exact octave intervals
+            this.subOscillator.setFreq(subBaseFreq, rampTime, actualScheduleTime);
+        } catch (e) {
+            console.warn('Failed to set sub oscillator frequency:', e);
+        }
     }
 
     updateSubOscillatorStereoSpread() {
-        if (this.subOscillatorPanners.length <= 1) {
-            // Single sub oscillator, ensure it's centered
-            if (this.subOscillatorPanners[0]) {
-                try {
-                    this.subOscillatorPanners[0].setPan(0);
-                } catch (e) {
-                    console.warn('Failed to center sub oscillator pan:', e);
-                }
-            }
-            return;
+        // For single sub oscillator, always keep it centered
+        // This method exists for compatibility with PolySynth
+        try {
+            this.subOscillatorPanner.setPan(0); // Always center for single sub oscillator
+        } catch (e) {
+            console.warn('Failed to center sub oscillator pan:', e);
         }
-
-        // Distribute sub oscillators across the stereo field (same as main oscillators)
-        this.subOscillatorPanners.forEach((panner, index) => {
-            let panPosition = 0;
-            
-            if (this.subOscillatorPanners.length === 2) {
-                panPosition = (index - 0.5) * 2;
-            } else {
-                panPosition = (index / (this.subOscillatorPanners.length - 1) - 0.5) * 2;
-            }
-            
-            const scaledPan = panPosition * (this.stereoSpread / 100);
-            const clampedPan = Math.max(-1, Math.min(1, scaledPan));
-            
-            try {
-                panner.setPan(clampedPan);
-            } catch (e) {
-                console.warn('Failed to set sub oscillator pan position:', e);
-            }
-        });
     }
 
     // Sub oscillator control methods
@@ -1272,26 +1251,24 @@ class MonoSynth {
         // Update the sub oscillator mix (bypass when offset is 0)
         this.updateSubOscillatorMix();
         
-        // Update frequencies if a note is currently playing
-        this.updateSubOscillatorFrequencies();
+        // Update frequency if a note is currently playing
+        this.updateSubOscillatorFrequency();
     }
 
     getSubOscOctaveOffset() {
         return this.subOscOctaveOffset;
     }
 
-    // Connect vibrato LFO to sub oscillators
-    connectVibratoToSubOscillators(vibratoLFO) {
-        this.subOscillators.forEach(subOsc => {
-            try {
-                const subOscNode = subOsc.getOscillatorNode();
-                if (subOscNode && subOscNode.detune) {
-                    vibratoLFO.connect(subOscNode.detune);
-                }
-            } catch (e) {
-                console.warn('Failed to connect vibrato to sub oscillator:', e);
+    // Connect vibrato LFO to sub oscillator
+    connectVibratoToSubOscillator(vibratoLFO) {
+        try {
+            const subOscNode = this.subOscillator.getOscillatorNode();
+            if (subOscNode && subOscNode.detune) {
+                vibratoLFO.connect(subOscNode.detune);
             }
-        });
+        } catch (e) {
+            console.warn('Failed to connect vibrato to sub oscillator:', e);
+        }
     }
     
     // Cleanup method to properly dispose of resources
@@ -1308,22 +1285,26 @@ class MonoSynth {
         }
         
         // Clean up oscillators
-        this.oscillators.forEach(osc => {
+        try {
+            this.primaryOscillator.disconnect();
+        } catch (e) {
+            console.warn('Error disconnecting primary oscillator:', e);
+        }
+        
+        this.additionalOscillators.forEach(osc => {
             try {
                 osc.disconnect();
             } catch (e) {
-                console.warn('Error disconnecting oscillator:', e);
+                console.warn('Error disconnecting additional oscillator:', e);
             }
         });
         
-        // Clean up sub oscillators
-        this.subOscillators.forEach(subOsc => {
-            try {
-                subOsc.disconnect();
-            } catch (e) {
-                console.warn('Error disconnecting sub oscillator:', e);
-            }
-        });
+        // Clean up sub oscillator
+        try {
+            this.subOscillator.disconnect();
+        } catch (e) {
+            console.warn('Error disconnecting sub oscillator:', e);
+        }
         
         // Clean up audio nodes
         try {
