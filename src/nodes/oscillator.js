@@ -34,7 +34,7 @@ class Oscillator {
         }
     }
     
-    start = () => this.node.start();
+    start = (when) => {console.log("Starting oscillator at:", when); this.node.start(when);}
 
     // Getters
     getNode = () => this.outputBuffer; // Always return the stable output buffer
@@ -115,27 +115,30 @@ class Oscillator {
         }
     }
     
-    setFreq = (freq, time = 0) => {
+    setFreq = (freq, time = 0, startTime = null) => {
         if (freq < 0 || freq > MAX_FREQ) return false;
+        
+        // Use provided startTime or current time + small offset to ensure simultaneous scheduling
+        const scheduledTime = startTime !== null ? startTime : (this.AC.currentTime + 0.001);
         
         try {
             if (time > 0) {
                 // Cancel any pending frequency changes to prevent conflicts
-                this.node.frequency.cancelScheduledValues(this.AC.currentTime);
+                this.node.frequency.cancelScheduledValues(scheduledTime);
                 // Set current value first, then ramp
-                this.node.frequency.setValueAtTime(this.node.frequency.value, this.AC.currentTime);
+                this.node.frequency.setValueAtTime(this.node.frequency.value, scheduledTime);
                 // Use linear ramp for smooth frequency transitions (prevents clicks)
-                this.node.frequency.linearRampToValueAtTime(freq, this.AC.currentTime + time);
+                this.node.frequency.linearRampToValueAtTime(freq, scheduledTime + time);
             } else {
                 // Cancel any pending changes and set immediately
-                this.node.frequency.cancelScheduledValues(this.AC.currentTime);
-                this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
+                this.node.frequency.cancelScheduledValues(scheduledTime);
+                this.node.frequency.setValueAtTime(freq, scheduledTime);
             }
         } catch (e) {
             console.warn('Failed to set oscillator frequency:', e);
             // Fallback: try simple immediate set
             try {
-                this.node.frequency.setValueAtTime(freq, this.AC.currentTime);
+                this.node.frequency.setValueAtTime(freq, scheduledTime);
             } catch (fallbackError) {
                 console.warn('Fallback frequency set also failed:', fallbackError);
             }

@@ -1066,10 +1066,13 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         // Prevent multiple initializations
         if (synthInitialized.current) return;
         
+        // Capture a single start time for all oscillators to ensure perfect phase alignment
+        const startTime = AC.currentTime + 0.001; // 1ms offset for stable scheduling
+        
         synthArr.forEach(synth => {
             synth.connect(synthMix.getNode());
             synth.connectVibratoToAll(vibratoLFO);
-            synth.init();
+            synth.init(startTime); // Pass synchronized start time
         });
 
         vibratoLFO.start();
@@ -1189,7 +1192,7 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
     portamentoSpeedGlobal = portamentoSpeed;
 
     // Functions to pass envelope data to the synth
-    const synthNoteOn = (synth, note, volume) => {
+    const synthNoteOn = (synth, note, volume, scheduleTime = null) => {
         const gainEnv = getGainEnv(volume);
         // console.log('Gain envelope:', gainEnv);
         const filterEnv = getFilterEnv();
@@ -1198,7 +1201,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             {
                 gainEnv,
                 filterEnv,
-                portamentoSpeed: polyphonyGlobal === 1 ? portamentoSpeedGlobal : 0
+                portamentoSpeed: polyphonyGlobal === 1 ? portamentoSpeedGlobal : 0,
+                scheduleTime: scheduleTime // Pass schedule time for phase alignment
             },
         );
         return voiceId; // Return voice ID for tracking
@@ -1216,6 +1220,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
         // console.log('Playing programmatic notes:', notes, 'Volume:', volume, 'Duration:', duration);
         
         const gainValue = volume / 100; // Convert percentage to gain value
+        
+        // Capture schedule time once for all simultaneous notes to ensure phase alignment
+        const scheduleTime = AC.currentTime + 0.001; // 1ms offset for stable scheduling
         
         notes.forEach(noteString => {
             // Parse note string (e.g., "C4", "D#5")
@@ -1244,8 +1251,8 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             // Create unique ID for this note instance
             const noteId = `${noteString}_${noteIdCounter.current++}`;
             
-            // Start the note and get the voice ID
-            const voiceId = synthNoteOn(targetSynth, note, gainValue);
+            // Start the note with synchronized schedule time and get the voice ID
+            const voiceId = synthNoteOn(targetSynth, note, gainValue, scheduleTime);
             
             // Store note info for tracking
             const noteInfo = {
@@ -1589,7 +1596,9 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             targetSynth = synthArr[synthPos];
         }
 
-        const voiceId = synthNoteOn(targetSynth, note);
+        // Capture schedule time for phase alignment
+        const scheduleTime = AC.currentTime + 0.001; // 1ms offset for stable scheduling
+        const voiceId = synthNoteOn(targetSynth, note, undefined, scheduleTime);
         
         // Track this note for proper cleanup
         regularActiveNotes.current.set(note.note, {
@@ -1850,9 +1859,25 @@ const PolySynth = React.forwardRef(({ className, setTheme, currentTheme }, ref) 
             if (synth1.getSubOscWaveform() !== subOscType) synthArr.forEach((synth) => synth.setSubOscWaveform(subOscType));
             if (synth1.getOsc2Waveform() !== osc2Type) synthArr.forEach((synth) => synth.setOsc2Waveform(osc2Type));
             if (synth1.getOsc2DutyCycle() !== osc2DutyCycle) synthArr.forEach((synth) => synth.setOsc2DutyCycle(osc2DutyCycle));
-            if (synth1.getOsc2Detune() !== osc2Detune) synthArr.forEach((synth) => synth.setOsc2Detune(osc2Detune));
-            if (synth1.getOsc2Amount() !== osc2Amount) synthArr.forEach((synth) => synth.setOsc2Amount(osc2Amount));
-            if (synth1.getOsc2PhaseOffset() !== osc2PhaseOffset) synthArr.forEach((synth) => synth.setOsc2PhaseOffset(osc2PhaseOffset));
+            if (synth1.getOsc2Detune() !== osc2Detune) {
+                // Capture single schedule time for synchronized detune changes
+                const scheduleTime = AC.currentTime + 0.001;
+                synthArr.forEach((synth) => synth.setOsc2Detune(osc2Detune, scheduleTime));
+            }
+            if (synth1.getOsc2Amount() !== osc2Amount) {
+                synthArr.forEach((synth) => synth.setOsc2Amount(osc2Amount));
+                
+                // If we're enabling osc2 (going from 0 to > 0), resynchronize all secondary oscillators
+                if (synth1.getOsc2Amount() === 0 && osc2Amount > 0) {
+                    const startTime = AC.currentTime + 0.001;
+                    synthArr.forEach((synth) => synth.resyncOsc2(startTime));
+                }
+            }
+            if (synth1.getOsc2PhaseOffset() !== osc2PhaseOffset) {
+                // Capture single schedule time for synchronized phase offset changes
+                const scheduleTime = AC.currentTime + 0.001;
+                synthArr.forEach((synth) => synth.setOsc2PhaseOffset(osc2PhaseOffset, scheduleTime));
+            }
             if (synth1.getFilterType() !== filterType) synthArr.forEach((synth) => synth.setFilterType(filterType));
             if (synth1.getFilterFreq() !== filterFreq) synthArr.forEach((synth) => synth.setFilterFreq(filterFreq));
             if (synth1.getFilterQ() !== filterQ) synthArr.forEach((synth) => synth.setFilterQ(filterQ));

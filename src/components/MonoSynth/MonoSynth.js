@@ -25,6 +25,7 @@ class MonoSynth {
         this.osc2Detune = 0; // Detune in cents
         this.osc2Amount = 0; // Mix amount (0-1)
         this.osc2PhaseOffset = 0; // Phase offset in degrees (0-360)
+        this.osc2Started = false; // Track if osc2 has been started
         
         // Multiple oscillators for voice spreading
         this.oscillators = [];
@@ -89,7 +90,7 @@ class MonoSynth {
                 try {
                     // Reset frequency of disconnected oscillators to prevent weird states
                     if (this.oscillators[i]) {
-                        this.oscillators[i].setFreq(440);
+                        this.oscillators[i].setFreq(440, 0, this.AC.currentTime + 0.001);
                     }
                 } catch (e) {
                     console.warn('Failed to reset oscillator frequency:', e);
@@ -114,7 +115,9 @@ class MonoSynth {
             // Start the new oscillator only if init has already been called
             if (this.isInitialized) {
                 try {
-                    osc.start();
+                    // Use a small future time for phase alignment with existing oscillators
+                    const startTime = this.AC.currentTime + 0.001;
+                    osc.start(startTime);
                 } catch (e) {
                     console.warn('Failed to start oscillator:', e);
                 }
@@ -141,18 +144,21 @@ class MonoSynth {
         }
     }
 
-    updateVoiceDetuning() {
+    updateVoiceDetuning(scheduleTime = null, rampTime = 0.001) {
+        // Use provided schedule time or create one for standalone calls
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
+        
         if (this.oscillators.length <= 1) {
             // Single oscillator, ensure it's not detuned
             if (this.oscillators[0]) {
                 if (this.currentNoteInfo) {
                     // If a note is playing, set to base frequency with no detune
-                    this.setOscillatorFrequency(this.oscillators[0], 0, 0.001); // Very short ramp
+                    this.setOscillatorFrequency(this.oscillators[0], 0, rampTime, actualScheduleTime);
                 } else {
                     // If no note is playing, reset to a standard frequency to clear any detune
                     // Use smooth ramp to prevent clicks
                     try {
-                        this.oscillators[0].setFreq(440, 0.002); // 2ms ramp
+                        this.oscillators[0].setFreq(440, Math.max(rampTime, 0.002), actualScheduleTime); // Minimum 2ms ramp for reset
                     } catch (e) {
                         console.warn('Failed to reset single oscillator frequency:', e);
                     }
@@ -183,7 +189,7 @@ class MonoSynth {
             // Clamp detune to reasonable range to prevent frequency issues
             detuneOffset = Math.max(-1200, Math.min(1200, detuneOffset)); // ±1 octave max
             
-            this.setOscillatorFrequency(osc, detuneOffset, 0.001); // Very short ramp for detuning
+            this.setOscillatorFrequency(osc, detuneOffset, rampTime, actualScheduleTime);
         });
     }
 
@@ -223,7 +229,7 @@ class MonoSynth {
         });
     }
 
-    setOscillatorFrequency(oscillator, detuneInCents, rampTime = 0.002) {
+    setOscillatorFrequency(oscillator, detuneInCents, rampTime = 0.002, scheduleTime = null) {
         if (!this.currentNoteInfo || !oscillator) return;
         
         const { baseFreq_ } = this.currentNoteInfo;
@@ -240,6 +246,9 @@ class MonoSynth {
             return;
         }
         
+        // Use provided schedule time or create one for UI changes
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
+        
         const detuneRatio = Math.pow(2, detuneInCents / 1200); // Convert cents to frequency ratio
         const detunedFreq = baseFreq_ * detuneRatio;
         
@@ -251,14 +260,17 @@ class MonoSynth {
         
         try {
             // Use small ramp time to prevent clicks/cracks
-            oscillator.setFreq(detunedFreq, rampTime);
+            oscillator.setFreq(detunedFreq, rampTime, actualScheduleTime);
         } catch (e) {
             console.warn('Failed to set oscillator frequency:', e);
         }
     }
 
-    init() {
+    init(startTime = null) {
         console.log('MonoSynth init - connecting audio nodes');
+        
+        // Use provided start time or create one for synchronized oscillator startup
+        const actualStartTime = startTime || (this.AC.currentTime + 0.001);
         
         // Set up noise filter as bandpass
         this.noiseFilter.setType('bandpass');
@@ -290,27 +302,27 @@ class MonoSynth {
         
         console.log('Connected oscillator mixers and noise paths to mixer');
         
-        // Start all main oscillators
+        // Start all main oscillators with synchronized timing
         this.oscillators.forEach(osc => {
             try {
-                osc.start();
+                osc.start(actualStartTime);
             } catch (e) {
                 console.warn('Main oscillator already started:', e);
             }
         });
         
-        // Start all sub oscillators
+        // Start all sub oscillators with synchronized timing
         this.subOscillators.forEach(subOsc => {
             try {
-                subOsc.start();
+                subOsc.start(actualStartTime);
             } catch (e) {
                 console.warn('Sub oscillator already started:', e);
             }
         });
         
-        // Start second oscillator
+        // Start second oscillator with synchronized timing
         try {
-            this.osc2.start();
+            this.osc2.start(actualStartTime);
         } catch (e) {
             console.warn('Second oscillator already started:', e);
         }
@@ -360,10 +372,13 @@ class MonoSynth {
 
     // Method to reset all oscillators to clean state (useful when switching voice counts)
     resetOscillatorStates() {
+        // Capture scheduling time once for all oscillators to ensure phase alignment
+        const scheduleTime = this.AC.currentTime + 0.001; // 1ms offset for stable scheduling
+        
         this.oscillators.forEach(osc => {
             try {
                 // Reset to standard frequency with smooth ramp to prevent clicks
-                osc.setFreq(440, 0.005); // 5ms ramp
+                osc.setFreq(440, 0.005, scheduleTime); // 5ms ramp
             } catch (e) {
                 console.warn('Failed to reset oscillator state:', e);
             }
@@ -457,24 +472,105 @@ class MonoSynth {
     getOsc2Waveform = () => this.osc2.getType();
     setOsc2DutyCycle = (val) => this.osc2.setDutyCycle(val);
     getOsc2DutyCycle = () => this.osc2.getDutyCycle();
-    setOsc2Detune = (cents) => {
+    setOsc2Detune = (cents, scheduleTime = null) => {
         this.osc2Detune = cents;
-        this.updateOsc2Frequency();
+        // Use provided schedule time or create one for UI parameter changes
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
+        this.updateOsc2Frequency(actualScheduleTime);
     };
     getOsc2Detune = () => this.osc2Detune;
     setOsc2Amount = (amount) => {
+        const previousAmount = this.osc2Amount;
         this.osc2Amount = clamp(amount, 0, 1);
         this.osc2Gain.setGain(this.osc2Amount);
+        
+        // If we're enabling osc2 (going from 0 to > 0) and it hasn't been started yet
+        if (previousAmount === 0 && this.osc2Amount > 0 && !this.osc2Started && this.isInitialized) {
+            try {
+                const startTime = this.AC.currentTime + 0.001;
+                this.osc2.start(startTime);
+                this.osc2Started = true;
+                
+                // Update frequency and phase delay if a note is playing
+                if (this.currentNoteInfo) {
+                    this.updateOsc2Frequency(startTime);
+                    this.updateOsc2PhaseDelay(startTime);
+                }
+                
+                // Reconnect vibrato if it was connected
+                if (this.vibratoLFO) {
+                    try {
+                        const osc2Node = this.osc2.getOscillatorNode();
+                        if (osc2Node && osc2Node.detune) {
+                            this.vibratoLFO.connect(osc2Node.detune);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to connect vibrato to newly started second oscillator:', e);
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to start second oscillator:', e);
+            }
+        }
+    };
+    
+    // Method to resynchronize secondary oscillator with specified start time
+    resyncOsc2 = (startTime = null) => {
+        // if (!this.isInitialized) return;
+        
+        // const actualStartTime = startTime || (this.AC.currentTime + 0.001);
+        
+        // try {
+        //     // Disconnect the old oscillator
+        //     this.osc2.disconnect();
+            
+        //     // Create a new oscillator with the same settings
+        //     const newOsc2 = new Oscillator(this.AC);
+        //     newOsc2.setType(this.osc2.getType());
+        //     newOsc2.setDutyCycle(this.osc2.getDutyCycle());
+            
+        //     // Replace the old oscillator
+        //     this.osc2 = newOsc2;
+            
+        //     // Reconnect with the same audio routing
+        //     this.osc2.connect(this.osc2PhaseDelay);
+            
+        //     // Start with synchronized timing
+        //     this.osc2.start(actualStartTime);
+            
+        //     // Update frequency and phase delay if a note is playing
+        //     if (this.currentNoteInfo) {
+        //         this.updateOsc2Frequency(actualStartTime);
+        //         this.updateOsc2PhaseDelay(actualStartTime);
+        //     }
+            
+        //     // Reconnect vibrato if it was connected
+        //     if (this.vibratoLFO) {
+        //         try {
+        //             const osc2Node = this.osc2.getOscillatorNode();
+        //             if (osc2Node && osc2Node.detune) {
+        //                 this.vibratoLFO.connect(osc2Node.detune);
+        //             }
+        //         } catch (e) {
+        //             console.warn('Failed to reconnect vibrato to resync\'d second oscillator:', e);
+        //         }
+        //     }
+        // } catch (e) {
+        //     console.warn('Failed to resync secondary oscillator:', e);
+        // }
     };
     getOsc2Amount = () => this.osc2Amount;
-    setOsc2PhaseOffset = (degrees) => {
+    setOsc2PhaseOffset = (degrees, scheduleTime = null) => {
         this.osc2PhaseOffset = clamp(degrees, 0, 360);
-        this.updateOsc2PhaseDelay();
+        this.updateOsc2PhaseDelay(scheduleTime);
     };
     getOsc2PhaseOffset = () => this.osc2PhaseOffset;
     
     // Method to update phase delay based on current frequency and phase offset
-    updateOsc2PhaseDelay = () => {
+    updateOsc2PhaseDelay = (scheduleTime = null) => {
+        // Use provided schedule time or current time for synchronized updates
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : this.AC.currentTime;
+        
         // Always calculate delay time if we have valid note info
         if (this.currentNoteInfo) {
             const { baseFreq_ } = this.currentNoteInfo;
@@ -490,19 +586,22 @@ class MonoSynth {
             // Clamp delay time to valid range (0 to 0.1 seconds for our delay node)
             const clampedDelay = Math.max(0, Math.min(delayTime, 0.1));
             
-            this.osc2PhaseDelay.delayTime.setValueAtTime(clampedDelay, this.AC.currentTime);
+            this.osc2PhaseDelay.delayTime.setValueAtTime(clampedDelay, actualScheduleTime);
         } else {
             // No note playing, set delay to 0
-            this.osc2PhaseDelay.delayTime.setValueAtTime(0, this.AC.currentTime);
+            this.osc2PhaseDelay.delayTime.setValueAtTime(0, actualScheduleTime);
         }
     };
     
     // Method to update second oscillator frequency based on current note and detune
-    updateOsc2Frequency = () => {
+    updateOsc2Frequency = (scheduleTime = null, rampTime = 0.001) => {
         if (!this.currentNoteInfo) return;
         
         const { baseFreq_ } = this.currentNoteInfo;
         if (!baseFreq_ || !isFinite(baseFreq_)) return;
+        
+        // Use provided schedule time or create one for UI changes
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
         
         // Apply detune in cents
         const detuneRatio = Math.pow(2, this.osc2Detune / 1200);
@@ -511,7 +610,7 @@ class MonoSynth {
         // Validate frequency and update to keep it tracking
         if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
             try {
-                this.osc2.setFreq(detunedFreq, 0.001);
+                this.osc2.setFreq(detunedFreq, rampTime, actualScheduleTime);
                 // Update phase delay whenever frequency changes
                 this.updateOsc2PhaseDelay();
             } catch (e) {
@@ -621,7 +720,17 @@ class MonoSynth {
         
         // Update the stored frequency and apply to all oscillators with detuning
         this.currentNoteInfo.baseFreq_ = newFreq;
-        this.updateVoiceDetuning();
+        
+        // Capture scheduling time once for all oscillators to ensure phase alignment
+        const scheduleTime = this.AC.currentTime + 0.001; // 1ms offset for stable scheduling
+        const rampTime = 0.001; // Short ramp for microtonal changes
+        
+        // Update all oscillator frequencies with synchronized timing
+        this.updateVoiceDetuning(scheduleTime, rampTime);
+        
+        // Also update sub oscillators and osc2 with the same schedule time and ramp time
+        this.updateSubOscillatorFrequencies(scheduleTime, rampTime);
+        this.updateOsc2Frequency(scheduleTime, rampTime);
     };
 
     // Note trigger methods
@@ -634,7 +743,7 @@ class MonoSynth {
         const currentVoiceId = this.voiceId; // Capture current voice ID for closures
         
         const { freq, note, oct } = noteInfo;
-        const { gainEnv, filterEnv, portamentoSpeed } = synthProps;
+        const { gainEnv, filterEnv, portamentoSpeed, scheduleTime } = synthProps;
 
         this.currentNote = note;
         
@@ -657,11 +766,14 @@ class MonoSynth {
         // Update noise filter frequency if enabled
         this.updateNoiseFilterFrequency();
         
+        // Use provided schedule time or capture one for all oscillators to ensure phase alignment
+        const actualScheduleTime = scheduleTime || (this.AC.currentTime + 0.001); // 1ms offset for stable scheduling
+        
         // Set frequency for all oscillators with detuning and portamento
         this.oscillators.forEach((osc, index) => {
             if (this.oscillators.length <= 1) {
                 // Single oscillator, no detuning
-                osc.setFreq(freq, portamentoSpeed);
+                osc.setFreq(freq, portamentoSpeed, actualScheduleTime);
             } else {
                 // Multiple oscillators with detuning
                 let detuneOffset = 0;
@@ -684,10 +796,10 @@ class MonoSynth {
                 
                 // Validate frequency before setting
                 if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
-                    osc.setFreq(detunedFreq, portamentoSpeed);
+                    osc.setFreq(detunedFreq, portamentoSpeed, actualScheduleTime);
                 } else {
                     console.warn('Invalid detuned frequency in noteOn:', detunedFreq);
-                    osc.setFreq(freq, portamentoSpeed); // Fallback to base frequency
+                    osc.setFreq(freq, portamentoSpeed, actualScheduleTime); // Fallback to base frequency
                 }
             }
         });
@@ -700,7 +812,7 @@ class MonoSynth {
             // Validate sub frequency
             if (isFinite(subBaseFreq) && subBaseFreq > 0 && subBaseFreq <= 20000) {
                 this.subOscillators.forEach(subOsc => {
-                    subOsc.setFreq(subBaseFreq, portamentoSpeed);
+                    subOsc.setFreq(subBaseFreq, portamentoSpeed, actualScheduleTime);
                 });
             } else {
                 console.warn('Invalid sub oscillator frequency:', subBaseFreq);
@@ -708,7 +820,7 @@ class MonoSynth {
         }
         
         // Update second oscillator frequency with detune
-        this.updateOsc2Frequency();
+        this.updateOsc2Frequency(actualScheduleTime, portamentoSpeed);
 
         // console.log('MonoSynth noteOn:', note, 'Freq:', freq, 'gainEnv:', gainEnv, 'filterEnv:', filterEnv);
         
@@ -935,7 +1047,9 @@ class MonoSynth {
             // Start the new sub oscillator only if init has already been called
             if (this.isInitialized) {
                 try {
-                    subOsc.start();
+                    // Use a small future time for phase alignment with existing oscillators
+                    const startTime = this.AC.currentTime + 0.001;
+                    subOsc.start(startTime);
                 } catch (e) {
                     console.warn('Failed to start sub oscillator:', e);
                 }
@@ -967,7 +1081,7 @@ class MonoSynth {
         }
     }
 
-    updateSubOscillatorFrequencies() {
+    updateSubOscillatorFrequencies(scheduleTime = null, rampTime = 0.001) {
         if (!this.currentNoteInfo || this.subOscOctaveOffset === 0) return;
         
         const { baseFreq_ } = this.currentNoteInfo;
@@ -980,10 +1094,13 @@ class MonoSynth {
             return;
         }
         
+        // Use provided schedule time or create one for standalone calls
+        const actualScheduleTime = scheduleTime !== null ? scheduleTime : (this.AC.currentTime + 0.001);
+        
         this.subOscillators.forEach((subOsc, index) => {
             try {
                 // Sub oscillators don't get detuning - they stay pitched at exact octave intervals
-                subOsc.setFreq(subBaseFreq, 0.001);
+                subOsc.setFreq(subBaseFreq, rampTime, actualScheduleTime);
             } catch (e) {
                 console.warn('Failed to set sub oscillator frequency:', e);
             }
