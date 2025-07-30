@@ -25,7 +25,6 @@ class MonoSynth {
         this.osc2Detune = 0; // Detune in cents
         this.osc2Amount = 0; // Mix amount (0-1)
         this.osc2PhaseOffset = 0; // Phase offset in degrees (0-360)
-        this.osc2IsBypassed = true; // Track if delay is bypassed (true when phase offset = 0)
         
         // Multiple oscillators for voice spreading
         this.oscillators = [];
@@ -280,8 +279,9 @@ class MonoSynth {
         this.oscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         this.subOscillatorMixer.connect(this.mainOscillatorMixer.getNode());
         
-        // Connect second oscillator - initially bypassed (direct connection)
-        this.osc2.connect(this.osc2Gain.getNode()); // Direct connection for bypass
+        // Connect second oscillator through delay node (always enabled for phase control)
+        this.osc2.connect(this.osc2PhaseDelay);
+        this.osc2PhaseDelay.connect(this.osc2Gain.getNode());
         this.osc2Gain.connect(this.mainOscillatorMixer.getNode());
         
         // Connect main oscillator mixer and combined noise to main mixer
@@ -451,7 +451,7 @@ class MonoSynth {
     // Second oscillator controls
     setOsc2Waveform = (type) => {
         this.osc2.setType(type);
-        // Update bypass state when waveform changes to/from 'off'
+        // Update phase delay when waveform changes
         this.updateOsc2PhaseDelay();
     };
     getOsc2Waveform = () => this.osc2.getType();
@@ -475,37 +475,8 @@ class MonoSynth {
     
     // Method to update phase delay based on current frequency and phase offset
     updateOsc2PhaseDelay = () => {
-        const shouldBypass = this.osc2PhaseOffset === 0 || this.osc2.getType() === 'off';
-        
-        if (shouldBypass && !this.osc2IsBypassed) {
-            // Switch to bypass mode - connect directly
-            try {
-                this.osc2.disconnect();
-                this.osc2PhaseDelay.disconnect();
-                this.osc2.connect(this.osc2Gain.getNode()); // Direct connection
-                this.osc2IsBypassed = true;
-                console.log('Osc2 phase delay bypassed (direct connection)');
-            } catch (e) {
-                console.warn('Failed to bypass osc2 phase delay:', e);
-            }
-            return;
-        }
-        
-        if (!shouldBypass && this.osc2IsBypassed) {
-            // Switch to delay mode - connect through delay node
-            try {
-                this.osc2.disconnect();
-                this.osc2.connect(this.osc2PhaseDelay);
-                this.osc2PhaseDelay.connect(this.osc2Gain.getNode());
-                this.osc2IsBypassed = false;
-                console.log('Osc2 phase delay enabled');
-            } catch (e) {
-                console.warn('Failed to enable osc2 phase delay:', e);
-            }
-        }
-        
-        // Only calculate delay time if we're using the delay node and have valid note info
-        if (!shouldBypass && this.currentNoteInfo) {
+        // Always calculate delay time if we have valid note info
+        if (this.currentNoteInfo) {
             const { baseFreq_ } = this.currentNoteInfo;
             const detuneMultiplier = Math.pow(2, this.osc2Detune / 1200);
             const actualFreq = baseFreq_ * detuneMultiplier;
@@ -520,6 +491,9 @@ class MonoSynth {
             const clampedDelay = Math.max(0, Math.min(delayTime, 0.1));
             
             this.osc2PhaseDelay.delayTime.setValueAtTime(clampedDelay, this.AC.currentTime);
+        } else {
+            // No note playing, set delay to 0
+            this.osc2PhaseDelay.delayTime.setValueAtTime(0, this.AC.currentTime);
         }
     };
     
@@ -534,11 +508,11 @@ class MonoSynth {
         const detuneRatio = Math.pow(2, this.osc2Detune / 1200);
         const detunedFreq = baseFreq_ * detuneRatio;
         
-        // Validate frequency and update even when 'off' to keep it tracking
+        // Validate frequency and update to keep it tracking
         if (isFinite(detunedFreq) && detunedFreq > 0 && detunedFreq <= 20000) {
             try {
                 this.osc2.setFreq(detunedFreq, 0.001);
-                // Update phase delay whenever frequency changes (even if amount is 0 or off)
+                // Update phase delay whenever frequency changes
                 this.updateOsc2PhaseDelay();
             } catch (e) {
                 console.warn('Failed to set second oscillator frequency:', e);
