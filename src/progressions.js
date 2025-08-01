@@ -92,7 +92,11 @@ let progressionOptions = {
     velocity: 'medium',          // 'soft', 'medium', 'loud', 'dynamic'
     sustain: true,               // true/false - use sustain pedal
     bassLine: 'root',            // 'root', 'walking', 'pedal', 'none'
-    rhythm: 'whole',             // 'whole', 'half', 'quarter', 'eighth'
+    rhythm: 'whole',             // 'whole', 'half', 'quarter', 'eighth', 'sixteenth'
+    noteDuration: 'whole',       // 'whole', 'half', 'quarter', 'eighth', 'sixteenth' - auto-repeats to fill bar
+    chordRepeat: 1,              // 1-4 - number of times each bar is repeated
+    arpeggioMode: false,         // true/false - enable arpeggio mode
+    arpeggioDirection: 'up',     // 'up', 'down', 'random', 'up-down', 'down-up'
 };
 
 // Create a table for selecting chord progressions
@@ -491,12 +495,58 @@ function createProgressionOptionsPanel() {
         'whole': 'Whole Notes',
         'half': 'Half Notes',
         'quarter': 'Quarter Notes',
-        'eighth': 'Eighth Notes'
+        'eighth': 'Eighth Notes',
+        'sixteenth': 'Sixteenth Notes'
     }, progressionOptions.rhythm, function(e) {
         progressionOptions.rhythm = e.target.value;
         // console.log('Rhythm changed to:', progressionOptions.rhythm);
         drawProgressionStaff();
     });
+    
+    // Note duration options
+    const noteDurationGroup = createOptionGroup('Note Duration', {
+        'whole': 'Whole Notes',
+        'half': 'Half Notes', 
+        'quarter': 'Quarter Notes',
+        'eighth': 'Eighth Notes',
+        'sixteenth': 'Sixteenth Notes'
+    }, progressionOptions.noteDuration, function(e) {
+        progressionOptions.noteDuration = e.target.value;
+        // console.log('Note duration changed to:', progressionOptions.noteDuration);
+        drawProgressionStaff();
+    });
+    
+    // Chord repeat options
+    const chordRepeatGroup = createNumberInput('Chord Repeat', 1, 4, progressionOptions.chordRepeat, function(e) {
+        progressionOptions.chordRepeat = parseInt(e.target.value);
+        console.log('Chord repeat changed to:', progressionOptions.chordRepeat);
+        drawProgressionStaff();
+    });
+    
+    // Arpeggio mode toggle
+    const arpeggioModeGroup = createOptionGroup('Arpeggio Mode', {
+        'false': 'Block Chords',
+        'true': 'Arpeggio'
+    }, progressionOptions.arpeggioMode.toString(), function(e) {
+        progressionOptions.arpeggioMode = e.target.value === 'true';
+        // console.log('Arpeggio mode changed to:', progressionOptions.arpeggioMode);
+        // Refresh options to enable/disable arpeggio direction
+        createProgressionOptionsPanel();
+        drawProgressionStaff();
+    });
+    
+    // Arpeggio direction (only enabled if arpeggio mode is on)
+    const arpeggioDirectionGroup = createOptionGroup('Arpeggio Direction', {
+        'up': 'Up',
+        'down': 'Down',
+        'random': 'Random',
+        'up-down': 'Up then Down',
+        'down-up': 'Down then Up'
+    }, progressionOptions.arpeggioDirection, function(e) {
+        progressionOptions.arpeggioDirection = e.target.value;
+        // console.log('Arpeggio direction changed to:', progressionOptions.arpeggioDirection);
+        drawProgressionStaff();
+    }, !progressionOptions.arpeggioMode);
     
     // Create a container that combines the rhythm option with buttons
     let rhythmAndButtonsContainer = document.createElement('div');
@@ -560,6 +610,10 @@ function createProgressionOptionsPanel() {
     optionsGrid.appendChild(sustainGroup.group);
     optionsGrid.appendChild(bassLineGroup.group);
     optionsGrid.appendChild(rhythmAndButtonsContainer);
+    optionsGrid.appendChild(noteDurationGroup.group);
+    optionsGrid.appendChild(chordRepeatGroup.group);
+    optionsGrid.appendChild(arpeggioModeGroup.group);
+    optionsGrid.appendChild(arpeggioDirectionGroup.group);
     optionsGrid.appendChild(buttonContainer);
     
     optionsContainer.appendChild(optionsGrid);
@@ -708,6 +762,51 @@ function getNotePosition(noteName) {
         'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
     };
     return noteMap[noteName] || 0;
+}
+
+// Helper function to sort notes by pitch for arpeggio
+function sortNotesByPitch(notes) {
+    return notes.slice().sort((a, b) => {
+        if (!a.includes('/') || !b.includes('/')) return 0;
+        
+        const [noteNameA, octaveA] = a.split('/');
+        const [noteNameB, octaveB] = b.split('/');
+        
+        const pitchA = parseInt(octaveA) * 12 + getNotePosition(noteNameA);
+        const pitchB = parseInt(octaveB) * 12 + getNotePosition(noteNameB);
+        
+        return pitchA - pitchB;
+    });
+}
+
+// Helper function to apply arpeggio ordering
+function applyArpeggioOrdering(notes, direction) {
+    if (notes.length <= 1) return notes;
+    
+    const sortedNotes = sortNotesByPitch(notes);
+    
+    switch (direction) {
+        case 'up':
+            return sortedNotes;
+        case 'down':
+            return sortedNotes.reverse();
+        case 'random':
+            const shuffled = [...sortedNotes];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        case 'up-down':
+            if (sortedNotes.length < 3) return sortedNotes;
+            return [...sortedNotes, ...sortedNotes.slice(-2, 0).reverse()];
+        case 'down-up':
+            if (sortedNotes.length < 3) return sortedNotes.reverse();
+            const reversed = [...sortedNotes].reverse();
+            return [...reversed, ...reversed.slice(-2, 0).reverse()];
+        default:
+            return sortedNotes;
+    }
 }
 
 // Function to apply leading voice logic to chord progressions
@@ -1038,37 +1137,148 @@ function drawProgressionStaff() {
         
         // Draw treble notes if any
         if (sampleNotes.treble.length > 0) {
-            const trebleNote = new StaveNote({
-                keys: sampleNotes.treble,
-                duration: 'w' // whole note
-            });
-            
-            const trebleVoice = new Voice({ num_beats: 4, beat_value: 4 });
-            trebleVoice.addTickables([trebleNote]);
-            
-            new Formatter().joinVoices([trebleVoice]).format([trebleVoice], displayWidth - 50);
-            trebleVoice.draw(context, currentTrebleStave);
+            if (progressionOptions.arpeggioMode && sampleNotes.treble.length > 1) {
+                // Arpeggio mode - draw individual notes
+                const arpeggioNotes = applyArpeggioOrdering(sampleNotes.treble, progressionOptions.arpeggioDirection);
+                
+                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                                       progressionOptions.noteDuration === 'half' ? 'h' :
+                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
+                                       progressionOptions.noteDuration === 'eighth' ? '8' :
+                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+                
+                let trebleVoice = new Voice({ 
+                    num_beats: 4, 
+                    beat_value: 4 
+                });
+                trebleVoice.setStrict(false); // Allow for flexible durations
+
+                
+                const trebleNoteObjects = [];
+                
+                // Draw each note in the arpeggio with the selected duration
+                for (let note of arpeggioNotes) {
+                    trebleNoteObjects.push(new StaveNote({
+                        keys: [note],
+                        duration: displayDuration
+                    }));
+                }
+                
+                if (trebleNoteObjects.length > 0) {
+                    trebleVoice.addTickables(trebleNoteObjects);
+                    new Formatter().joinVoices([trebleVoice]).format([trebleVoice], displayWidth - 50);
+                    trebleVoice.draw(context, currentTrebleStave);
+                }
+            } else {
+                // Block chord mode - single chord with selected duration
+                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                                       progressionOptions.noteDuration === 'half' ? 'h' :
+                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
+                                       progressionOptions.noteDuration === 'eighth' ? '8' :
+                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+                
+                let trebleVoice = new Voice({ num_beats: 4, beat_value: 4 });
+                trebleVoice.setStrict(false); // Allow for flexible durations
+                const trebleNoteObjects = [];
+                
+                // Single chord with the selected duration
+                trebleNoteObjects.push(new StaveNote({
+                    keys: sampleNotes.treble,
+                    duration: displayDuration
+                }));
+                
+                if (trebleNoteObjects.length > 0) {
+                    trebleVoice.addTickables(trebleNoteObjects);
+                    new Formatter().joinVoices([trebleVoice]).format([trebleVoice], displayWidth - 50);
+                    trebleVoice.draw(context, currentTrebleStave);
+                }
+            }
         }
         
         // Draw bass notes if any
         if (sampleNotes.bass.length > 0) {
-            const bassNote = new StaveNote({
-                clef: "bass",
-                keys: sampleNotes.bass,
-                duration: 'w' // whole note
-            });
-            
-            const bassVoice = new Voice({ num_beats: 4, beat_value: 4 });
-            bassVoice.addTickables([bassNote]);
-            
-            new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
-            bassVoice.draw(context, currentBassStave);
+            if (progressionOptions.arpeggioMode && sampleNotes.bass.length > 1) {
+                // Arpeggio mode - draw individual notes
+                const arpeggioNotes = applyArpeggioOrdering(sampleNotes.bass, progressionOptions.arpeggioDirection);
+                
+                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                                       progressionOptions.noteDuration === 'half' ? 'h' :
+                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
+                                       progressionOptions.noteDuration === 'eighth' ? '8' :
+                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+                
+                let bassVoice = new Voice({ 
+                    num_beats: 4, 
+                    beat_value: 4 
+                });
+                bassVoice.setStrict(false); // Allow for flexible durations
+                
+                const bassNoteObjects = [];
+                
+                // Draw each note in the arpeggio with the selected duration
+                for (let note of arpeggioNotes) {
+                    bassNoteObjects.push(new StaveNote({
+                        clef: "bass",
+                        keys: [note],
+                        duration: displayDuration
+                    }));
+                }
+                
+                if (bassNoteObjects.length > 0) {
+                    bassVoice.addTickables(bassNoteObjects);
+                    new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
+                    bassVoice.draw(context, currentBassStave);
+                }
+            } else {
+                // Block chord mode - single chord with selected duration
+                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                                       progressionOptions.noteDuration === 'half' ? 'h' :
+                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
+                                       progressionOptions.noteDuration === 'eighth' ? '8' :
+                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+                
+                let bassVoice = new Voice({ num_beats: 4, beat_value: 4 });
+                bassVoice.setStrict(false); // Allow for flexible durations
+                const bassNoteObjects = [];
+                
+                // Single chord with the selected duration
+                bassNoteObjects.push(new StaveNote({
+                    clef: "bass",
+                    keys: sampleNotes.bass,
+                    duration: displayDuration
+                }));
+                
+                if (bassNoteObjects.length > 0) {
+                    bassVoice.addTickables(bassNoteObjects);
+                    new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
+                    bassVoice.draw(context, currentBassStave);
+                }
+            }
         }
         
         // Add chord symbol as text
         if (currentTrebleStave) {
+            let chordLabel = chordSymbol;
+            
+            // Add chord repeat indicator if chord repeat > 1
+            if (progressionOptions.chordRepeat > 1) {
+                chordLabel += ` (repeat ${progressionOptions.chordRepeat}x)`;
+            }
+            
+            // Add arpeggio indicator
+            if (progressionOptions.arpeggioMode) {
+                const directionSymbol = {
+                    'up': '↑',
+                    'down': '↓', 
+                    'random': '⟲',
+                    'up-down': '↕',
+                    'down-up': '↕'
+                }[progressionOptions.arpeggioDirection] || '~';
+                chordLabel += ` ${directionSymbol}`;
+            }
+            
             const text = new Vex.Flow.TextNote({
-                text: chordSymbol,
+                text: chordLabel,
                 font: {
                     family: "Arial",
                     size: 14,
@@ -1079,8 +1289,9 @@ function drawProgressionStaff() {
             })
             .setLine(0)
             .setStave(currentTrebleStave);
-            
-            const textVoice = new Voice({ num_beats: 4, beat_value: 4 });
+
+            let textVoice = new Voice({ num_beats: 4, beat_value: 4 });
+            textVoice.setStrict(false); // Allow for flexible durations
             textVoice.addTickables([text]);
             
             new Formatter().joinVoices([textVoice]).format([textVoice], displayWidth - 50);
@@ -1120,23 +1331,22 @@ createProgressionStaffDisplay();
 function numeralToChord(numeral, rootNote, scaleFamily, scaleIndex, scaleRoot, triads, seventhChords) {
     const numeral_ = numeral.trim();
 
-    if(numeral == 'I' || numeral == 'i')
+    if(numeral === 'I' || numeral === 'i')
         return triads[0];
-    else if(numeral == 'ii' || numeral == 'II')
+    else if(numeral === 'ii' || numeral === 'II')
         return triads[1];
-    else if(numeral == 'iii' || numeral == 'III')
+    else if(numeral === 'iii' || numeral === 'III')
         return triads[2];
-    else if(numeral == 'IV' || numeral == 'iv')
+    else if(numeral === 'IV' || numeral === 'iv')
         return triads[3];
-    else if(numeral == 'V' || numeral == 'v')
+    else if(numeral === 'V' || numeral === 'v')
         return triads[4];
-    else if(numeral == 'vi' || numeral == 'VI')
+    else if(numeral === 'vi' || numeral === 'VI')
         return triads[5];
-    else if(numeral == 'vii' || numeral == 'VII')
+    else if(numeral === 'vii' || numeral === 'VII')
         return triads[6];
     else 
         throw new Error(`Unknown numeral: ${numeral}`);
-
 }
 
 
@@ -1200,7 +1410,7 @@ function convertProgressionToOutputFormat() {
     const trebleBars = [];
     const bassBars = [];
     
-    // Process each chord in the progression - each chord becomes one bar
+    // Process each chord in the progression
     for (let i = 0; i < noteArray.length; i++) {
         const chordNotes = noteArray[i]; // Array of note strings like ["C/4", "E/4", "G/4"]
         
@@ -1219,53 +1429,81 @@ function convertProgressionToOutputFormat() {
             }
         }
         
-        // Each chord becomes one bar with one chord/note
+        // Get the duration for display
+        const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                               progressionOptions.noteDuration === 'half' ? 'h' :
+                               progressionOptions.noteDuration === 'quarter' ? 'q' :
+                               progressionOptions.noteDuration === 'eighth' ? '8' :
+                               progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+        
+        // Create a single bar with the chord at the selected duration
         let trebleBar = [];
         let bassBar = [];
         
-        // Get the duration based on rhythm setting
-        const rhythmDuration = progressionOptions.rhythm === 'whole' ? 'w' : 
-                              progressionOptions.rhythm === 'half' ? 'h' : 
-                              progressionOptions.rhythm === 'quarter' ? 'q' : 
-                              progressionOptions.rhythm === 'eighth' ? '8' : 'w';
-        
-        // Create treble bar - each chord fills the entire bar
-        if (trebleNotes.length > 0) {
-            trebleBar.push({
-                "note": trebleNotes.length === 1 ? trebleNotes[0] : trebleNotes,
-                "duration": rhythmDuration
-            });
+        // Handle arpeggio mode
+        if (progressionOptions.arpeggioMode && (trebleNotes.length > 1 || bassNotes.length > 1)) {
+            // Apply arpeggio to treble notes
+            if (trebleNotes.length > 1) {
+                const arpeggioTreble = applyArpeggioOrdering(trebleNotes, progressionOptions.arpeggioDirection);
+                for (let note of arpeggioTreble) {
+                    trebleBar.push({
+                        "note": note,
+                        "duration": displayDuration
+                    });
+                }
+            } else if (trebleNotes.length === 1) {
+                trebleBar.push({
+                    "note": trebleNotes[0],
+                    "duration": displayDuration
+                });
+            }
+            
+            // Apply arpeggio to bass notes
+            if (bassNotes.length > 1) {
+                const arpeggioBass = applyArpeggioOrdering(bassNotes, progressionOptions.arpeggioDirection);
+                for (let note of arpeggioBass) {
+                    bassBar.push({
+                        "note": note,
+                        "duration": displayDuration
+                    });
+                }
+            } else if (bassNotes.length === 1) {
+                bassBar.push({
+                    "note": bassNotes[0],
+                    "duration": displayDuration
+                });
+            }
         } else {
-            // trebleBar.push({
-            //     "note": "Pause",
-            //     "duration": rhythmDuration
-            // });
+            // Block chord mode - single chord with selected duration
+            if (trebleNotes.length > 0) {
+                trebleBar.push({
+                    "note": trebleNotes.length === 1 ? trebleNotes[0] : trebleNotes,
+                    "duration": displayDuration
+                });
+            }
+            
+            if (bassNotes.length > 0) {
+                bassBar.push({
+                    "note": bassNotes.length === 1 ? bassNotes[0] : bassNotes,
+                    "duration": displayDuration
+                });
+            }
         }
         
-        // Create bass bar - each chord fills the entire bar
-        if (bassNotes.length > 0) {
-            bassBar.push({
-                "note": bassNotes.length === 1 ? bassNotes[0] : bassNotes,
-                "duration": rhythmDuration
-            });
-        } else {
-            // bassBar.push({
-            //     "note": "Pause",
-            //     "duration": rhythmDuration
-            // });
+        // Handle chord repeat - duplicate the entire bar the specified number of times
+        for (let barRepeat = 0; barRepeat < progressionOptions.chordRepeat; barRepeat++) {
+            trebleBars.push([...trebleBar]); // Create a copy of the bar
+            bassBars.push([...bassBar]);     // Create a copy of the bar
         }
-        
-        trebleBars.push(trebleBar);
-        bassBars.push(bassBar);
     }
     
-    // console.log('Converted progression to output format:', [trebleBars, bassBars]);
+    console.log(`Converted progression to output format with ${progressionOptions.chordRepeat} repeat(s):`, [trebleBars, bassBars]);
     return [trebleBars, bassBars];
 }
 
 // Add current progression to output grid
 function addProgressionToOutput() {
-    // console.log('Adding progression to output grid');
+    console.log('Adding progression to output grid');
     
     if (!window.outputDiv) {
         console.error('Output div not available');
@@ -1279,19 +1517,32 @@ function addProgressionToOutput() {
     
     const convertedProgression = convertProgressionToOutputFormat();
     if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
-        // console.log('No notes to add to output');
+        console.log('No notes to add to output');
         return;
+    }
+    
+    // Debug the format before sending to addDrawNotes
+    console.log('Converted progression format check:', {
+        trebleBars: convertedProgression[0],
+        bassBars: convertedProgression[1],
+        totalBars: convertedProgression[0].length
+    });
+    
+    // Initialize outputNoteArray if it doesn't exist
+    if (typeof window.outputNoteArray === 'undefined') {
+        console.log('Initializing empty outputNoteArray');
+        window.outputNoteArray = [[], []]; // [trebleBars, bassBars]
     }
     
     // Use the addDrawNotes function from staves.js
     window.addDrawNotes(window.outputDiv, convertedProgression, true);
     
-    // console.log('Successfully added progression to output grid');
+    console.log('Successfully added progression to output grid');
 }
 
 // Replace output grid with current progression
 function replaceOutputWithProgression() {
-    // console.log('Replacing output grid with progression');
+    console.log('Replacing output grid with progression');
     
     if (!window.outputDiv) {
         console.error('Output div not available');
@@ -1303,22 +1554,54 @@ function replaceOutputWithProgression() {
         return;
     }
     
-    // Clear existing notation
+    // Clear existing notation first
     window.clearAllNotation(window.outputDiv);
     
-    // Add the progression
+    // Initialize outputNoteArray to empty state
+    window.outputNoteArray = [[], []]; // [trebleBars, bassBars]
+    
+    // Get the progression to add
     const convertedProgression = convertProgressionToOutputFormat();
     if (convertedProgression[0].length === 0 && convertedProgression[1].length === 0) {
-        // console.log('No notes to replace output with');
+        console.log('No notes to replace output with');
+        // Still need to redraw empty staves after clearing
+        if (typeof window.drawNotes2 === 'function') {
+            window.gridData = window.drawNotes2(window.outputDiv, window.outputNoteArray, false);
+        }
         return;
     }
     
-    // Use the addDrawNotes function from staves.js
-    window.addDrawNotes(window.outputDiv, convertedProgression, true);
+    // Debug the format before sending to addDrawNotes
+    console.log('Converted progression format check for replace:', {
+        trebleBars: convertedProgression[0],
+        bassBars: convertedProgression[1],
+        totalBars: convertedProgression[0].length
+    });
     
-    // console.log('Successfully replaced output grid with progression');
-    highlightBothPositions();
-    updateOutputText();
+    // Set the outputNoteArray to the new progression data
+    // window.outputNoteArray[0] = convertedProgression[0];
+    // window.outputNoteArray[1] = convertedProgression[1];
+    
+    // Redraw with the new data
+    window.addDrawNotes(window.outputDiv, convertedProgression, true);
+    // window.addDrawNotes(window.outputDiv, convertedProgression, true);
+
+    // if (typeof window.drawNotes2 === 'function') {
+    //     window.gridData = window.drawNotes2(window.outputDiv, convertedProgression, true);
+    // } else {
+    //     console.error('drawNotes2 function not available on window');
+    //     return;
+    // }
+    
+    console.log('Successfully replaced output grid with progression');
+    
+    // Call additional functions if they exist
+    if (typeof window.highlightBothPositions === 'function') {
+        window.highlightBothPositions();
+    }
+    if (typeof window.updateOutputText === 'function') {
+        window.updateOutputText();
+    }
 }
 
 // Function to refresh progression display when primary scale/root changes

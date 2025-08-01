@@ -7,7 +7,7 @@ import $ from 'jquery';
 import { metronome, reset } from './metronome';
 import {processChord} from './intervals';
 import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from './scales';
-import {createHeptatonicScaleTable, selectedRootNote, selectedScales, navigateToNextScale, navigateToPreviousScale, navigateToNextRootNote, navigateToPreviousRootNote} from './scaleGenerator';
+import {createHeptatonicScaleTable, selectedRootNote, selectedScales, navigateToNextScale, navigateToPreviousScale, navigateToNextRootNote, navigateToPreviousRootNote, refreshChordsForRootNote} from './scaleGenerator';
 import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
@@ -203,6 +203,9 @@ window.$ = window.jQuery = require('jquery');
 
 
 createHeptatonicScaleTable();
+
+// Initialize chord cache for default selected scales
+refreshChordsForRootNote();
 
 let firstScaleId = selectedScales[0];
 let [family, mode] = firstScaleId.split('-');
@@ -1045,13 +1048,13 @@ setTimeout(() => {
 // Helper function to highlight current playback position
 function highlightPlaybackPosition(barIndex, beatIndex) {
     const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'red' };
-    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+    highlightNotesInNotation(outputDiv, window.outputNoteArray, highlight);
 }
 
 // Helper function to highlight selected notes
 function highlightSelectedNotes(barIndex, beatIndex) {
     const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'blue' };
-    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+    highlightNotesInNotation(outputDiv, window.outputNoteArray, highlight);
 }
 
 // Enhanced helper function to highlight selected notes with separate tracking
@@ -1066,7 +1069,7 @@ function highlightSelectedNotesSecondary(barIndex, beatIndex) {
     window.selectedNoteIndex = selectedNoteIndex;
     
     const highlight = { barIndex: barIndex, beatIndex: beatIndex, color: 'green' };
-    highlightNotesInNotation(outputDiv, outputNoteArray, highlight);
+    highlightNotesInNotation(outputDiv, window.outputNoteArray, highlight);
     
     // Update the outputText div with selected notes
     updateOutputText();
@@ -1074,11 +1077,15 @@ function highlightSelectedNotesSecondary(barIndex, beatIndex) {
 
 // Helper function to highlight both playback and selection positions simultaneously
 function highlightBothPositions() {
+    console.log('Highlighting both playback and selected positions');
+    console.log('Current Playback Position - Bar:', currentBarIndex, 'Beat:', currentNoteIndex);
+    console.log('Selected Position - Bar:', selectedBarIndex, 'Beat:', selectedNoteIndex);
+    console.log('Output Note Array:', window.outputNoteArray);
     const highlights = [
         { barIndex: currentBarIndex, beatIndex: currentNoteIndex, color: 'red' },      // Playback position
         { barIndex: selectedBarIndex, beatIndex: selectedNoteIndex, color: 'green' }   // Selected position
     ];
-    highlightNotesInNotation(outputDiv, outputNoteArray, highlights);
+    highlightNotesInNotation(outputDiv, window.outputNoteArray, highlights);
 }
 
 // Helper function to get notes at selected position
@@ -1257,13 +1264,13 @@ function retreatSelectedPosition() {
 
 // Helper function to clear highlighting (reset to black)
 function clearNoteHighlighting() {
-    window.gridData = drawNotes2(outputDiv, outputNoteArray, false);
+    window.gridData = drawNotes2(outputDiv, window.outputNoteArray, false);
 }
 
 // Helper function to highlight multiple positions with different colors
 function highlightMultiplePositions(highlightArray) {
     // highlightArray format: [{ barIndex: 0, beatIndex: 1, color: 'red' }, ...]
-    highlightNotesInNotation(outputDiv, outputNoteArray, highlightArray);
+    highlightNotesInNotation(outputDiv, window.outputNoteArray, highlightArray);
 }
 
 // Helper function to reset playback position

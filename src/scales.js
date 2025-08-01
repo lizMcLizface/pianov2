@@ -1,4 +1,8 @@
 import { noteToMidi, noteToName } from './midi';
+import { identifySyntheticChords } from './intervals';
+
+// Cache for precomputed chords
+let scaleChordCache = new Map();
 
 let HeptatonicScales = {
     'Major': [
@@ -426,6 +430,144 @@ function highlightKeysForScales(notes){
         });
     }
 }
+
+/**
+ * Generate a cache key for a scale and root note combination
+ * @param {string} scaleId - Scale identifier (e.g., "Major-1")
+ * @param {string} rootNote - Root note (e.g., "C")
+ * @returns {string} Cache key
+ */
+function generateScaleCacheKey(scaleId, rootNote) {
+    return `${scaleId}_${rootNote}`;
+}
+
+/**
+ * Get scale object from scaleId
+ * @param {string} scaleId - Scale identifier (e.g., "Major-1")
+ * @returns {object|null} Scale object or null if not found
+ */
+function getScaleFromId(scaleId) {
+    const [scaleFamily, scaleIndex] = scaleId.split('-');
+    const index = parseInt(scaleIndex) - 1;
+    
+    if (HeptatonicScales[scaleFamily] && HeptatonicScales[scaleFamily][index]) {
+        return HeptatonicScales[scaleFamily][index];
+    }
+    
+    return null;
+}
+
+/**
+ * Precompute chords for a specific scale and root note
+ * @param {string} scaleId - Scale identifier (e.g., "Major-1")
+ * @param {string} rootNote - Root note (e.g., "C")
+ * @returns {object|null} Object containing triads and sevenths, or null if error
+ */
+function precomputeScaleChords(scaleId, rootNote) {
+    const scale = getScaleFromId(scaleId);
+    if (!scale) {
+        console.warn(`Scale not found: ${scaleId}`);
+        return null;
+    }
+
+    // Only compute for heptatonic scales (7 notes)
+    if (scale.intervals.length !== 7) {
+        console.warn(`Scale ${scaleId} is not heptatonic, skipping chord computation`);
+        return null;
+    }
+
+    try {
+        const identifiedChords_3 = identifySyntheticChords(scale, 3, rootNote);
+        const identifiedChords_4 = identifySyntheticChords(scale, 4, rootNote);
+
+        const chordData = {
+            scaleId,
+            rootNote,
+            scaleName: scale.name,
+            triads: identifiedChords_3,
+            sevenths: identifiedChords_4,
+            computedAt: Date.now()
+        };
+
+        const cacheKey = generateScaleCacheKey(scaleId, rootNote);
+        scaleChordCache.set(cacheKey, chordData);
+
+        return chordData;
+    } catch (error) {
+        console.error(`Error computing chords for ${scaleId} in ${rootNote}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Precompute chords for multiple scales and root notes
+ * @param {Array<string>} scaleIds - Array of scale identifiers
+ * @param {Array<string>} rootNotes - Array of root notes
+ * @returns {Array<object>} Array of successfully computed chord data objects
+ */
+function precomputeChordsForScales(scaleIds, rootNotes) {
+    const results = [];
+    
+    for (const scaleId of scaleIds) {
+        for (const rootNote of rootNotes) {
+            const chordData = precomputeScaleChords(scaleId, rootNote);
+            if (chordData) {
+                results.push(chordData);
+            }
+        }
+    }
+    
+    console.log(`Precomputed chords for ${results.length} scale-root combinations`);
+    return results;
+}
+
+/**
+ * Get precomputed chords for a scale and root note
+ * @param {string} scaleId - Scale identifier (e.g., "Major-1")
+ * @param {string} rootNote - Root note (e.g., "C")
+ * @returns {object|null} Cached chord data or null if not found
+ */
+function getPrecomputedChords(scaleId, rootNote) {
+    const cacheKey = generateScaleCacheKey(scaleId, rootNote);
+    return scaleChordCache.get(cacheKey) || null;
+}
+
+/**
+ * Get precomputed chords for a scale and root note, computing if not cached
+ * @param {string} scaleId - Scale identifier (e.g., "Major-1")
+ * @param {string} rootNote - Root note (e.g., "C")
+ * @returns {object|null} Chord data (cached or newly computed)
+ */
+function getChordsForScale(scaleId, rootNote) {
+    let chordData = getPrecomputedChords(scaleId, rootNote);
+    
+    if (!chordData) {
+        console.log(`Chords not cached for ${scaleId} in ${rootNote}, computing...`);
+        chordData = precomputeScaleChords(scaleId, rootNote);
+    }
+    
+    return chordData;
+}
+
+/**
+ * Clear the chord cache
+ */
+function clearChordCache() {
+    scaleChordCache.clear();
+    console.log('Chord cache cleared');
+}
+
+/**
+ * Get cache statistics
+ * @returns {object} Cache statistics
+ */
+function getChordCacheStats() {
+    return {
+        size: scaleChordCache.size,
+        keys: Array.from(scaleChordCache.keys())
+    };
+}
+
 function getScaleNotes(rootNote, intervals) {
     // console.log("Generating scale notes for root:", rootNote, "with intervals:", intervals);
     let rootNoteMidi = noteToMidi(rootNote + "/5");
@@ -449,4 +591,17 @@ function getScaleNotes(rootNote, intervals) {
     });
 }
 
-export { HeptatonicScales, HexatonicScales, PentatonicScales, scales, highlightKeysForScales, getScaleNotes };
+export { 
+    HeptatonicScales, 
+    HexatonicScales, 
+    PentatonicScales, 
+    scales, 
+    highlightKeysForScales, 
+    getScaleNotes,
+    precomputeScaleChords,
+    precomputeChordsForScales,
+    getPrecomputedChords,
+    getChordsForScale,
+    clearChordCache,
+    getChordCacheStats
+};

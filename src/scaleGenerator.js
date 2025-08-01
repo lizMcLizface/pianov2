@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import {HeptatonicScales, scales, highlightKeysForScales, getScaleNotes} from './scales';
+import {HeptatonicScales, scales, highlightKeysForScales, getScaleNotes, precomputeScaleChords, getChordsForScale} from './scales';
 import {identifySyntheticChords} from './intervals';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 
@@ -175,6 +175,13 @@ function clearSelectedScales() {
 function addSelectedScale(scaleId) {
     if (!selectedScales.includes(scaleId)) {
         selectedScales.push(scaleId);
+        
+        // Precompute chords for this scale with current root note(s)
+        const rootNotes = Array.isArray(selectedRootNote) ? selectedRootNote : [selectedRootNote];
+        for (const rootNote of rootNotes) {
+            precomputeScaleChords(scaleId, rootNote);
+        }
+        
         // If this is the first scale being added, make it primary
         if (selectedScales.length === 1) {
             primaryScaleIndex = 0;
@@ -301,6 +308,7 @@ function createRootNoteTable() {
                 selectedRootNote = [...chromaticNotes];
                 primaryRootNoteIndex = 0;
             }
+            refreshChordsForRootNote(); // Refresh chords for updated root notes
         }
         
         // console.log('Selected root note(s):', selectedRootNote);
@@ -407,6 +415,7 @@ function createRootNoteTable() {
                 // In exclusive mode, always select the clicked note
                 selectedRootNote = note;
                 primaryRootNoteIndex = 0;
+                refreshChordsForRootNote(); // Refresh chords for new root note
             } else {
                 // In multiple mode, toggle selection
                 if (Array.isArray(selectedRootNote)) {
@@ -426,9 +435,11 @@ function createRootNoteTable() {
                             selectedRootNote = 'C';
                             primaryRootNoteIndex = 0;
                         }
+                        refreshChordsForRootNote(); // Refresh chords for updated root notes
                     } else {
                         // Note is not selected, add it
                         selectedRootNote.push(note);
+                        refreshChordsForRootNote(); // Refresh chords for new root note
                     }
                 } else {
                     // Convert to array mode
@@ -436,10 +447,12 @@ function createRootNoteTable() {
                         // Clicking the same note - convert to array with just 'C'
                         selectedRootNote = 'C';
                         primaryRootNoteIndex = 0;
+                        refreshChordsForRootNote(); // Refresh chords for reset root note
                     } else {
                         // Clicking a different note - convert to array with both
                         selectedRootNote = [selectedRootNote, note];
                         primaryRootNoteIndex = 0;
+                        refreshChordsForRootNote(); // Refresh chords for new root notes
                     }
                 }
             }
@@ -917,6 +930,50 @@ function createHeptatonicScaleTable() {
 
 }
 
+/**
+ * Get precomputed chords for the current primary scale and root note
+ * @returns {object|null} Precomputed chord data or null if not available
+ */
+function getPrimaryScaleChords() {
+    const primaryScale = getPrimaryScale();
+    const primaryRootNote = getPrimaryRootNote();
+    
+    if (!primaryScale || !primaryRootNote) {
+        return null;
+    }
+    
+    return getChordsForScale(primaryScale, primaryRootNote);
+}
+
+/**
+ * Get precomputed chords for all selected scales with current root note
+ * @returns {Array<object>} Array of chord data for all selected scales
+ */
+function getAllSelectedScaleChords() {
+    const primaryRootNote = getPrimaryRootNote();
+    if (!primaryRootNote) {
+        return [];
+    }
+    
+    return selectedScales.map(scaleId => {
+        return getChordsForScale(scaleId, primaryRootNote);
+    }).filter(chordData => chordData !== null);
+}
+
+/**
+ * Refresh chord cache for all selected scales when root note changes
+ */
+function refreshChordsForRootNote() {
+    const primaryRootNote = getPrimaryRootNote();
+    if (!primaryRootNote) {
+        return;
+    }
+    
+    selectedScales.forEach(scaleId => {
+        precomputeScaleChords(scaleId, primaryRootNote);
+    });
+}
+
 
 
 
@@ -930,5 +987,8 @@ export {
     getPrimaryRootNote,
     navigateToNextRootNote,
     navigateToPreviousRootNote,
-    updateCurrentScaleDisplay
+    updateCurrentScaleDisplay,
+    getPrimaryScaleChords,
+    getAllSelectedScaleChords,
+    refreshChordsForRootNote
 }
