@@ -87,6 +87,7 @@ let progressionOptions = {
     third: 'upper',               // 'lower', 'upper', 'both'
     fifth: 'upper',               // 'lower', 'upper', 'both'
     seventh: 'upper',             // 'lower', 'upper', 'both'
+    ninth: 'upper',               // 'lower', 'upper', 'both'
     playStyle: 'block',          // 'block', 'arpeggiated', 'broken'
     timing: 'even',              // 'even', 'swing', 'rubato'
     velocity: 'medium',          // 'soft', 'medium', 'loud', 'dynamic'
@@ -97,6 +98,7 @@ let progressionOptions = {
     chordRepeat: 1,              // 1-4 - number of times each bar is repeated
     arpeggioMode: false,         // true/false - enable arpeggio mode
     arpeggioDirection: 'up',     // 'up', 'down', 'random', 'up-down', 'down-up'
+    chordType: 'triads',         // 'triads', 'seventh', 'ninth' - determines chord complexity
 };
 
 // Create a table for selecting chord progressions
@@ -367,6 +369,17 @@ function createProgressionOptionsPanel() {
         drawProgressionStaff();
     });
     
+    // Chord type options
+    const chordTypeGroup = createOptionGroup('Chord Type', {
+        'triads': 'Triads (3 notes)',
+        'seventh': 'Seventh Chords (4 notes)',
+        'ninth': 'Ninth Chords (5 notes)'
+    }, progressionOptions.chordType, function(e) {
+        progressionOptions.chordType = e.target.value;
+        console.log('Chord type changed to:', progressionOptions.chordType);
+        drawProgressionStaff();
+    });
+    
     // Split chord option
     const splitChordGroup = createOptionGroup('Split Chord', {
         'true': 'Yes',
@@ -431,6 +444,16 @@ function createProgressionOptionsPanel() {
     }, progressionOptions.seventh, function(e) {
         progressionOptions.seventh = e.target.value;
         // console.log('Seventh distribution changed to:', progressionOptions.seventh);
+        drawProgressionStaff();
+    });
+    
+    const ninthGroup = createOptionGroup('Ninth', {
+        'lower': 'Lower',
+        'upper': 'Upper',
+        'both': 'Both'
+    }, progressionOptions.ninth, function(e) {
+        progressionOptions.ninth = e.target.value;
+        // console.log('Ninth distribution changed to:', progressionOptions.ninth);
         drawProgressionStaff();
     });
     
@@ -597,6 +620,7 @@ function createProgressionOptionsPanel() {
     
     // Add all groups to the grid
     optionsGrid.appendChild(voicingGroup.group);
+    optionsGrid.appendChild(chordTypeGroup.group);
     optionsGrid.appendChild(splitChordGroup.group);
     optionsGrid.appendChild(lowerOctaveGroup.group);
     optionsGrid.appendChild(upperOctaveGroup.group);
@@ -604,6 +628,7 @@ function createProgressionOptionsPanel() {
     optionsGrid.appendChild(thirdGroup.group);
     optionsGrid.appendChild(fifthGroup.group);
     optionsGrid.appendChild(seventhGroup.group);
+    optionsGrid.appendChild(ninthGroup.group);
     optionsGrid.appendChild(playStyleGroup.group);
     optionsGrid.appendChild(timingGroup.group);
     optionsGrid.appendChild(velocityGroup.group);
@@ -976,6 +1001,7 @@ function drawProgressionStaff() {
             let thirdNote = currentNotes[1];
             let fifthNote = currentNotes[2];
             let seventhNote = currentNotes[3] || null; // Optional seventh note
+            let ninthNote = currentNotes[4] || null; // Optional ninth note
 
             if(progressionOptions.third === 'lower') {
                 trebleNotes = trebleNotes.filter(note => !note.startsWith(thirdNote)); // Remove third from treble
@@ -990,6 +1016,10 @@ function drawProgressionStaff() {
                 trebleNotes = trebleNotes.filter(note => !note.startsWith(seventhNote)); // Remove seventh from treble
                 bassNotes.push(`${seventhNote}/${progressionOptions.lowerOctave}`); // Add seventh to bass
             }
+            if(progressionOptions.ninth === 'lower' && ninthNote) {
+                trebleNotes = trebleNotes.filter(note => !note.startsWith(ninthNote)); // Remove ninth from treble
+                bassNotes.push(`${ninthNote}/${progressionOptions.lowerOctave}`); // Add ninth to bass
+            }
             if(progressionOptions.root === 'lower') {
                 trebleNotes = trebleNotes.filter(note => !note.startsWith(currentNotes[0])); // Remove root from treble
                 bassNotes.push(`${currentNotes[0]}/${progressionOptions.lowerOctave}`); // Add root to bass
@@ -1003,6 +1033,9 @@ function drawProgressionStaff() {
             }
             if(progressionOptions.seventh === 'both' && seventhNote) {
                 bassNotes.push(`${seventhNote}/${progressionOptions.lowerOctave}`); // Add seventh to bass
+            }
+            if(progressionOptions.ninth === 'both' && ninthNote) {
+                bassNotes.push(`${ninthNote}/${progressionOptions.lowerOctave}`); // Add ninth to bass
             }
 
             if (progressionOptions.bassLine === 'root') {
@@ -1075,36 +1108,58 @@ function drawProgressionStaff() {
         const trebleNotes = allTrebleChords[i];
         const bassNotes = allBassChords[i];
 
-        let actualTrebleNotes = []
-        let actualBassNotes = []
+        // Separate notes by staff, but keep track of which are chord notes vs bass line
+        let actualTrebleChordNotes = [];  // Main chord notes on treble staff
+        let actualTrebleBassNotes = [];   // Bass line notes that ended up on treble staff
+        let actualBassChordNotes = [];    // Main chord notes on bass staff  
+        let actualBassBassNotes = [];     // Bass line notes on bass staff
+        
         let currentNoteArray = [];
+        
+        // Process treble notes (main chord notes)
         for (let note of trebleNotes) {
             if (note.includes('/')) {
                 const [noteName, octave] = note.split('/');
                 if (parseInt(octave) >= 4) {
-                    actualTrebleNotes.push(note);
-                }else {
-                    actualBassNotes.push(note);
+                    actualTrebleChordNotes.push(note);
+                } else {
+                    actualBassChordNotes.push(note);
                 }
             }
             currentNoteArray.push(note);
         }
+        
+        // Process bass notes (bass line notes)
         for (let note of bassNotes) {
             if (note.includes('/')) {   
                 const [noteName, octave] = note.split('/');
                 if (parseInt(octave) < 4) {
-                    actualBassNotes.push(note);
-                } else{
-                    actualTrebleNotes.push(note);
+                    actualBassBassNotes.push(note);
+                } else {
+                    actualTrebleBassNotes.push(note);
                 }
             }
             currentNoteArray.push(note);
         }
-        noteArray.push(currentNoteArray);
+        
+        noteArray.push({
+            allNotes: currentNoteArray,
+            trebleChordNotes: actualTrebleChordNotes,
+            trebleBassNotes: actualTrebleBassNotes,
+            bassChordNotes: actualBassChordNotes,
+            bassBassNotes: actualBassBassNotes
+        });
+
+        // Combine notes for each staff, with chord notes first (for arpeggio) then bass notes
+        const finalTrebleNotes = [...actualTrebleChordNotes, ...actualTrebleBassNotes];
+        const finalBassNotes = [...actualBassChordNotes, ...actualBassBassNotes];
 
         chordSampleNotes.push({
-            treble: actualTrebleNotes,
-            bass: actualBassNotes
+            treble: finalTrebleNotes,
+            bass: finalBassNotes,
+            // Keep track of which notes are chord vs bass for arpeggio logic
+            trebleChordCount: actualTrebleChordNotes.length,
+            bassChordCount: actualBassChordNotes.length
         });
         console.log(`Chord ${i + 1} notes:`, chordSampleNotes[i]);
         // console.log(`Chord ${i + 1} treble notes:`, chordSampleNotes[i].treble);
@@ -1135,53 +1190,89 @@ function drawProgressionStaff() {
             }
         }
         
+        // Determine if arpeggio mode should be applied (only to chord notes, not bass line)
+        const trebleChordNotes = sampleNotes.treble.slice(0, sampleNotes.trebleChordCount || sampleNotes.treble.length);
+        const trebleBassNotes = sampleNotes.treble.slice(sampleNotes.trebleChordCount || sampleNotes.treble.length);
+        const shouldArpeggiate = progressionOptions.arpeggioMode && trebleChordNotes.length > 1;
+        
+        // Calculate durations
+        const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
+                               progressionOptions.noteDuration === 'half' ? 'h' :
+                               progressionOptions.noteDuration === 'quarter' ? 'q' :
+                               progressionOptions.noteDuration === 'eighth' ? '8' :
+                               progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+        
+        // For arpeggio mode, calculate individual note duration based on number of notes
+        let arpeggioDuration = displayDuration;
+        let bassNoteDuration = displayDuration; // Bass notes should match total arpeggio duration
+        
+        if (shouldArpeggiate) {
+            // Adjust duration for individual arpeggio notes
+            const noteCount = trebleChordNotes.length;
+            if (displayDuration === 'w' && noteCount <= 4) {
+                arpeggioDuration = noteCount === 2 ? 'h' : noteCount === 3 ? 'q' : noteCount === 4 ? 'q' : 'q';
+                // Bass note duration remains 'w' to match the total duration
+            } else if (displayDuration === 'h' && noteCount <= 4) {
+                arpeggioDuration = noteCount === 2 ? 'q' : noteCount === 3 ? '8' : noteCount === 4 ? '8' : '8';
+                // Bass note duration remains 'h' to match the total duration
+            } else {
+                arpeggioDuration = '8'; // Default for complex arpeggios
+                // Keep bass note duration as original for complex cases
+            }
+            bassNoteDuration = getFractionalLength(displayDuration, noteCount);
+            console.log(`Arpeggio duration for ${trebleChordNotes.length} notes:`, arpeggioDuration);
+            console.log(`Bass note duration for arpeggio: ${bassNoteDuration} for ${noteCount} notes`);
+        }
+        
         // Draw treble notes if any
         if (sampleNotes.treble.length > 0) {
-            if (progressionOptions.arpeggioMode && sampleNotes.treble.length > 1) {
-                // Arpeggio mode - draw individual notes
-                const arpeggioNotes = applyArpeggioOrdering(sampleNotes.treble, progressionOptions.arpeggioDirection);
-                
-                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
-                                       progressionOptions.noteDuration === 'half' ? 'h' :
-                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
-                                       progressionOptions.noteDuration === 'eighth' ? '8' :
-                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
+            if (shouldArpeggiate) {
+                // Arpeggio mode - create all notes with proper timing
+                const arpeggioNotes = applyArpeggioOrdering(trebleChordNotes, progressionOptions.arpeggioDirection);
                 
                 let trebleVoice = new Voice({ 
                     num_beats: 4, 
                     beat_value: 4 
                 });
-                trebleVoice.setStrict(false); // Allow for flexible durations
-
-                
+                trebleVoice.setStrict(false);
                 const trebleNoteObjects = [];
                 
-                // Draw each note in the arpeggio with the selected duration
+                // Add each arpeggio note
                 for (let note of arpeggioNotes) {
                     trebleNoteObjects.push(new StaveNote({
                         keys: [note],
-                        duration: displayDuration
+                        duration: arpeggioDuration
                     }));
                 }
                 
+                // If there are bass line notes on treble staff, we need to handle them differently
+                // For now, let's add them as a simultaneous chord with the first arpeggio note
+                if (trebleBassNotes.length > 0 && trebleNoteObjects.length > 0) {
+                    // Replace the first arpeggio note with a chord that includes bass notes
+                    const firstArpeggioNote = arpeggioNotes[0];
+                    const combinedKeys = [firstArpeggioNote, ...trebleBassNotes];
+                    
+                    trebleNoteObjects[0] = new StaveNote({
+                        keys: combinedKeys,
+                        duration: arpeggioDuration
+                    });
+                }
+                
+                // Add tickables and draw
                 if (trebleNoteObjects.length > 0) {
                     trebleVoice.addTickables(trebleNoteObjects);
                     new Formatter().joinVoices([trebleVoice]).format([trebleVoice], displayWidth - 50);
                     trebleVoice.draw(context, currentTrebleStave);
                 }
             } else {
-                // Block chord mode - single chord with selected duration
-                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
-                                       progressionOptions.noteDuration === 'half' ? 'h' :
-                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
-                                       progressionOptions.noteDuration === 'eighth' ? '8' :
-                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
-                
-                let trebleVoice = new Voice({ num_beats: 4, beat_value: 4 });
-                trebleVoice.setStrict(false); // Allow for flexible durations
+                // Block chord mode - all notes together
+                let trebleVoice = new Voice({ 
+                    num_beats: 4, 
+                    beat_value: 4 
+                });
+                trebleVoice.setStrict(false);
                 const trebleNoteObjects = [];
                 
-                // Single chord with the selected duration
                 trebleNoteObjects.push(new StaveNote({
                     keys: sampleNotes.treble,
                     duration: displayDuration
@@ -1196,63 +1287,38 @@ function drawProgressionStaff() {
         }
         
         // Draw bass notes if any
+        // Bass notes are ALWAYS drawn as block chords, even in arpeggio mode
         if (sampleNotes.bass.length > 0) {
-            if (progressionOptions.arpeggioMode && sampleNotes.bass.length > 1) {
-                // Arpeggio mode - draw individual notes
-                const arpeggioNotes = applyArpeggioOrdering(sampleNotes.bass, progressionOptions.arpeggioDirection);
-                
-                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
-                                       progressionOptions.noteDuration === 'half' ? 'h' :
-                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
-                                       progressionOptions.noteDuration === 'eighth' ? '8' :
-                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
-                
-                let bassVoice = new Voice({ 
-                    num_beats: 4, 
-                    beat_value: 4 
+            // Bass line always uses block chord mode with duration matching the total arpeggio duration
+            let bassVoice = new Voice({ num_beats: 4, beat_value: 4 });
+            bassVoice.setStrict(false); // Allow for flexible durations
+            const bassNoteObjects = [];
+            
+            // If bassNoteDuration contains a dot, add a dot to the note
+            if (bassNoteDuration.includes('.')) {
+                // Remove the dot for VexFlow duration, add Dot after
+                const baseDuration = bassNoteDuration.replace('.', '');
+                const bassNote = new StaveNote({
+                    clef: "bass",
+                    keys: sampleNotes.bass,
+                    duration: baseDuration,
+                    dots: 1
                 });
-                bassVoice.setStrict(false); // Allow for flexible durations
-                
-                const bassNoteObjects = [];
-                
-                // Draw each note in the arpeggio with the selected duration
-                for (let note of arpeggioNotes) {
-                    bassNoteObjects.push(new StaveNote({
-                        clef: "bass",
-                        keys: [note],
-                        duration: displayDuration
-                    }));
-                }
-                
-                if (bassNoteObjects.length > 0) {
-                    bassVoice.addTickables(bassNoteObjects);
-                    new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
-                    bassVoice.draw(context, currentBassStave);
-                }
+                Dot.buildAndAttach([bassNote], {all: true});
+                bassNoteObjects.push(bassNote);
             } else {
-                // Block chord mode - single chord with selected duration
-                const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
-                                       progressionOptions.noteDuration === 'half' ? 'h' :
-                                       progressionOptions.noteDuration === 'quarter' ? 'q' :
-                                       progressionOptions.noteDuration === 'eighth' ? '8' :
-                                       progressionOptions.noteDuration === 'sixteenth' ? '16' : 'w';
-                
-                let bassVoice = new Voice({ num_beats: 4, beat_value: 4 });
-                bassVoice.setStrict(false); // Allow for flexible durations
-                const bassNoteObjects = [];
-                
-                // Single chord with the selected duration
+                // Single chord with the bass note duration (matches total arpeggio duration)
                 bassNoteObjects.push(new StaveNote({
                     clef: "bass",
                     keys: sampleNotes.bass,
-                    duration: displayDuration
+                    duration: bassNoteDuration
                 }));
-                
-                if (bassNoteObjects.length > 0) {
-                    bassVoice.addTickables(bassNoteObjects);
-                    new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
-                    bassVoice.draw(context, currentBassStave);
-                }
+            }
+            
+            if (bassNoteObjects.length > 0) {
+                bassVoice.addTickables(bassNoteObjects);
+                new Formatter().joinVoices([bassVoice]).format([bassVoice], displayWidth - 50);
+                bassVoice.draw(context, currentBassStave);
             }
         }
         
@@ -1328,27 +1394,54 @@ createProgressionTable();
 createProgressionOptionsPanel();
 createProgressionStaffDisplay();
 
-function numeralToChord(numeral, rootNote, scaleFamily, scaleIndex, scaleRoot, triads, seventhChords) {
+function numeralToChord(numeral, rootNote, scaleFamily, scaleIndex, scaleRoot, triads, seventhChords, ninthChords) {
     const numeral_ = numeral.trim();
+    
+    // Determine which chord array to use based on the global chord type setting
+    let chordArray;
+    switch (progressionOptions.chordType) {
+        case 'triads':
+            chordArray = triads;
+            break;
+        case 'seventh':
+            chordArray = seventhChords;
+            break;
+        case 'ninth':
+            chordArray = ninthChords;
+            break;
+        default:
+            chordArray = triads; // fallback to triads
+            break;
+    }
 
     if(numeral === 'I' || numeral === 'i')
-        return triads[0];
+        return chordArray[0];
     else if(numeral === 'ii' || numeral === 'II')
-        return triads[1];
+        return chordArray[1];
     else if(numeral === 'iii' || numeral === 'III')
-        return triads[2];
+        return chordArray[2];
     else if(numeral === 'IV' || numeral === 'iv')
-        return triads[3];
+        return chordArray[3];
     else if(numeral === 'V' || numeral === 'v')
-        return triads[4];
+        return chordArray[4];
     else if(numeral === 'vi' || numeral === 'VI')
-        return triads[5];
+        return chordArray[5];
     else if(numeral === 'vii' || numeral === 'VII')
-        return triads[6];
+        return chordArray[6];
     else 
         throw new Error(`Unknown numeral: ${numeral}`);
 }
 
+function getFractionalLength(duration, noteCount) {
+    let noteDurations = ['w', 'h', 'q', '8', '16'];
+    let baseDuration = noteDurations.indexOf(duration);
+
+    if(noteCount == 1) return noteDurations[baseDuration];
+    if(noteCount == 2) return noteDurations[baseDuration];
+    if(noteCount == 3) return noteDurations[baseDuration + 1]+ '.';
+    if(noteCount == 4) return noteDurations[baseDuration];
+    else throw new Error(`Unsupported note count: ${noteCount}`);
+}
 
 function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote){
     // console.log('getProgressionNotes called with:', progressionName, scaleFamily, scaleIndex, rootNote);
@@ -1370,8 +1463,10 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
 
     let scale = HeptatonicScales[scaleFamily][scaleIndex - 1];
 
+    // Generate chord arrays based on the selected chord type
     let identifiedChords_3 = identifySyntheticChords(scale, 3, rootNote);
     let identifiedChords_4 = identifySyntheticChords(scale, 4, rootNote);
+    // let identifiedChords_5 = identifySyntheticChords(scale, 5, rootNote);
 
     var notes = [];
     
@@ -1384,7 +1479,7 @@ function getProgressionNotes(progressionName, scaleFamily, scaleIndex, rootNote)
         if (chord.includes('/')) {
             throw new Error(`Chord "${chord}" contains a slash (/) which is not allowed.`);
         }
-        notes.push(numeralToChord(chord, scale[c], scaleFamily, scaleIndex, rootNote, identifiedChords_3, identifiedChords_4));
+        notes.push(numeralToChord(chord, scale[c], scaleFamily, scaleIndex, rootNote, identifiedChords_3, identifiedChords_4, identifiedChords_4));
     }
     return notes;
 }
@@ -1412,22 +1507,40 @@ function convertProgressionToOutputFormat() {
     
     // Process each chord in the progression
     for (let i = 0; i < noteArray.length; i++) {
-        const chordNotes = noteArray[i]; // Array of note strings like ["C/4", "E/4", "G/4"]
+        const chordData = noteArray[i]; // Now an object with separated note types
         
-        let trebleNotes = [];
-        let bassNotes = [];
+        // Handle both old and new format for backward compatibility
+        let trebleChordNotes, trebleBassNotes, bassChordNotes, bassBassNotes;
         
-        // Separate notes by octave into treble and bass
-        for (let noteStr of chordNotes) {
-            if (noteStr.includes('/')) {
-                const [noteName, octave] = noteStr.split('/');
-                if (parseInt(octave) >= 4) {
-                    trebleNotes.push(noteStr);
-                } else {
-                    bassNotes.push(noteStr);
+        if (typeof chordData === 'object' && chordData.trebleChordNotes) {
+            // New format with separated note types
+            trebleChordNotes = chordData.trebleChordNotes || [];
+            trebleBassNotes = chordData.trebleBassNotes || [];
+            bassChordNotes = chordData.bassChordNotes || [];
+            bassBassNotes = chordData.bassBassNotes || [];
+        } else {
+            // Old format - fall back to simple octave separation
+            const allNotes = Array.isArray(chordData) ? chordData : chordData.allNotes || [];
+            trebleChordNotes = [];
+            trebleBassNotes = [];
+            bassChordNotes = [];
+            bassBassNotes = [];
+            
+            for (let noteStr of allNotes) {
+                if (noteStr.includes('/')) {
+                    const [noteName, octave] = noteStr.split('/');
+                    if (parseInt(octave) >= 4) {
+                        trebleChordNotes.push(noteStr); // Assume all treble notes are chord notes
+                    } else {
+                        bassBassNotes.push(noteStr); // Assume all bass notes are bass line notes
+                    }
                 }
             }
         }
+        
+        // Combine notes for each staff
+        const trebleNotes = [...trebleChordNotes, ...trebleBassNotes];
+        const bassNotes = [...bassChordNotes, ...bassBassNotes];
         
         // Get the duration for display
         const displayDuration = progressionOptions.noteDuration === 'whole' ? 'w' :
@@ -1440,37 +1553,54 @@ function convertProgressionToOutputFormat() {
         let trebleBar = [];
         let bassBar = [];
         
-        // Handle arpeggio mode
-        if (progressionOptions.arpeggioMode && (trebleNotes.length > 1 || bassNotes.length > 1)) {
-            // Apply arpeggio to treble notes
-            if (trebleNotes.length > 1) {
-                const arpeggioTreble = applyArpeggioOrdering(trebleNotes, progressionOptions.arpeggioDirection);
-                for (let note of arpeggioTreble) {
-                    trebleBar.push({
-                        "note": note,
-                        "duration": displayDuration
-                    });
-                }
-            } else if (trebleNotes.length === 1) {
+        // Determine if we should arpeggiate (only chord notes, not bass line notes)
+        const shouldArpeggiate = progressionOptions.arpeggioMode && trebleChordNotes.length > 1;
+        
+        if (shouldArpeggiate) {
+            // Apply arpeggio only to chord notes
+            const arpeggioTreble = applyArpeggioOrdering(trebleChordNotes, progressionOptions.arpeggioDirection);
+            
+            let arpeggioDuration = displayDuration; // Default to full duration for arpeggio
+            // Adjust duration for individual arpeggio notes
+            const noteCount = trebleChordNotes.length;
+            if (displayDuration === 'w' && noteCount <= 4) {
+                arpeggioDuration = noteCount === 2 ? 'h' : noteCount === 3 ? 'q' : noteCount === 4 ? 'q' : 'q';
+                // Bass note duration remains 'w' to match the total duration
+            } else if (displayDuration === 'h' && noteCount <= 4) {
+                arpeggioDuration = noteCount === 2 ? 'q' : noteCount === 3 ? '8' : noteCount === 4 ? '8' : '8';
+                // Bass note duration remains 'h' to match the total duration
+            } else {
+                arpeggioDuration = '8'; // Default for complex arpeggios
+                // Keep bass note duration as original for complex cases
+            }
+            let bassNoteDuration = getFractionalLength(displayDuration, noteCount);
+            console.log(`Arpeggio duration for ${trebleChordNotes.length} notes:`, arpeggioDuration);
+            console.log(`Bass note duration for arpeggio: ${bassNoteDuration} for ${noteCount} notes`);
+
+            for (let note of arpeggioTreble) {
                 trebleBar.push({
-                    "note": trebleNotes[0],
-                    "duration": displayDuration
+                    "note": note,
+                    "duration": arpeggioDuration
                 });
             }
             
-            // Apply arpeggio to bass notes
-            if (bassNotes.length > 1) {
-                const arpeggioBass = applyArpeggioOrdering(bassNotes, progressionOptions.arpeggioDirection);
-                for (let note of arpeggioBass) {
-                    bassBar.push({
-                        "note": note,
-                        "duration": displayDuration
-                    });
-                }
-            } else if (bassNotes.length === 1) {
+            // Add bass line notes that ended up on treble staff as sustained notes
+            if (trebleBassNotes.length > 0) {
+                trebleBar.push({
+                    "note": trebleBassNotes.length === 1 ? trebleBassNotes[0] : trebleBassNotes,
+                    "duration": bassNoteDuration, // Full duration to sustain through arpeggio
+                    "isBassLine": true // Mark as bass line for potential different handling
+                });
+            }
+            
+            // let bassNoteDuration = getFractionalLength(displayDuration, bassNotes.length);
+            console.log(`Bass note duration for arpeggio: ${bassNoteDuration} for ${arpeggioTreble.length} notes`);
+
+            // Bass notes always remain as block chords with full duration
+            if (bassNotes.length > 0) {
                 bassBar.push({
-                    "note": bassNotes[0],
-                    "duration": displayDuration
+                    "note": bassNotes.length === 1 ? bassNotes[0] : bassNotes,
+                    "duration": bassNoteDuration // Full duration to match total arpeggio time
                 });
             }
         } else {

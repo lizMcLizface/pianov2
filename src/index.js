@@ -1351,96 +1351,334 @@ function drawNotes2(div, noteArray, stacked = false){
     // Initialize the result structure to return
     const gridAlignedNotes = [];
 
+    // Helper function to convert duration to beat value
+    function getDurationValue(duration) {
+        const isDotted = duration.includes('.');
+        const baseDuration = duration.replace('.', '');
+        
+        let baseValue = baseDuration === 'w' ? 4 : 
+                       baseDuration === 'h' ? 2 : 
+                       baseDuration === 'q' || baseDuration === '4' ? 1 : 
+                       baseDuration === '8' ? 0.5 : 
+                       baseDuration === '16' ? 0.25 : 1;
+        
+        // Dotted notes are 1.5 times the base duration
+        return isDotted ? baseValue * 1.5 : baseValue;
+    }
+
     // Process each bar
     for (let barIndex = 0; barIndex < numBars; barIndex++) {
         const trebleBar = trebleNotes[barIndex] || [];
         const bassBar = bassNotes[barIndex] || [];
         
-        // Combine notes at the same temporal position
-        const maxLength = Math.max(trebleBar.length, bassBar.length);
+        // Create a temporal grid for this bar to handle different durations
+        const temporalGrid = [];
+        let currentTime = 0;
         
+        // Calculate total bar duration by processing both clefs
+        let trebleTime = 0;
+        let bassTime = 0;
+        
+        // Process treble notes to get temporal positions
+        const trebleEvents = [];
+        trebleTime = 0;
+        for (const noteObj of trebleBar) {
+            const durationValue = getDurationValue(noteObj.duration);
+            trebleEvents.push({
+                startTime: trebleTime,
+                endTime: trebleTime + durationValue,
+                duration: noteObj.duration,
+                durationValue: durationValue,
+                note: noteObj.note,
+                clef: 'treble'
+            });
+            trebleTime += durationValue;
+        }
+        
+        // Process bass notes to get temporal positions
+        const bassEvents = [];
+        bassTime = 0;
+        for (const noteObj of bassBar) {
+            const durationValue = getDurationValue(noteObj.duration);
+            bassEvents.push({
+                startTime: bassTime,
+                endTime: bassTime + durationValue,
+                duration: noteObj.duration,
+                durationValue: durationValue,
+                note: noteObj.note,
+                clef: 'bass'
+            });
+            bassTime += durationValue;
+        }
+        
+        // Create a unified timeline by finding all unique time points
+        const timePoints = new Set();
+        timePoints.add(0);
+        
+        for (const event of trebleEvents) {
+            timePoints.add(event.startTime);
+            timePoints.add(event.endTime);
+        }
+        for (const event of bassEvents) {
+            timePoints.add(event.startTime);
+            timePoints.add(event.endTime);
+        }
+        
+        const sortedTimePoints = Array.from(timePoints).sort((a, b) => a - b);
+        
+        // Create grid entries based on note start times (not segments)
+        // This ensures each note is only triggered once at its start time
+        const barData = [];
         const trebleStaveNotes = [];
         const bassStaveNotes = [];
-        let totalBeats = 0;
-
-        // Initialize the bar data for the result
-        const barData = [];
-
-        for (let noteIndex = 0; noteIndex < maxLength; noteIndex++) {
-            const trebleNoteObj = trebleBar[noteIndex];
-            const bassNoteObj = bassBar[noteIndex];
+        
+        // Get all unique start times for notes
+        const noteStartTimes = new Set();
+        for (const event of trebleEvents) {
+            noteStartTimes.add(event.startTime);
+        }
+        for (const event of bassEvents) {
+            noteStartTimes.add(event.startTime);
+        }
+        
+        const sortedStartTimes = Array.from(noteStartTimes).sort((a, b) => a - b);
+        
+        // Create grid entries for each note start time
+        // We need to create a temporal grid that properly handles notes with different durations
+        // Instead of using shortest duration, we'll create entries at all unique time points
+        for (const startTime of sortedStartTimes) {
+            // Find notes that start at this time
+            const trebleNotesAtTime = trebleEvents.filter(event => event.startTime === startTime);
+            const bassNotesAtTime = bassEvents.filter(event => event.startTime === startTime);
             
-            // Use the duration from whichever note exists (they should match)
-            const duration = trebleNoteObj ? trebleNoteObj.duration : (bassNoteObj ? bassNoteObj.duration : '4');
-            const durationValue = duration === 'w' ? 4 : 
-                                duration === 'h' ? 2 : 
-                                duration === 'q' || duration === '4' ? 1 : 
-                                duration === '8' ? 0.5 : 
-                                duration === '16' ? 0.25 : 1;
-            totalBeats += durationValue;
-
-            // Collect all notes that should play simultaneously
-            const allNotesAtThisTime = [];
-            if (trebleNoteObj) allNotesAtThisTime.push(trebleNoteObj);
-            if (bassNoteObj) allNotesAtThisTime.push(bassNoteObj);
-
-            // Separate notes by clef based on pitch
+            // Collect all notes that should play at this time
             const trebleNotesToPlay = [];
             const bassNotesToPlay = [];
             const simultaneousNotes = [];
+            const trebleNotesDurations = [];
+            const bassNotesDurations = [];
             let isPause = false;
-
-            for (const noteObj of allNotesAtThisTime) {
-                if (noteObj.note === "Pause") {
+            
+            // Process treble notes starting at this time
+            for (const event of trebleNotesAtTime) {
+                if (event.note === "Pause") {
                     isPause = true;
                     simultaneousNotes.push("Pause");
-                    break;
                 } else {
-                    // Handle both single notes (string) and chords (array)
-                    const notes = Array.isArray(noteObj.note) ? noteObj.note : [noteObj.note];
-                    
-                    for (const note of notes) {
+                    const notes = Array.isArray(event.note) ? event.note : [event.note];
+                    for (let note of notes) {
                         simultaneousNotes.push(note);
                         const octave = parseInt(note.slice(-1));
                         if (octave >= 4) {
                             trebleNotesToPlay.push(note);
+                            trebleNotesDurations.push(event.duration);
                         } else {
                             bassNotesToPlay.push(note);
+                            bassNotesDurations.push(event.duration);
                         }
                     }
                 }
             }
-
-            // Add to result data structure
+            
+            // Process bass notes starting at this time
+            for (const event of bassNotesAtTime) {
+                if (event.note === "Pause") {
+                    if (!isPause) {
+                        isPause = true;
+                        simultaneousNotes.push("Pause");
+                    }
+                } else {
+                    const notes = Array.isArray(event.note) ? event.note : [event.note];
+                    for (const note of notes) {
+                        if (!simultaneousNotes.includes(note)) {
+                            simultaneousNotes.push(note);
+                        }
+                        const octave = parseInt(note.slice(-1));
+                        if (octave >= 4) {
+                            if (!trebleNotesToPlay.includes(note)) {
+                                trebleNotesToPlay.push(note);
+                                trebleNotesDurations.push(event.duration);
+                            }
+                        } else {
+                            if (!bassNotesToPlay.includes(note)) {
+                                bassNotesToPlay.push(note);
+                                bassNotesDurations.push(event.duration);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Calculate the duration until the next note starts
+            // This ensures each grid entry lasts until something new happens
+            const nextStartTimeIndex = sortedStartTimes.indexOf(startTime) + 1;
+            let gridDuration;
+            let gridDurationString;
+            
+            if (nextStartTimeIndex < sortedStartTimes.length) {
+                // Duration until next note starts
+                gridDuration = sortedStartTimes[nextStartTimeIndex] - startTime;
+            } else {
+                // Last note group - use shortest duration or standard quarter note
+                const durationsAtThisTime = [...trebleNotesAtTime, ...bassNotesAtTime].map(e => e.durationValue);
+                gridDuration = durationsAtThisTime.length > 0 ? Math.min(...durationsAtThisTime) : 1;
+            }
+            
+            // Convert duration back to string representation
+            if (gridDuration >= 4) gridDurationString = 'w';
+            else if (gridDuration >= 2) gridDurationString = 'h';
+            else if (gridDuration >= 1) gridDurationString = '4';
+            else if (gridDuration >= 0.5) gridDurationString = '8';
+            else gridDurationString = '16';
+            
+            // Add to grid data structure - each entry represents notes that start at this time
             barData.push({
                 notes: simultaneousNotes,
-                duration: duration,
-                durationValue: durationValue,
-                isPause: isPause
+                duration: gridDurationString,
+                durationValue: gridDuration,
+                isPause: isPause,
+                timeStart: startTime,
+                timeEnd: startTime + gridDuration,
+                trebleNotes: trebleNotesToPlay,
+                bassNotes: bassNotesToPlay,
+                trebleDurations: trebleNotesDurations,
+                bassDurations: bassNotesDurations
             });
-
-            // Add notes or rests to appropriate staves
-            if (isPause) {
-                trebleStaveNotes.push(new StaveNote({keys: ['b/4'], duration: duration + 'r'}));
-                bassStaveNotes.push(new StaveNote({clef: "bass", keys: ['b/2'], duration: duration + 'r'}));
-            } else {
-                if (trebleNotesToPlay.length > 0) {
-                    trebleStaveNotes.push(new StaveNote({keys: trebleNotesToPlay, duration: duration}));
+        }
+        
+        // Now create the stave notes based on the original events (not segments)
+        // We need to maintain the original note durations for proper rendering
+        
+        // Add treble notes
+        for (const event of trebleEvents) {
+            const notes = Array.isArray(event.note) ? event.note : [event.note];
+            const trebleNotesToPlay = notes.filter(note => {
+                if (note === "Pause") return false;
+                const octave = parseInt(note.slice(-1));
+                return octave >= 4;
+            });
+            
+            const isDotted = event.duration.includes('.');
+            const baseDuration = event.duration.replace('.', '');
+            
+            if (event.note === "Pause") {
+                const note = new StaveNote({keys: ['b/4'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
                 } else {
-                    trebleStaveNotes.push(new StaveNote({keys: ['b/4'], duration: duration + 'r'}));
+                    trebleStaveNotes.push(note);
                 }
-
-                if (bassNotesToPlay.length > 0) {
-                    bassStaveNotes.push(new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: duration}));
+            } else if (trebleNotesToPlay.length > 0) {
+                const note = new StaveNote({keys: trebleNotesToPlay, duration: baseDuration});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
                 } else {
-                    bassStaveNotes.push(new StaveNote({clef: "bass", keys: ['D/3'], duration: duration + 'r'}));
+                    trebleStaveNotes.push(note);
+                }
+            } else {
+                const note = new StaveNote({keys: ['b/4'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
+                } else {
+                    trebleStaveNotes.push(note);
                 }
             }
         }
+        
+        // Add bass notes
+        for (const event of bassEvents) {
+            const notes = Array.isArray(event.note) ? event.note : [event.note];
+            const bassNotesToPlay = notes.filter(note => {
+                if (note === "Pause") return false;
+                const octave = parseInt(note.slice(-1));
+                return octave < 4;
+            });
+            
+            const isDotted = event.duration.includes('.');
+            const baseDuration = event.duration.replace('.', '');
+            
+            if (event.note === "Pause") {
+                const note = new StaveNote({clef: "bass", keys: ['b/2'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    bassStaveNotes.push(note);
+                }
+            } else if (bassNotesToPlay.length > 0) {
+                const note = new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: baseDuration});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    bassStaveNotes.push(note);
+                }
+            } else {
+                const note = new StaveNote({clef: "bass", keys: ['D/3'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    bassStaveNotes.push(note);
+                }
+            }
+        }
+        
+        // Calculate total beats for the bar (use the maximum of treble and bass)
+        const totalBeats = Math.max(trebleTime, bassTime);
+
+        console.log(`Bar ${barIndex + 1}: Treble Time = ${trebleTime}, Bass Time = ${bassTime}, Total Beats = ${totalBeats}`);
+        console.log(`Treble Notes:`, trebleStaveNotes);
+        console.log(`Bass Notes:`, bassStaveNotes);
 
         // Render treble staff for this bar
         if (trebleStaveNotes.length > 0) {
-            const trebleVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            const trebleVoice = new Voice({ num_beats: Math.max(trebleTime, 1), beat_value: 4 });
             trebleVoice.addTickables(trebleStaveNotes);
             Accidental.applyAccidentals([trebleVoice], keySignature);
 
@@ -1450,7 +1688,7 @@ function drawNotes2(div, noteArray, stacked = false){
 
         // Render bass staff for this bar
         if (bassStaveNotes.length > 0) {
-            const bassVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            const bassVoice = new Voice({ num_beats: Math.max(bassTime, 1), beat_value: 4 });
             bassVoice.addTickables(bassStaveNotes);
             Accidental.applyAccidentals([bassVoice], keySignature);
 
@@ -1462,7 +1700,9 @@ function drawNotes2(div, noteArray, stacked = false){
         gridAlignedNotes.push({
             barIndex: barIndex,
             totalBeats: totalBeats,
-            notes: barData
+            notes: barData,
+            trebleTime: trebleTime,
+            bassTime: bassTime
         });
     }
 
@@ -1489,54 +1729,114 @@ function highlightNotesInNotation(div, noteArray, highlightData = null) {
     // Initialize the result structure to return
     const gridAlignedNotes = [];
 
+    // Helper function to convert duration to beat value
+    function getDurationValue(duration) {
+        const isDotted = duration.includes('.');
+        const baseDuration = duration.replace('.', '');
+        
+        let baseValue = baseDuration === 'w' ? 4 : 
+                       baseDuration === 'h' ? 2 : 
+                       baseDuration === 'q' || baseDuration === '4' ? 1 : 
+                       baseDuration === '8' ? 0.5 : 
+                       baseDuration === '16' ? 0.25 : 1;
+        
+        // Dotted notes are 1.5 times the base duration
+        return isDotted ? baseValue * 1.5 : baseValue;
+    }
+
     // Process each bar
     for (let barIndex = 0; barIndex < numBars; barIndex++) {
         const trebleBar = trebleNotes[barIndex] || [];
         const bassBar = bassNotes[barIndex] || [];
         
-        // Combine notes at the same temporal position
-        const maxLength = Math.max(trebleBar.length, bassBar.length);
+        // Create a temporal grid for this bar to handle different durations
+        let trebleTime = 0;
+        let bassTime = 0;
         
+        // Process treble notes to get temporal positions
+        const trebleEvents = [];
+        trebleTime = 0;
+        for (const noteObj of trebleBar) {
+            const durationValue = getDurationValue(noteObj.duration);
+            trebleEvents.push({
+                startTime: trebleTime,
+                endTime: trebleTime + durationValue,
+                duration: noteObj.duration,
+                durationValue: durationValue,
+                note: noteObj.note,
+                clef: 'treble'
+            });
+            trebleTime += durationValue;
+        }
+        
+        // Process bass notes to get temporal positions
+        const bassEvents = [];
+        bassTime = 0;
+        for (const noteObj of bassBar) {
+            const durationValue = getDurationValue(noteObj.duration);
+            bassEvents.push({
+                startTime: bassTime,
+                endTime: bassTime + durationValue,
+                duration: noteObj.duration,
+                durationValue: durationValue,
+                note: noteObj.note,
+                clef: 'bass'
+            });
+            bassTime += durationValue;
+        }
+        
+        // Create a unified timeline by finding all unique time points
+        const timePoints = new Set();
+        timePoints.add(0);
+        
+        for (const event of trebleEvents) {
+            timePoints.add(event.startTime);
+            timePoints.add(event.endTime);
+        }
+        for (const event of bassEvents) {
+            timePoints.add(event.startTime);
+            timePoints.add(event.endTime);
+        }
+        
+        const sortedTimePoints = Array.from(timePoints).sort((a, b) => a - b);
+        
+        // Create grid entries based on note start times (not segments)  
+        // This ensures each note is only triggered once at its start time
+        const barData = [];
         const trebleStaveNotes = [];
         const bassStaveNotes = [];
-        let totalBeats = 0;
-
-        // Initialize the bar data for the result
-        const barData = [];
-
-        for (let noteIndex = 0; noteIndex < maxLength; noteIndex++) {
-            const trebleNoteObj = trebleBar[noteIndex];
-            const bassNoteObj = bassBar[noteIndex];
+        
+        // Get all unique start times for notes
+        const noteStartTimes = new Set();
+        for (const event of trebleEvents) {
+            noteStartTimes.add(event.startTime);
+        }
+        for (const event of bassEvents) {
+            noteStartTimes.add(event.startTime);
+        }
+        
+        const sortedStartTimes = Array.from(noteStartTimes).sort((a, b) => a - b);
+        
+        // Create grid entries for each note start time
+        // We need to create a temporal grid that properly handles notes with different durations  
+        for (const startTime of sortedStartTimes) {
+            // Find notes that start at this time
+            const trebleNotesAtTime = trebleEvents.filter(event => event.startTime === startTime);
+            const bassNotesAtTime = bassEvents.filter(event => event.startTime === startTime);
             
-            // Use the duration from whichever note exists (they should match)
-            const duration = trebleNoteObj ? trebleNoteObj.duration : (bassNoteObj ? bassNoteObj.duration : '4');
-            const durationValue = duration === 'w' ? 4 : 
-                                duration === 'h' ? 2 : 
-                                duration === 'q' || duration === '4' ? 1 : 
-                                duration === '8' ? 0.5 : 
-                                duration === '16' ? 0.25 : 1;
-            totalBeats += durationValue;
-
-            // Collect all notes that should play simultaneously
-            const allNotesAtThisTime = [];
-            if (trebleNoteObj) allNotesAtThisTime.push(trebleNoteObj);
-            if (bassNoteObj) allNotesAtThisTime.push(bassNoteObj);
-
-            // Separate notes by clef based on pitch
+            // Collect all notes that should play at this time
             const trebleNotesToPlay = [];
             const bassNotesToPlay = [];
             const simultaneousNotes = [];
             let isPause = false;
-
-            for (const noteObj of allNotesAtThisTime) {
-                if (noteObj.note === "Pause") {
+            
+            // Process treble notes starting at this time
+            for (const event of trebleNotesAtTime) {
+                if (event.note === "Pause") {
                     isPause = true;
                     simultaneousNotes.push("Pause");
-                    break;
                 } else {
-                    // Handle both single notes (string) and chords (array)
-                    const notes = Array.isArray(noteObj.note) ? noteObj.note : [noteObj.note];
-                    
+                    const notes = Array.isArray(event.note) ? event.note : [event.note];
                     for (const note of notes) {
                         simultaneousNotes.push(note);
                         const octave = parseInt(note.slice(-1));
@@ -1548,74 +1848,254 @@ function highlightNotesInNotation(div, noteArray, highlightData = null) {
                     }
                 }
             }
-
-            // Add to result data structure
-            barData.push({
-                notes: simultaneousNotes,
-                duration: duration,
-                durationValue: durationValue,
-                durationValueStr: duration,
-                isPause: isPause
-            });
-
-            // Check if this note should be highlighted
-            let highlightColor = null;
-            if (highlightData) {
-                const highlights = Array.isArray(highlightData) ? highlightData : [highlightData];
-                for (const highlight of highlights) {
-                    if (highlight.barIndex === barIndex && highlight.beatIndex === noteIndex) {
-                        highlightColor = highlight.color;
-                        break;
+            
+            // Process bass notes starting at this time
+            for (const event of bassNotesAtTime) {
+                if (event.note === "Pause") {
+                    if (!isPause) {
+                        isPause = true;
+                        simultaneousNotes.push("Pause");
+                    }
+                } else {
+                    const notes = Array.isArray(event.note) ? event.note : [event.note];
+                    for (const note of notes) {
+                        if (!simultaneousNotes.includes(note)) {
+                            simultaneousNotes.push(note);
+                        }
+                        const octave = parseInt(note.slice(-1));
+                        if (octave >= 4) {
+                            if (!trebleNotesToPlay.includes(note)) {
+                                trebleNotesToPlay.push(note);
+                            }
+                        } else {
+                            if (!bassNotesToPlay.includes(note)) {
+                                bassNotesToPlay.push(note);
+                            }
+                        }
                     }
                 }
             }
-
-            // Add notes or rests to appropriate staves
-            if (isPause) {
-                const trebleNote = new StaveNote({keys: ['b/4'], duration: duration + 'r'});
-                const bassNote = new StaveNote({clef: "bass", keys: ['b/2'], duration: duration + 'r'});
-                
-                if (highlightColor && highlightColor !== 'black') {
-                    trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
-                    bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
-                }
-                
-                trebleStaveNotes.push(trebleNote);
-                bassStaveNotes.push(bassNote);
+            
+            // Calculate the duration until the next note starts
+            const nextStartTimeIndex = sortedStartTimes.indexOf(startTime) + 1;
+            let gridDuration;
+            let gridDurationString;
+            
+            if (nextStartTimeIndex < sortedStartTimes.length) {
+                // Duration until next note starts
+                gridDuration = sortedStartTimes[nextStartTimeIndex] - startTime;
             } else {
-                if (trebleNotesToPlay.length > 0) {
-                    const trebleNote = new StaveNote({keys: trebleNotesToPlay, duration: duration});
-                    if (highlightColor && highlightColor !== 'black') {
-                        trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
-                    }
-                    trebleStaveNotes.push(trebleNote);
-                } else {
-                    const trebleNote = new StaveNote({keys: ['b/4'], duration: duration + 'r'});
-                    if (highlightColor && highlightColor !== 'black') {
-                        trebleNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
-                    }
-                    trebleStaveNotes.push(trebleNote);
+                // Last note group - use shortest duration or standard quarter note  
+                const durationsAtThisTime = [...trebleNotesAtTime, ...bassNotesAtTime].map(e => e.durationValue);
+                gridDuration = durationsAtThisTime.length > 0 ? Math.min(...durationsAtThisTime) : 1;
+            }
+            
+            // Convert duration back to string representation
+            if (gridDuration >= 4) gridDurationString = 'w';
+            else if (gridDuration >= 2) gridDurationString = 'h';
+            else if (gridDuration >= 1) gridDurationString = '4';
+            else if (gridDuration >= 0.5) gridDurationString = '8';
+            else gridDurationString = '16';
+            
+            // Add to grid data structure - each entry represents notes that start at this time
+            barData.push({
+                notes: simultaneousNotes,
+                duration: gridDurationString,
+                durationValue: gridDuration,
+                isPause: isPause,
+                timeStart: startTime,
+                timeEnd: startTime + gridDuration,
+                trebleNotes: trebleNotesToPlay,
+                bassNotes: bassNotesToPlay
+            });
+        }
+        
+        // Check if any segments should be highlighted
+        const highlights = Array.isArray(highlightData) ? highlightData : (highlightData ? [highlightData] : []);
+        
+        // Now create the stave notes based on the original events with highlighting
+        // Add treble notes
+        for (let eventIndex = 0; eventIndex < trebleEvents.length; eventIndex++) {
+            const event = trebleEvents[eventIndex];
+            const notes = Array.isArray(event.note) ? event.note : [event.note];
+            const trebleNotesToPlay = notes.filter(note => {
+                if (note === "Pause") return false;
+                const octave = parseInt(note.slice(-1));
+                return octave >= 4;
+            });
+            
+            // Check if this note should be highlighted
+            let highlightColor = null;
+            for (const highlight of highlights) {
+                if (highlight.barIndex === barIndex && highlight.beatIndex === eventIndex) {
+                    highlightColor = highlight.color;
+                    break;
                 }
-
-                if (bassNotesToPlay.length > 0) {
-                    const bassNote = new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: duration});
-                    if (highlightColor && highlightColor !== 'black') {
-                        bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
-                    }
-                    bassStaveNotes.push(bassNote);
+            }
+            
+            const isDotted = event.duration.includes('.');
+            const baseDuration = event.duration.replace('.', '');
+            
+            if (event.note === "Pause") {
+                const note = new StaveNote({keys: ['b/4'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
                 } else {
-                    const bassNote = new StaveNote({clef: "bass", keys: ['D/3'], duration: duration + 'r'});
                     if (highlightColor && highlightColor !== 'black') {
-                        bassNote.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
                     }
-                    bassStaveNotes.push(bassNote);
+                    trebleStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+            } else if (trebleNotesToPlay.length > 0) {
+                const note = new StaveNote({keys: trebleNotesToPlay, duration: baseDuration});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
+                } else {
+                    if (highlightColor && highlightColor !== 'black') {
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    trebleStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+            } else {
+                const note = new StaveNote({keys: ['b/4'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    trebleStaveNotes.push(note);
+                    trebleStaveNotes.push(ghostNote);
+                } else {
+                    if (highlightColor && highlightColor !== 'black') {
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    trebleStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
                 }
             }
         }
+        
+        // Add bass notes
+        for (let eventIndex = 0; eventIndex < bassEvents.length; eventIndex++) {
+            const event = bassEvents[eventIndex];
+            const notes = Array.isArray(event.note) ? event.note : [event.note];
+            const bassNotesToPlay = notes.filter(note => {
+                if (note === "Pause") return false;
+                const octave = parseInt(note.slice(-1));
+                return octave < 4;
+            });
+            
+            // Check if this note should be highlighted
+            let highlightColor = null;
+            for (const highlight of highlights) {
+                if (highlight.barIndex === barIndex && highlight.beatIndex === eventIndex) {
+                    highlightColor = highlight.color;
+                    break;
+                }
+            }
+            
+            const isDotted = event.duration.includes('.');
+            const baseDuration = event.duration.replace('.', '');
+            
+            if (event.note === "Pause") {
+                const note = new StaveNote({clef: "bass", keys: ['b/2'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    if (highlightColor && highlightColor !== 'black') {
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    bassStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+            } else if (bassNotesToPlay.length > 0) {
+                const note = new StaveNote({clef: "bass", keys: bassNotesToPlay, duration: baseDuration});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    if (highlightColor && highlightColor !== 'black') {
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    bassStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+            } else {
+                const note = new StaveNote({clef: "bass", keys: ['D/3'], duration: baseDuration + 'r'});
+                if (isDotted) {
+                    Dot.buildAndAttach([note], {all: true});
+                    // Add ghost note for the dot duration
+                    const ghostDuration = baseDuration === 'w' ? 'h' : 
+                                         baseDuration === 'h' ? 'q' : 
+                                         baseDuration === 'q' ? '8' : 
+                                         baseDuration === '8' ? '16' : '16';
+                    const ghostNote = new GhostNote({duration: ghostDuration});
+                    bassStaveNotes.push(note);
+                    bassStaveNotes.push(ghostNote);
+                } else {
+                    if (highlightColor && highlightColor !== 'black') {
+                        note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                    }
+                    bassStaveNotes.push(note);
+                }
+                if (highlightColor && highlightColor !== 'black') {
+                    note.setStyle({fillStyle: highlightColor, strokeStyle: highlightColor});
+                }
+            }
+        }
+        
+        // Calculate total beats for the bar (use the maximum of treble and bass)
+        const totalBeats = Math.max(trebleTime, bassTime);
 
         // Render treble staff for this bar
         if (trebleStaveNotes.length > 0) {
-            const trebleVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            const trebleVoice = new Voice({ num_beats: Math.max(trebleTime, 1), beat_value: 4 });
             trebleVoice.addTickables(trebleStaveNotes);
             Accidental.applyAccidentals([trebleVoice], keySignature);
 
@@ -1625,7 +2105,7 @@ function highlightNotesInNotation(div, noteArray, highlightData = null) {
 
         // Render bass staff for this bar
         if (bassStaveNotes.length > 0) {
-            const bassVoice = new Voice({ num_beats: Math.max(totalBeats, 1), beat_value: 4 });
+            const bassVoice = new Voice({ num_beats: Math.max(bassTime, 1), beat_value: 4 });
             bassVoice.addTickables(bassStaveNotes);
             Accidental.applyAccidentals([bassVoice], keySignature);
 
@@ -1637,7 +2117,9 @@ function highlightNotesInNotation(div, noteArray, highlightData = null) {
         gridAlignedNotes.push({
             barIndex: barIndex,
             totalBeats: totalBeats,
-            notes: barData
+            notes: barData,
+            trebleTime: trebleTime,
+            bassTime: bassTime
         });
     }
 
@@ -3819,12 +4301,10 @@ function nextNote() {
 
 function notEventDurationToString(durationValue) {
     // Convert duration value to string representation
-                // const durationValue = duration === 'w' ? 4 : 
-                //                 duration === 'h' ? 2 : 
-                //                 duration === 'q' || duration === '4' ? 1 : 
-                //                 duration === '8' ? 0.5 : 
-                //                 duration === '16' ? 0.25 : 1;
-    switch (durationValue) {
+    // Handle dotted durations by stripping the dot
+    const baseDuration = durationValue.replace('.', '');
+    
+    switch (baseDuration) {
         case 'w': return 'whole';
         case 'h': return 'half';
         case 'q':
@@ -3875,10 +4355,37 @@ function playCurrentNoteAtTime(audioTime, gridAlign = false) {
         return noteDurationSeconds; // Don't play anything for pauses
     }
     
-    const notesToPlay = noteEvent.notes;
+    // const notesToPlay = noteEvent.notes;
     // console.log('playing grid data notes:', noteEvent, bpmSlider.value, 'at bar:', currentBarIndex, 'note index:', currentNoteIndex);
 
+    console.log('Not event:', noteEvent, 'at audio time:', audioTime, 'with duration:', noteDurationSeconds, 'seconds');
 
+    const notesToPlay = [];
+    const durationsToPlay = [];
+
+    for(let i = 0; i < noteEvent.trebleNotes.length; i++) {
+        notesToPlay.push(noteEvent.trebleNotes[i]);
+        durationsToPlay.push(noteEvent.trebleDurations[i]);
+    }
+    for(let i = 0; i < noteEvent.bassNotes.length; i++) {
+        notesToPlay.push(noteEvent.bassNotes[i]);
+        durationsToPlay.push(noteEvent.bassDurations[i]);
+    }
+
+        // Helper function to convert duration to beat value
+    function getDurationValue(duration) {
+        const isDotted = duration.includes('.');
+        const baseDuration = duration.replace('.', '');
+        
+        let baseValue = baseDuration === 'w' ? 4 : 
+                       baseDuration === 'h' ? 2 : 
+                       baseDuration === 'q' || baseDuration === '4' ? 1 : 
+                       baseDuration === '8' ? 0.5 : 
+                       baseDuration === '16' ? 0.25 : 1;
+        
+        // Dotted notes are 1.5 times the base duration
+        return isDotted ? baseValue * 1.5 : baseValue;
+    }
     let delay = metronome.timePerBeat;
     // Play the notes
     if (notesToPlay.length === 1) {
@@ -3897,12 +4404,22 @@ function playCurrentNoteAtTime(audioTime, gridAlign = false) {
         // Also play with PolySynth if enabled
         if (polySynthRef && $('#polySynthMidiBox') && $('#polySynthMidiBox')[0].checked) {
             const chordNotes = notesToPlay.map(note => convertNoteNameToPolySynthFormat(note)).filter(n => n);
+            let delays = []
+            for(let n = 0; n < notesToPlay.length; n++) {
+                let note = notesToPlay[n];
+                let noteDuration = durationsToPlay[n];
+                const noteDurationSeconds = (60.0 / bpmSlider.value) * getDurationValue(noteDuration);
+                let currentDelay = schedulePolySynthNote([note], audioTime, noteDurationSeconds * 1000);
+                delays.push(currentDelay);
+                // console.log('Converted chord note for PolySynth:', chordNotes[n]);
+            }
+            delay = Math.max(...delays); // Use the longest delay for chord playback
 
             // console.log('Converted chord notes for PolySynth:', chordNotes);
-            if (chordNotes.length > 0) {
+            // if (chordNotes.length > 0) {
                 // console.log('Playing chord with PolySynth:', chordNotes, 'bpm:', bpmSlider.value);
-                delay = schedulePolySynthNote(chordNotes, audioTime, noteDurationSeconds * 1000);
-            }
+                // delay = schedulePolySynthNote(chordNotes, audioTime, noteDurationSeconds * 1000);
+            // }
         }
     }
     return delay + 0.01;

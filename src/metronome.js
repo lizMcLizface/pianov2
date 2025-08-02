@@ -12,13 +12,12 @@ function reset(){
 }
 
 $('#metronomeCheckBox').on('change', function (e) {
-    animations.forEach(animation => {
-      const running = getComputedStyle(animation).getPropertyValue("--animps") || 'running';
-      animation.style.setProperty('--animps', running === 'running' ? 'paused' : 'running');
-    })
     if($('#metronomeCheckBox')[0].checked){
-        reset();
-    }else{
+        document.querySelector('#metronomeContainer').style.visibility = 'visible';
+        document.querySelector('#metronomeContainer').style.opacity = '1';
+    } else {
+        document.querySelector('#metronomeContainer').style.visibility = 'hidden';
+        document.querySelector('#metronomeContainer').style.opacity = '0';
     }
 });
 
