@@ -1,0 +1,2676 @@
+import {processChord, generateSyntheticChords} from './intervals';
+import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from './scales';
+import {createHeptatonicScaleTable, selectedRootNote, selectedScales, getPrimaryScale, getPrimaryRootNote} from './scaleGenerator';
+import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
+import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from './midi';
+
+// Standard guitar tuning (lowest to highest strings) - displayed from top to bottom
+const GUITAR_TUNING = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
+const FRET_COUNT = 15; // Number of frets to display
+
+// Calculate fret positions using the rule of 18 (each fret divides remaining string length by 18)
+function calculateFretPositions(fretCount) {
+    const positions = [0]; // Open string position at 0%
+    
+    // Calculate what the full string length should be so that the 15th fret ends at 100%
+    // Work backwards from the desired end position
+    let totalLength = 100;
+    let tempLength = totalLength;
+    
+    // Calculate the theoretical positions if we started with this length
+    const tempPositions = [0];
+    for (let fret = 1; fret <= fretCount; fret++) {
+        const fretDistance = tempLength / 17.817;
+        tempPositions.push(totalLength - tempLength + fretDistance);
+        tempLength -= fretDistance;
+    }
+    
+    // Scale so that the last fret (15th) is at 100%
+    const lastFretPosition = tempPositions[fretCount];
+    const scaleFactor = 100 / lastFretPosition;
+    
+    // Apply scaling to all positions
+    for (let fret = 1; fret <= fretCount; fret++) {
+        positions.push(tempPositions[fret] * scaleFactor);
+    }
+    
+    return positions;
+}
+
+// Scale degree colors for visual differentiation
+const SCALE_COLORS = {
+    1: '#ff4444', // Root - red
+    2: '#ff8844', // 2nd - orange
+    3: '#ffcc44', // 3rd - yellow
+    4: '#44ff44', // 4th - green
+    5: '#44ccff', // 5th - light blue
+    6: '#4444ff', // 6th - blue
+    7: '#cc44ff', // 7th - purple
+    8: '#ff4444'  // Octave - red (same as root)
+};
+
+// Default marker colors
+const DEFAULT_COLORS = {
+    primary: '#666666',
+    secondary: '#999999',
+    text: '#ffffff'
+};
+
+/**
+ * Class representing a guitar fretboard
+ */
+class Fretboard {
+    constructor(containerId, options = {}) {
+        this.containerId = containerId;
+        this.container = document.getElementById(containerId);
+        if (!this.container) {
+            throw new Error(`Container with id "${containerId}" not found`);
+        }
+        
+        this.tuning = options.tuning || GUITAR_TUNING;
+        this.fretCount = options.fretCount || FRET_COUNT;
+        this.showFretNumbers = options.showFretNumbers !== false;
+        this.showStringNames = options.showStringNames !== false;
+        
+        this.fretboardElement = null;
+        this.markers = new Map(); // Store markers by string-fret key
+        this.subscaleBoxes = new Map(); // Store subscale boxes by ID
+        this.chordLines = new Map(); // Store chord lines by ID
+        
+        this.init();
+    }
+    
+    /**
+     * Initialize the fretboard visual structure
+     */
+    init() {
+        this.container.innerHTML = '';
+        
+        // Calculate fret positions first
+        this.fretPositions = calculateFretPositions(this.fretCount);
+        
+        // Create main fretboard container
+        this.fretboardElement = document.createElement('div');
+        this.fretboardElement.className = 'fretboard';
+        this.fretboardElement.style.cssText = `
+            position: relative;
+            background: #f5f5f5;
+            border-radius: 12px;
+            margin: 20px 0;
+            padding: 40px 20px 60px 20px; /* Increased top and bottom padding for boxes and labels */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            overflow: visible; /* Allow content to extend beyond bounds for labels */
+        `;
+        
+        // Add CSS animations and styles for subscale features
+        this.addSubscaleStyles();
+        
+        // Add fret numbers if enabled
+        if (this.showFretNumbers) {
+            this.addFretNumbers();
+        }
+        
+        // Add string names if enabled
+        if (this.showStringNames) {
+            this.addStringNames();
+        }
+        
+        // Create the neck structure
+        this.createNeckStructure();
+        
+        // Create fret grid
+        this.createFretGrid();
+        
+        this.container.appendChild(this.fretboardElement);
+    }
+    
+    /**
+     * Add CSS styles for subscale boxes and animations
+     */
+    addSubscaleStyles() {
+        // Check if styles already exist
+        if (document.getElementById('fretboard-subscale-styles')) {
+            return;
+        }
+        
+        const styleElement = document.createElement('style');
+        styleElement.id = 'fretboard-subscale-styles';
+        styleElement.textContent = `
+            @keyframes rootPulse {
+                0%, 100% { 
+                    transform: translate(-50%, -50%) scale(1);
+                    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+                }
+                50% { 
+                    transform: translate(-50%, -50%) scale(1.1);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                }
+            }
+            
+            @keyframes subscaleBoxGlow {
+                0%, 100% { 
+                    box-shadow: 0 0 5px rgba(255, 107, 53, 0.3);
+                }
+                50% { 
+                    box-shadow: 0 0 15px rgba(255, 107, 53, 0.6);
+                }
+            }
+            
+            .subscale-box {
+                animation: subscaleBoxGlow 3s ease-in-out infinite;
+            }
+            
+            .subscale-label {
+                transition: all 0.2s ease;
+            }
+            
+            .subscale-label:hover {
+                transform: translateX(-50%) scale(1.05);
+            }
+        `;
+        document.head.appendChild(styleElement);
+    }
+    
+    /**
+     * Add fret number labels under each fret wire
+     */
+    addFretNumbers() {
+        const fretNumberRow = document.createElement('div');
+        fretNumberRow.style.cssText = `
+            position: absolute;
+            bottom: 10px; /* Position within the container padding */
+            left: ${this.showStringNames ? '60px' : '40px'};
+            right: 40px;
+            z-index: 10;
+        `;
+        
+        // Add fret 0 (nut) label
+        const nutLabel = document.createElement('div');
+        nutLabel.textContent = '0';
+        nutLabel.style.cssText = `
+            position: absolute;
+            left: 0%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            min-width: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 3px;
+            padding: 2px 4px;
+            border: 1px solid #ccc;
+        `;
+        fretNumberRow.appendChild(nutLabel);
+        
+        // Add labels for each fret aligned with fret wires
+        for (let fret = 1; fret <= this.fretCount; fret++) {
+            const fretLabel = document.createElement('div');
+            fretLabel.textContent = fret.toString();
+            
+            // Position label directly under each fret wire
+            const fretPosition = this.fretPositions[fret];
+            
+            fretLabel.style.cssText = `
+                position: absolute;
+                left: ${fretPosition}%;
+                transform: translateX(-50%);
+                text-align: center;
+                font-size: 12px;
+                font-weight: bold;
+                color: #333;
+                min-width: 20px;
+                background: rgba(255, 255, 255, 0.8);
+                border-radius: 3px;
+                padding: 2px 4px;
+                border: 1px solid #ccc;
+            `;
+            fretNumberRow.appendChild(fretLabel);
+        }
+        
+        this.fretboardElement.appendChild(fretNumberRow);
+    }
+    
+    /**
+     * Add string name labels
+     */
+    addStringNames() {
+        const stringContainer = document.createElement('div');
+        stringContainer.style.cssText = `
+            position: absolute;
+            left: -50px;
+            top: 40px; /* Adjusted for new padding */
+            bottom: 60px; /* Adjusted for new padding */
+            width: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+        `;
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            const stringLabel = document.createElement('div');
+            stringLabel.textContent = this.extractNoteName(stringNote);
+            stringLabel.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: #333;
+                background-color: rgba(255, 255, 255, 0.9);
+                border-radius: 6px;
+                height: 24px;
+                font-size: 12px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+            stringContainer.appendChild(stringLabel);
+        });
+        
+        this.fretboardElement.appendChild(stringContainer);
+    }
+    
+    /**
+     * Create the neck structure with strings and fret wires
+     */
+    createNeckStructure() {
+        const neckContainer = document.createElement('div');
+        neckContainer.className = 'neck-container';
+        neckContainer.style.cssText = `
+            position: relative;
+            height: 160px;
+            margin: 0 40px 0 40px; /* Adjusted for new padding */
+        `;
+        
+        // Create strings
+        this.tuning.forEach((stringNote, stringIndex) => {
+            const stringElement = document.createElement('div');
+            stringElement.className = 'guitar-string';
+            const stringPosition = (stringIndex / (this.tuning.length - 1)) * 100;
+            stringElement.style.cssText = `
+                position: absolute;
+                top: ${stringPosition}%;
+                left: 0;
+                right: 0;
+                height: ${stringIndex < 2 ? '3px' : stringIndex < 4 ? '2px' : '1px'};
+                background: linear-gradient(to right, #C0C0C0, #E0E0E0, #C0C0C0);
+                z-index: 1;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            `;
+            neckContainer.appendChild(stringElement);
+        });
+        
+        // Create nut (at the start of the fretboard)
+        const nut = document.createElement('div');
+        nut.className = 'nut';
+        nut.style.cssText = `
+            position: absolute;
+            left: 0;
+            top: -5px;
+            bottom: -5px;
+            width: 4px;
+            // background: linear-gradient(to bottom, #f5f5f5, #e0e0e0, #f5f5f5);
+            z-index: 2;
+            border-radius: 2px;
+            box-shadow: 1px 0 3px rgba(0,0,0,0.4);
+        `;
+        neckContainer.appendChild(nut);
+        
+        // Create fret wires using calculated positions
+        for (let fret = 1; fret <= this.fretCount; fret++) {
+            const fretWire = document.createElement('div');
+            fretWire.className = 'fret-wire';
+            const fretPosition = this.fretPositions[fret];
+            fretWire.style.cssText = `
+                position: absolute;
+                left: ${fretPosition}%;
+                top: -5px;
+                bottom: -5px;
+                width: 3px;
+                background: linear-gradient(to bottom, #666, #999, #666);
+                z-index: 2;
+                border-radius: 1px;
+                box-shadow: 1px 0 3px rgba(0,0,0,0.4);
+            `;
+            neckContainer.appendChild(fretWire);
+        }
+        
+        // Add position markers (dots) - centered between fret wires
+        const dotPositions = [3, 5, 7, 9, 12, 15];
+        const doubleDotPositions = [12];
+        
+        dotPositions.forEach(fret => {
+            if (fret <= this.fretCount) {
+                const isDouble = doubleDotPositions.includes(fret);
+                // Position marker in the center of the fret space
+                const markerPosition = this.calculateFretPosition(fret);
+                
+                if (isDouble) {
+                    // Double dots for 12th fret
+                    [30, 70].forEach(yPos => {
+                        const dot = document.createElement('div');
+                        dot.className = 'position-marker';
+                        dot.style.cssText = `
+                            position: absolute;
+                            left: ${markerPosition}%;
+                            top: ${yPos}%;
+                            width: 12px;
+                            height: 12px;
+                            background: radial-gradient(circle, #D4AF37, #B8860B);
+                            border-radius: 50%;
+                            transform: translate(-50%, -50%);
+                            z-index: 3;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        `;
+                        neckContainer.appendChild(dot);
+                    });
+                } else {
+                    // Single dot
+                    const dot = document.createElement('div');
+                    dot.className = 'position-marker';
+                    dot.style.cssText = `
+                        position: absolute;
+                        left: ${markerPosition}%;
+                        top: 50%;
+                        width: 14px;
+                        height: 14px;
+                        background: radial-gradient(circle, #D4AF37, #B8860B);
+                        border-radius: 50%;
+                        transform: translate(-50%, -50%);
+                        z-index: 3;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    `;
+                    neckContainer.appendChild(dot);
+                }
+            }
+        });
+        
+        this.fretboardElement.appendChild(neckContainer);
+    }
+    
+    /**
+     * Create the fret grid structure
+     */
+    createFretGrid() {
+        const fretGrid = document.createElement('div');
+        fretGrid.className = 'fret-grid';
+        fretGrid.style.cssText = `
+            position: absolute;
+            top: 40px; /* Adjusted for new padding */
+            left: 40px; /* Match neck container margins exactly */
+            right: 60px; /* Match neck container margins exactly */
+            bottom: 60px; /* Adjusted for new padding */
+            z-index: 10;
+        `;
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const fretElement = document.createElement('div');
+                fretElement.className = 'fret';
+                fretElement.dataset.string = stringIndex;
+                fretElement.dataset.fret = fret;
+                
+                const note = this.calculateNote(stringNote, fret);
+                fretElement.dataset.note = note;
+                
+                // Calculate position for this fret
+                const stringPosition = (stringIndex / (this.tuning.length - 1)) * 100;
+                const fretPosition = this.calculateFretPosition(fret);
+                
+                fretElement.style.cssText = `
+                    position: absolute;
+                    left: ${fretPosition}%;
+                    top: ${stringPosition}%;
+                    width: 30px;
+                    height: 30px;
+                    transform: ${fret === 0 ? 'translateY(-50%)' : 'translate(-50%, -50%)'};
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                `;
+                
+                // Add hover effect
+                fretElement.addEventListener('mouseenter', () => {
+                    if (!this.markers.has(`${stringIndex}-${fret}`)) {
+                        if (fret === 0) {
+                            fretElement.style.transform = 'translateY(-50%) scale(1.1)';
+                        } else {
+                            fretElement.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                        }
+                    }
+                });
+                
+                fretElement.addEventListener('mouseleave', () => {
+                    if (!this.markers.has(`${stringIndex}-${fret}`)) {
+                        if (fret === 0) {
+                            fretElement.style.transform = 'translateY(-50%) scale(1)';
+                        } else {
+                            fretElement.style.transform = 'translate(-50%, -50%) scale(1)';
+                        }
+                    }
+                });
+                
+                fretGrid.appendChild(fretElement);
+            }
+        });
+        
+        this.fretboardElement.appendChild(fretGrid);
+    }
+    
+    /**
+     * Calculate the note at a specific string and fret
+     */
+    calculateNote(openStringNote, fret) {
+        const openMidi = noteToMidi(openStringNote);
+        const frettedMidi = openMidi + fret + 12; // Add 12 to correct octave offset
+        return noteToName(frettedMidi);
+    }
+    
+    /**
+     * Extract note name without octave from a full note string
+     * Handles both "C/4" and "C4" formats
+     */
+    extractNoteName(noteString) {
+        if (!noteString) return '';
+        // Handle format like "C/4" or "C#/4"
+        if (noteString.includes('/')) {
+            return noteString.split('/')[0];
+        }
+        // Handle format like "C4" or "C#4" (fallback)
+        return noteString.replace(/\d+$/, '');
+    }
+    
+    /**
+     * Extract octave number from a full note string
+     * Returns null if no octave found
+     */
+    extractOctave(noteString) {
+        if (!noteString) return null;
+        // Handle format like "C/4"
+        if (noteString.includes('/')) {
+            const parts = noteString.split('/');
+            return parts.length > 1 ? parseInt(parts[1]) : null;
+        }
+        // Handle format like "C4" (fallback)
+        const match = noteString.match(/(\d+)$/);
+        return match ? parseInt(match[1]) : null;
+    }
+    
+    /**
+     * Calculate the horizontal position for a fret (same logic as dot inlays)
+     */
+    calculateFretPosition(fret) {
+        if (fret === 0) {
+            return 0; // Nut position
+        } else {
+            // Position in the center of the fret space, same as dot inlays
+            const prevFretPos = fret > 1 ? this.fretPositions[fret - 1] : 0;
+            const currentFretPos = this.fretPositions[fret];
+            return (prevFretPos + currentFretPos) / 2;
+        }
+    }
+    
+    /**
+     * Clear all markers from the fretboard
+     */
+    clearMarkers() {
+        this.markers.forEach((marker, key) => {
+            const [stringIndex, fret] = key.split('-').map(Number);
+            const fretElement = this.fretboardElement.querySelector(
+                `[data-string="${stringIndex}"][data-fret="${fret}"]`
+            );
+            if (fretElement) {
+                // Remove any existing marker elements
+                const existingMarker = fretElement.querySelector('.note-marker');
+                if (existingMarker) {
+                    existingMarker.remove();
+                }
+                // Reset transform based on fret position
+                if (fret === 0) {
+                    fretElement.style.transform = 'translateY(-50%) scale(1)';
+                } else {
+                    fretElement.style.transform = 'translate(-50%, -50%) scale(1)';
+                }
+            }
+        });
+        this.markers.clear();
+        
+        // Only remove from scale tracking if not in an automatic update cycle
+        if (!isUpdatingFretboards) {
+            fretboardsShowingScale.delete(this.containerId);
+        }
+    }
+    
+    /**
+     * Mark a specific fret with color and label
+     */
+    markFret(stringIndex, fret, options = {}) {
+        const key = `${stringIndex}-${fret}`;
+        const fretElement = this.fretboardElement.querySelector(
+            `[data-string="${stringIndex}"][data-fret="${fret}"]`
+        );
+        
+        console.log(`Marking fret ${fret} on string ${stringIndex} with key ${key} -> `, fretElement);
+        if (!fretElement) return;
+        
+        const {
+            color = DEFAULT_COLORS.primary,
+            textColor = DEFAULT_COLORS.text,
+            label = '',
+            isRoot = false,
+            useCustomStyle = false,
+            backgroundColor = '#ffffff',
+            borderColor = '#ff4444',
+            borderWidth = 3,
+            size = 26
+        } = options;
+        
+        // Remove any existing marker
+        const existingMarker = fretElement.querySelector('.note-marker');
+        if (existingMarker) {
+            existingMarker.remove();
+        }
+        
+        // Create new marker
+        const marker = document.createElement('div');
+        marker.className = `note-marker ${isRoot ? 'root-note' : ''}`;
+        marker.textContent = label;
+        
+        if (useCustomStyle) {
+            // Use the new custom styling system
+            const markerSize = isRoot ? Math.max(size, 28) : size;
+            const fontSize = Math.max(8, Math.floor(markerSize * 0.4));
+            const borderWidthPx = isRoot ? Math.max(borderWidth, 3) : borderWidth;
+            
+            marker.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: ${backgroundColor};
+                color: ${textColor};
+                width: ${markerSize}px;
+                height: ${markerSize}px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: ${fontSize}px;
+                font-weight: bold;
+                border: ${borderWidthPx}px solid ${borderColor};
+                box-shadow: 0 ${Math.floor(markerSize * 0.15)}px ${Math.floor(markerSize * 0.3)}px rgba(0,0,0,0.4);
+                z-index: 15;
+                ${isRoot ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
+            `;
+        } else {
+            // Use the original styling system
+            marker.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: ${color};
+                color: ${textColor};
+                width: ${isRoot ? '28px' : '24px'};
+                height: ${isRoot ? '28px' : '24px'};
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: ${isRoot ? '12px' : '10px'};
+                font-weight: bold;
+                border: ${isRoot ? '3px solid rgba(255,255,255,0.6)' : '2px solid rgba(255,255,255,0.3)'};
+                box-shadow: 0 ${isRoot ? '3px 8px' : '2px 6px'} rgba(0,0,0,0.4);
+                z-index: 15;
+                ${isRoot ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
+            `;
+        }
+        
+        fretElement.appendChild(marker);
+        this.markers.set(key, { 
+            color, 
+            textColor, 
+            label, 
+            isRoot, 
+            useCustomStyle, 
+            backgroundColor, 
+            borderColor, 
+            borderWidth, 
+            size 
+        });
+        console.log(`Marked fret ${fret} on string ${stringIndex} with key ${key}`);
+    }
+    
+    /**
+     * Mark all notes on the fretboard with note names
+     */
+    markAllNotes() {
+        this.clearMarkers();
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const note = this.calculateNote(stringNote, fret);
+                // Show full note with octave (e.g., "C/4")
+                
+                this.markFret(stringIndex, fret, {
+                    color: DEFAULT_COLORS.secondary,
+                    label: note
+                });
+            }
+        });
+    }
+    
+    /**
+     * Mark scale notes with color coding based on scale degrees
+     */
+    markScale(scaleNotes, rootNote) {
+        this.clearMarkers();
+        
+        // Normalize scale notes (remove octave numbers)
+        const normalizedScaleNotes = scaleNotes.map(note => this.extractNoteName(note));
+        const normalizedRoot = this.extractNoteName(rootNote);
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const note = this.calculateNote(stringNote, fret);
+                const noteName = this.extractNoteName(note);
+                
+                const scaleIndex = normalizedScaleNotes.indexOf(noteName);
+                if (scaleIndex !== -1) {
+                    const scaleDegree = scaleIndex + 1;
+                    const isRoot = noteName === normalizedRoot;
+                    
+                    this.markFret(stringIndex, fret, {
+                        color: isRoot ? SCALE_COLORS[1] : SCALE_COLORS[scaleDegree] || DEFAULT_COLORS.primary,
+                        label: noteName,
+                        isRoot: isRoot
+                    });
+                }
+            }
+        });
+        
+        // Always add to tracking if showing scale, whether from user action or auto-update
+        fretboardsShowingScale.add(this.containerId);
+    }
+    
+    /**
+     * Mark all instances of a specific note on the fretboard
+     * @param {string} targetNote - The note to mark (e.g., 'C', 'F#', 'Bb' for all octaves, or 'C/4', 'F#/3' for specific octave)
+     * @param {Object} options - Styling options for the markers
+     */
+    markNote(targetNote, options = {}) {
+        const {
+            backgroundColor = '#ffffff',
+            borderColor = '#ff4444',
+            borderWidth = 3,
+            textColor = '#333333',
+            size = 26,
+            showLabel = true,
+            label = null,
+            isRoot = false,
+            clearFirst = true
+        } = options;
+        
+        if (clearFirst) {
+            this.clearMarkers();
+        }
+        
+        // Check if targeting a specific octave (has a slash) or all octaves
+        const hasSpecificOctave = targetNote.includes('/');
+        let targetNoteName, targetOctave;
+        
+        if (hasSpecificOctave) {
+            targetNoteName = this.extractNoteName(targetNote);
+            targetOctave = this.extractOctave(targetNote);
+        } else {
+            targetNoteName = targetNote;
+            targetOctave = null;
+        }
+        
+        let displayLabel;
+        if (label !== null) {
+            displayLabel = label;
+        } else if (showLabel) {
+            displayLabel = hasSpecificOctave ? targetNote : targetNoteName;
+        } else {
+            displayLabel = '';
+        }
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const note = this.calculateNote(stringNote, fret);
+                const noteName = this.extractNoteName(note);
+                const noteOctave = this.extractOctave(note);
+                
+                console.log(`Checking note ${note} (${noteName}/${noteOctave}) at string ${stringIndex}, fret ${fret}`);
+                
+                let shouldMark = false;
+                
+                if (hasSpecificOctave) {
+                    // Match both note name and octave
+                    shouldMark = (noteName === targetNoteName && noteOctave === targetOctave);
+                } else {
+                    // Match just the note name, any octave
+                    shouldMark = (noteName === targetNoteName);
+                }
+                
+                if (shouldMark) {
+                    console.log(`Marking note ${note} at string ${stringIndex}, fret ${fret}`);
+                    this.markFret(stringIndex, fret, {
+                        backgroundColor,
+                        borderColor,
+                        borderWidth,
+                        textColor,
+                        size,
+                        label: displayLabel,
+                        isRoot,
+                        useCustomStyle: true
+                    });
+                }
+            }
+        });
+        
+        // Remove from scale tracking since we're showing specific notes
+        if (clearFirst) {
+            fretboardsShowingScale.delete(this.containerId);
+        }
+    }
+    
+    /**
+     * Mark multiple notes with different colors
+     * @param {Array} noteConfigs - Array of {note, options} objects
+     */
+    markMultipleNotes(noteConfigs, clearFirst = true) {
+        if (clearFirst) {
+            this.clearMarkers();
+        }
+        
+        noteConfigs.forEach(config => {
+            const { note, ...options } = config;
+            this.markNote(note, { ...options, clearFirst: false });
+        });
+        
+        // Remove from scale tracking since we're showing specific notes
+        if (clearFirst) {
+            fretboardsShowingScale.delete(this.containerId);
+        }
+    }
+    
+    /**
+     * Display a chord on the fretboard with chord tones highlighted
+     * @param {Array} chordNotes - Array of note names in the chord
+     * @param {string} chordName - Name of the chord for labeling
+     * @param {Object} options - Display options
+     */
+    displayChord(chordNotes, chordName = '', options = {}) {
+        const {
+            clearFirst = true,
+            showLines = true,
+            rootColor = '#ff4444',
+            thirdColor = '#ffcc44',
+            fifthColor = '#44ff44',
+            seventhColor = '#4444ff',
+            backgroundColor = '#ffffff',
+            textColor = '#333333',
+            borderWidth = 3,
+            size = 28
+        } = options;
+        
+        if (clearFirst) {
+            this.clearMarkers();
+            this.clearChordLines();
+        }
+        
+        // Color mapping for chord tones
+        const colorMap = [rootColor, thirdColor, fifthColor, seventhColor];
+        const roleNames = ['Root', '3rd', '5th', '7th'];
+        
+        // Find all positions for each chord tone
+        const chordPositions = [];
+        
+        chordNotes.forEach((note, index) => {
+            const noteName = this.extractNoteName(note);
+            const positions = this.findNotePositions(noteName);
+            
+            positions.forEach(pos => {
+                this.markFret(pos.string, pos.fret, {
+                    backgroundColor,
+                    borderColor: colorMap[index % colorMap.length],
+                    borderWidth: index === 0 ? borderWidth + 1 : borderWidth, // Root gets thicker border
+                    textColor,
+                    size: index === 0 ? size + 2 : size, // Root gets slightly larger
+                    label: noteName,
+                    isRoot: index === 0,
+                    useCustomStyle: true
+                });
+                
+                // Store position for potential line drawing
+                chordPositions.push({
+                    string: pos.string,
+                    fret: pos.fret,
+                    note: noteName,
+                    role: roleNames[index % roleNames.length]
+                });
+            });
+        });
+        
+        // Draw connecting lines between chord tones if requested
+        if (showLines && chordPositions.length > 1) {
+            // Find a good chord shape to connect (prefer closer frets)
+            const chordShape = this.findOptimalChordShape(chordPositions, chordNotes);
+            
+            if (chordShape.length > 1) {
+                this.drawChordLine(`chord-${chordName}`, chordShape, {
+                    color: rootColor,
+                    lineWidth: 2,
+                    style: 'solid',
+                    opacity: 0.5,
+                    label: chordName,
+                    labelPosition: 'middle'
+                });
+            }
+        }
+        
+        // Add to chord tracking
+        fretboardsShowingChords.add(this.containerId);
+        // Remove from scale tracking since we're showing chords
+        fretboardsShowingScale.delete(this.containerId);
+    }
+    
+    /**
+     * Find an optimal chord shape from available positions
+     * @param {Array} positions - All available positions for chord tones
+     * @param {Array} chordNotes - The chord notes to prioritize
+     * @returns {Array} Optimal positions for chord shape
+     */
+    findOptimalChordShape(positions, chordNotes) {
+        // Group positions by note
+        const positionsByNote = {};
+        positions.forEach(pos => {
+            if (!positionsByNote[pos.note]) {
+                positionsByNote[pos.note] = [];
+            }
+            positionsByNote[pos.note].push(pos);
+        });
+        
+        // Try to find a compact chord shape
+        const chordShape = [];
+        const usedStrings = new Set();
+        
+        // Prioritize positions in a reasonable fret range (3-7 frets)
+        for (let centerFret = 3; centerFret <= 12; centerFret++) {
+            const candidateShape = [];
+            const tempUsedStrings = new Set();
+            
+            chordNotes.forEach(note => {
+                const noteName = this.extractNoteName(note);
+                const notePositions = positionsByNote[noteName] || [];
+                
+                // Find closest position to centerFret on an unused string
+                const bestPos = notePositions
+                    .filter(pos => !tempUsedStrings.has(pos.string))
+                    .filter(pos => Math.abs(pos.fret - centerFret) <= 4)
+                    .sort((a, b) => Math.abs(a.fret - centerFret) - Math.abs(b.fret - centerFret))[0];
+                
+                if (bestPos) {
+                    candidateShape.push(bestPos);
+                    tempUsedStrings.add(bestPos.string);
+                }
+            });
+            
+            // If we found a good shape (at least 3 notes), use it
+            if (candidateShape.length >= Math.min(3, chordNotes.length)) {
+                return candidateShape.sort((a, b) => a.string - b.string);
+            }
+        }
+        
+        // Fallback: just take the first position of each note
+        chordNotes.forEach(note => {
+            const noteName = this.extractNoteName(note);
+            const notePositions = positionsByNote[noteName] || [];
+            if (notePositions.length > 0 && !usedStrings.has(notePositions[0].string)) {
+                chordShape.push(notePositions[0]);
+                usedStrings.add(notePositions[0].string);
+            }
+        });
+        
+        return chordShape.sort((a, b) => a.string - b.string);
+    }
+    
+    /**
+     * Get the note at a specific string and fret
+     */
+    getNoteAt(stringIndex, fret) {
+        if (stringIndex < 0 || stringIndex >= this.tuning.length || fret < 0 || fret > this.fretCount) {
+            return null;
+        }
+        return this.calculateNote(this.tuning[stringIndex], fret);
+    }
+    
+    /**
+     * Find all positions of a specific note on the fretboard
+     */
+    findNotePositions(targetNote) {
+        const positions = [];
+        
+        // Check if targeting a specific octave or all octaves
+        const hasSpecificOctave = targetNote.includes('/');
+        let targetNoteName, targetOctave;
+        
+        if (hasSpecificOctave) {
+            targetNoteName = this.extractNoteName(targetNote);
+            targetOctave = this.extractOctave(targetNote);
+        } else {
+            targetNoteName = targetNote;
+            targetOctave = null;
+        }
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const note = this.calculateNote(stringNote, fret);
+                const noteName = this.extractNoteName(note);
+                const noteOctave = this.extractOctave(note);
+                
+                let shouldInclude = false;
+                
+                if (hasSpecificOctave) {
+                    // Match both note name and octave
+                    shouldInclude = (noteName === targetNoteName && noteOctave === targetOctave);
+                } else {
+                    // Match just the note name, any octave
+                    shouldInclude = (noteName === targetNoteName);
+                }
+                
+                if (shouldInclude) {
+                    positions.push({ string: stringIndex, fret, note });
+                }
+            }
+        });
+        
+        return positions;
+    }
+    
+    /**
+     * Draw a box around a section of the fretboard to mark subscales
+     * @param {string} boxId - Unique identifier for the box
+     * @param {number} startString - Starting string index (0-based)
+     * @param {number} endString - Ending string index (0-based)
+     * @param {number} startFret - Starting fret number
+     * @param {number} endFret - Ending fret number
+     * @param {Object} options - Styling and label options
+     */
+    drawSubscaleBox(boxId, startString, endString, startFret, endFret, options = {}) {
+        const {
+            color = '#ff6b35',
+            lineWidth = 2,
+            label = '',
+            labelPosition = 'bottom', // 'top' or 'bottom'
+            labelColor = '#333',
+            labelBackgroundColor = 'rgba(255, 255, 255, 0.9)'
+        } = options;
+        
+        // Remove existing box if it exists
+        this.removeSubscaleBox(boxId);
+        
+        // Calculate positions
+        const topStringPos = (Math.min(startString, endString) / (this.tuning.length - 1)) * 100;
+        const bottomStringPos = (Math.max(startString, endString) / (this.tuning.length - 1)) * 100;
+        
+        let leftPos, rightPos;
+        
+        if (startFret === 0) {
+            leftPos = 0;
+        } else {
+            const prevFretPos = startFret > 1 ? this.fretPositions[startFret - 1] : 0;
+            const currentFretPos = this.fretPositions[startFret];
+            leftPos = (prevFretPos + currentFretPos) / 2;
+        }
+        
+        if (endFret === 0) {
+            rightPos = 0;
+        } else {
+            const prevFretPos = endFret > 1 ? this.fretPositions[endFret - 1] : 0;
+            const currentFretPos = this.fretPositions[endFret];
+            rightPos = (prevFretPos + currentFretPos) / 2;
+        }
+        
+        // Ensure left is less than right
+        if (leftPos > rightPos) {
+            [leftPos, rightPos] = [rightPos, leftPos];
+        }
+        
+        // Create box container
+        const boxContainer = document.createElement('div');
+        boxContainer.className = 'subscale-box';
+        boxContainer.dataset.boxId = boxId;
+        
+        // Create the box outline
+        const boxOutline = document.createElement('div');
+        boxOutline.style.cssText = `
+            position: absolute;
+            left: ${leftPos}%;
+            top: ${topStringPos}%;
+            width: ${rightPos - leftPos}%;
+            height: ${bottomStringPos - topStringPos}%;
+            border: ${lineWidth}px solid ${color};
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 8;
+            background: ${color}08; /* Very transparent background */
+        `;
+        
+        boxContainer.appendChild(boxOutline);
+        
+        // Create label if provided
+        if (label) {
+            const labelElement = document.createElement('div');
+            labelElement.className = 'subscale-label';
+            labelElement.textContent = label;
+            
+            const labelTop = labelPosition === 'top' 
+                ? `${topStringPos - 12}%`  // More space above with new padding
+                : `${bottomStringPos + 8}%`; // More space below with new padding
+            
+            labelElement.style.cssText = `
+                position: absolute;
+                left: ${(leftPos + rightPos) / 2}%;
+                top: ${labelTop};
+                transform: translateX(-50%);
+                background: ${labelBackgroundColor};
+                color: ${labelColor};
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                white-space: nowrap;
+                z-index: 9;
+                border: 1px solid ${color};
+                box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            `;
+            
+            boxContainer.appendChild(labelElement);
+        }
+        
+        // Position the container relative to the fret grid
+        boxContainer.style.cssText = `
+            position: absolute;
+            top: 40px; /* Adjusted for new padding */
+            left: 40px; /* Adjusted for new padding */
+            right: 40px; /* Adjusted for new padding */
+            bottom: 60px; /* Adjusted for new padding */
+            pointer-events: none;
+            z-index: 8;
+        `;
+        
+        this.fretboardElement.appendChild(boxContainer);
+        this.subscaleBoxes.set(boxId, {
+            element: boxContainer,
+            startString,
+            endString,
+            startFret,
+            endFret,
+            options
+        });
+    }
+    
+    /**
+     * Remove a subscale box by ID
+     */
+    removeSubscaleBox(boxId) {
+        const box = this.subscaleBoxes.get(boxId);
+        if (box && box.element) {
+            box.element.remove();
+            this.subscaleBoxes.delete(boxId);
+        }
+    }
+    
+    /**
+     * Clear all subscale boxes
+     */
+    clearSubscaleBoxes() {
+        this.subscaleBoxes.forEach((box, boxId) => {
+            if (box.element) {
+                box.element.remove();
+            }
+        });
+        this.subscaleBoxes.clear();
+    }
+    
+    /**
+     * Update the position and size of an existing subscale box
+     */
+    updateSubscaleBox(boxId, startString, endString, startFret, endFret, options = {}) {
+        const existingBox = this.subscaleBoxes.get(boxId);
+        if (existingBox) {
+            // Merge with existing options
+            const mergedOptions = { ...existingBox.options, ...options };
+            this.drawSubscaleBox(boxId, startString, endString, startFret, endFret, mergedOptions);
+        }
+    }
+    
+    /**
+     * Get all subscale boxes
+     */
+    getSubscaleBoxes() {
+        return new Map(this.subscaleBoxes);
+    }
+    
+    /**
+     * Draw lines between frets to mark chord shapes or patterns
+     * @param {string} lineId - Unique identifier for the line
+     * @param {Array} points - Array of {string, fret} objects defining the line path
+     * @param {Object} options - Styling and label options
+     */
+    drawChordLine(lineId, points, options = {}) {
+        const {
+            color = '#ff6b35',
+            lineWidth = 3,
+            style = 'solid', // 'solid', 'dashed', 'dotted'
+            label = '',
+            labelPosition = 'middle', // 'start', 'middle', 'end'
+            labelColor = '#333',
+            labelBackgroundColor = 'rgba(255, 255, 255, 0.9)',
+            opacity = 0.8
+        } = options;
+        
+        if (points.length < 2) {
+            console.warn('At least 2 points are required to draw a line');
+            return;
+        }
+        
+        // Remove existing line if it exists
+        this.removeChordLine(lineId);
+        
+        // Create line container
+        const lineContainer = document.createElement('div');
+        lineContainer.className = 'chord-line';
+        lineContainer.dataset.lineId = lineId;
+        
+        // Calculate positions for each point
+        const positions = points.map(point => {
+            const stringPosition = (point.string / (this.tuning.length - 1)) * 100;
+            const fretPosition = this.calculateFretPosition(point.fret);
+            return { x: fretPosition, y: stringPosition };
+        });
+        
+        // Create SVG for precise line drawing
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 12;
+            opacity: ${opacity};
+        `;
+        
+        // Create path element
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        
+        // Build path data using viewBox coordinates (0-100)
+        let pathData = `M ${positions[0].x} ${positions[0].y}`;
+        for (let i = 1; i < positions.length; i++) {
+            pathData += ` L ${positions[i].x} ${positions[i].y}`;
+        }
+        
+        // Style the path
+        let strokeDasharray = '';
+        switch (style) {
+            case 'dashed':
+                strokeDasharray = '4,2';
+                break;
+            case 'dotted':
+                strokeDasharray = '1,1';
+                break;
+            default:
+                strokeDasharray = 'none';
+        }
+        
+        path.setAttribute('d', pathData);
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', lineWidth / 10); // Scale for viewBox
+        path.setAttribute('stroke-dasharray', strokeDasharray);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('vector-effect', 'non-scaling-stroke');
+        
+        svg.appendChild(path);
+        lineContainer.appendChild(svg);
+        
+        // Add label if provided
+        if (label) {
+            const labelElement = document.createElement('div');
+            labelElement.className = 'chord-line-label';
+            labelElement.textContent = label;
+            
+            // Calculate label position
+            let labelPos;
+            switch (labelPosition) {
+                case 'start':
+                    labelPos = positions[0];
+                    break;
+                case 'end':
+                    labelPos = positions[positions.length - 1];
+                    break;
+                default: // 'middle'
+                    const midIndex = Math.floor(positions.length / 2);
+                    if (positions.length % 2 === 0) {
+                        // Average of two middle points
+                        const pos1 = positions[midIndex - 1];
+                        const pos2 = positions[midIndex];
+                        labelPos = {
+                            x: (pos1.x + pos2.x) / 2,
+                            y: (pos1.y + pos2.y) / 2
+                        };
+                    } else {
+                        labelPos = positions[midIndex];
+                    }
+            }
+            
+            labelElement.style.cssText = `
+                position: absolute;
+                left: ${labelPos.x}%;
+                top: ${labelPos.y}%;
+                transform: translate(-50%, -50%);
+                background: ${labelBackgroundColor};
+                color: ${labelColor};
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: bold;
+                white-space: nowrap;
+                z-index: 13;
+                border: 1px solid ${color};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                pointer-events: none;
+            `;
+            
+            lineContainer.appendChild(labelElement);
+        }
+        
+        // Position the container relative to the fret grid
+        lineContainer.style.cssText = `
+            position: absolute;
+            top: 40px; /* Adjusted for new padding */
+            left: 40px; /* Adjusted for new padding */
+            right: 40px; /* Adjusted for new padding */
+            bottom: 60px; /* Adjusted for new padding */
+            pointer-events: none;
+            z-index: 12;
+        `;
+        
+        this.fretboardElement.appendChild(lineContainer);
+        
+        // Store line data
+        if (!this.chordLines) {
+            this.chordLines = new Map();
+        }
+        this.chordLines.set(lineId, {
+            element: lineContainer,
+            points,
+            options
+        });
+    }
+    
+    /**
+     * Remove a chord line by ID
+     */
+    removeChordLine(lineId) {
+        if (!this.chordLines) return;
+        
+        const line = this.chordLines.get(lineId);
+        if (line && line.element) {
+            line.element.remove();
+            this.chordLines.delete(lineId);
+        }
+    }
+    
+    /**
+     * Clear all chord lines
+     */
+    clearChordLines() {
+        if (!this.chordLines) return;
+        
+        this.chordLines.forEach((line, lineId) => {
+            if (line.element) {
+                line.element.remove();
+            }
+        });
+        this.chordLines.clear();
+    }
+    
+    /**
+     * Get all chord lines
+     */
+    getChordLines() {
+        if (!this.chordLines) {
+            this.chordLines = new Map();
+        }
+        return new Map(this.chordLines);
+    }
+
+    /**
+     * Search for all instances of a note on the fretboard
+     * @param {string} searchNote - The note to search for (e.g., 'C' for all C notes, 'C/4' for specific octave)
+     * @returns {Array} Array of {string, fret, note, octave} objects representing all matches
+     */
+    searchNote(searchNote) {
+        const results = [];
+        
+        // Check if searching for a specific octave or all octaves
+        const hasSpecificOctave = searchNote.includes('/');
+        let targetNoteName, targetOctave;
+        
+        if (hasSpecificOctave) {
+            targetNoteName = this.extractNoteName(searchNote);
+            targetOctave = this.extractOctave(searchNote);
+        } else {
+            targetNoteName = searchNote;
+            targetOctave = null;
+        }
+        
+        // Search through all fret positions
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const fretNote = this.calculateNote(stringNote, fret);
+                const fretNoteName = this.extractNoteName(fretNote);
+                const fretOctave = this.extractOctave(fretNote);
+                
+                let isMatch = false;
+                
+                if (hasSpecificOctave) {
+                    // Match both note name and octave
+                    isMatch = fretNoteName === targetNoteName && fretOctave === targetOctave;
+                } else {
+                    // Match note name only (any octave)
+                    isMatch = fretNoteName === targetNoteName;
+                }
+                
+                if (isMatch) {
+                    results.push({
+                        string: stringIndex,
+                        fret: fret,
+                        note: fretNote,
+                        noteName: fretNoteName,
+                        octave: fretOctave,
+                        stringName: this.tuning[stringIndex],
+                        position: `String ${stringIndex + 1}, Fret ${fret}`
+                    });
+                }
+            }
+        });
+        
+        // Sort results by string (low to high) then by fret (low to high)
+        results.sort((a, b) => {
+            if (a.string !== b.string) {
+                return a.string - b.string;
+            }
+            return a.fret - b.fret;
+        });
+        
+        return results;
+    }
+
+    /**
+     * Search for multiple notes at once
+     * @param {Array} searchNotes - Array of note names to search for
+     * @returns {Object} Object with note names as keys and arrays of positions as values
+     */
+    searchMultipleNotes(searchNotes) {
+        const results = {};
+        
+        searchNotes.forEach(note => {
+            results[note] = this.searchNote(note);
+        });
+        
+        return results;
+    }
+
+    /**
+     * Get all unique notes on the fretboard (useful for debugging or analysis)
+     * @returns {Array} Array of unique note names found on the fretboard
+     */
+    getAllUniqueNotes() {
+        const uniqueNotes = new Set();
+        
+        this.tuning.forEach((stringNote, stringIndex) => {
+            for (let fret = 0; fret <= this.fretCount; fret++) {
+                const fretNote = this.calculateNote(stringNote, fret);
+                const fretNoteName = this.extractNoteName(fretNote);
+                uniqueNotes.add(fretNoteName);
+            }
+        });
+        
+        return Array.from(uniqueNotes).sort();
+    }
+    
+    /**
+     * Draw a chord shape with both markers and connecting lines
+     * @param {string} chordId - Unique identifier for the chord
+     * @param {Array} notes - Array of {string, fret, label, color} objects
+     * @param {Object} options - Options for both markers and lines
+     */
+    drawChordShape(chordId, notes, options = {}) {
+        const {
+            markerOptions = {},
+            lineOptions = {},
+            drawLines = true,
+            clearFirst = true
+        } = options;
+        
+        if (clearFirst) {
+            this.clearMarkers();
+            this.clearChordLines();
+        }
+        
+        // Draw markers for each note
+        notes.forEach((note, index) => {
+            const {
+                string: stringIndex,
+                fret,
+                label = '',
+                backgroundColor = '#ffffff',
+                borderColor = '#ff6b35',
+                borderWidth = 3,
+                textColor = '#333333',
+                size = 28,
+                isRoot = false
+            } = { ...markerOptions, ...note };
+            
+            this.markFret(stringIndex, fret, {
+                backgroundColor,
+                borderColor,
+                borderWidth,
+                textColor,
+                size,
+                label,
+                isRoot,
+                useCustomStyle: true
+            });
+        });
+        
+        // Draw connecting lines if requested
+        if (drawLines && notes.length > 1) {
+            const linePoints = notes.map(note => ({
+                string: note.string,
+                fret: note.fret
+            }));
+            
+            this.drawChordLine(`${chordId}-shape`, linePoints, {
+                color: lineOptions.color || '#ff6b35',
+                lineWidth: lineOptions.lineWidth || 2,
+                style: lineOptions.style || 'solid',
+                opacity: lineOptions.opacity || 0.6,
+                ...lineOptions
+            });
+        }
+    }
+}
+
+// Global fretboard instances
+let fretboardInstances = new Map();
+
+// Track which fretboards are showing the current scale
+let fretboardsShowingScale = new Set();
+
+// Track which fretboards are showing chords
+let fretboardsShowingChords = new Set();
+
+// Track current chord display state
+let currentChordType = 'triads'; // 'triads' or 'sevenths'
+let currentDisplayedChord = null; // Currently displayed chord index (0-6)
+
+// Flag to prevent infinite update loops
+let isUpdatingFretboards = false;
+
+/**
+ * Create a new fretboard instance
+ */
+function createFretboard(containerId, options = {}) {
+    const fretboard = new Fretboard(containerId, options);
+    fretboardInstances.set(containerId, fretboard);
+    return fretboard;
+}
+
+/**
+ * Get an existing fretboard instance
+ */
+function getFretboard(containerId) {
+    return fretboardInstances.get(containerId);
+}
+
+/**
+ * Initialize the main fretboard in the fretNotPlaceholder
+ */
+function initializeFretboard() {
+    const mainFretboard = createFretboard('fretNotPlaceholder', {
+        showFretNumbers: true,
+        showStringNames: false
+    });
+    
+    // Create control panel
+    createFretboardControls(mainFretboard);
+    
+    return mainFretboard;
+}
+
+/**
+ * Create control buttons for the fretboard
+ */
+function createFretboardControls(fretboard) {
+    const controlsContainer = document.createElement('div');
+    controlsContainer.style.cssText = `
+        margin: 20px 0;
+        padding: 15px;
+        background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+        border-radius: 12px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #ddd;
+    `;
+    
+    const buttonStyle = `
+        padding: 10px 20px;
+        background: linear-gradient(to bottom, #4a4a4a, #333);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    `;
+    
+    const buttonHoverStyle = `
+        background: linear-gradient(to bottom, #5a5a5a, #444);
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    `;
+    
+    // Clear button
+    const clearButton = document.createElement('button');
+    clearButton.textContent = 'Clear All';
+    clearButton.style.cssText = buttonStyle;
+    clearButton.addEventListener('mouseenter', () => {
+        clearButton.style.cssText = buttonStyle + buttonHoverStyle;
+    });
+    clearButton.addEventListener('mouseleave', () => {
+        clearButton.style.cssText = buttonStyle;
+    });
+    clearButton.addEventListener('click', () => {
+        fretboard.clearMarkers();
+        fretboard.clearChordLines();
+        // Clear all tracking state
+        fretboardsShowingScale.delete(fretboard.containerId);
+        fretboardsShowingChords.delete(fretboard.containerId);
+        currentDisplayedChord = null;
+        // Update chord button styles
+        updateChordButtonStyles();
+    });
+    
+    // Show all notes button
+    const showAllButton = document.createElement('button');
+    showAllButton.textContent = 'Show All Notes';
+    showAllButton.style.cssText = buttonStyle;
+    showAllButton.addEventListener('mouseenter', () => {
+        showAllButton.style.cssText = buttonStyle + buttonHoverStyle;
+    });
+    showAllButton.addEventListener('mouseleave', () => {
+        showAllButton.style.cssText = buttonStyle;
+    });
+    showAllButton.addEventListener('click', () => {
+        fretboard.markAllNotes();
+        // Remove this fretboard from the scale tracking set since it's now showing all notes
+        fretboardsShowingScale.delete(fretboard.containerId);
+    });
+    
+    // Show current scale button
+    const showScaleButton = document.createElement('button');
+    showScaleButton.textContent = 'Show Current Scale';
+    showScaleButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #ff6b35, #e55a2b);
+    `;
+    showScaleButton.addEventListener('mouseenter', () => {
+        showScaleButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #ff7b45, #f56a3b);
+        `;
+    });
+    showScaleButton.addEventListener('mouseleave', () => {
+        showScaleButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #ff6b35, #e55a2b);
+        `;
+    });
+    showScaleButton.addEventListener('click', () => {
+        // Get current scale from the scale generator
+        try {
+            const primaryScale = getPrimaryScale();
+            if (!primaryScale) {
+                console.warn('No primary scale available');
+                return;
+            }
+            
+            const [family, mode] = primaryScale.split('-');
+            const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+            const rootNote = getPrimaryRootNote();
+            const scaleNotes = getScaleNotes(rootNote, intervals);
+            
+            fretboard.markScale(scaleNotes, rootNote);
+            
+            // Track that this fretboard is showing the current scale
+            fretboardsShowingScale.add(fretboard.containerId);
+            
+            // Set the Scale button as the current selection
+            currentDisplayedChord = 0;
+            updateChordButtonStyles();
+        } catch (error) {
+            console.warn('Could not get current scale:', error);
+            fretboard.markAllNotes(); // Fallback
+        }
+    });
+    
+    // Clear subscale boxes button
+    const clearBoxesButton = document.createElement('button');
+    clearBoxesButton.textContent = 'Clear Boxes';
+    clearBoxesButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #dc3545, #c82333);
+    `;
+    clearBoxesButton.addEventListener('mouseenter', () => {
+        clearBoxesButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #e74c3c, #d32f2f);
+        `;
+    });
+    clearBoxesButton.addEventListener('mouseleave', () => {
+        clearBoxesButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #dc3545, #c82333);
+        `;
+    });
+    clearBoxesButton.addEventListener('click', () => {
+        fretboard.clearSubscaleBoxes();
+    });
+    
+    // Demo subscale box button
+    const demoBoxButton = document.createElement('button');
+    demoBoxButton.textContent = 'Demo Box';
+    demoBoxButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #28a745, #1e7e34);
+    `;
+    demoBoxButton.addEventListener('mouseenter', () => {
+        demoBoxButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #34ce57, #2d8e47);
+        `;
+    });
+    demoBoxButton.addEventListener('mouseleave', () => {
+        demoBoxButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #28a745, #1e7e34);
+        `;
+    });
+    demoBoxButton.addEventListener('click', () => {
+        // Create a demo subscale box (3-string span, 3-fret span)
+        fretboard.drawSubscaleBox(
+            'demo-box',
+            1, // start string (B string)
+            3, // end string (D string)
+            3, // start fret
+            5, // end fret
+            {
+                color: '#ff6b35',
+                label: 'Demo Subscale',
+                labelPosition: 'bottom'
+            }
+        );
+    });
+    
+    // Mark specific note button (with input)
+    const noteInputContainer = document.createElement('div');
+    noteInputContainer.style.cssText = `
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    `;
+    
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.placeholder = 'Note (e.g., C, F#, C/4)';
+    noteInput.value = 'C';
+    noteInput.style.cssText = `
+        width: 100px;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 12px;
+    `;
+    
+    const markNoteButton = document.createElement('button');
+    markNoteButton.textContent = 'Mark Note';
+    markNoteButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #6f42c1, #5a2d91);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    markNoteButton.addEventListener('mouseenter', () => {
+        markNoteButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #7952d1, #6a3da1);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    markNoteButton.addEventListener('mouseleave', () => {
+        markNoteButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #6f42c1, #5a2d91);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    markNoteButton.addEventListener('click', () => {
+        const note = noteInput.value.trim();
+        if (note) {
+            fretboard.markNote(note, {
+                backgroundColor: '#ffffff',
+                borderColor: '#6f42c1',
+                borderWidth: 3,
+                textColor: '#333333',
+                size: 26,
+                showLabel: true
+            });
+        }
+    });
+    
+    // Demo multiple notes button
+    const demoNotesButton = document.createElement('button');
+    demoNotesButton.textContent = 'Demo C-E-G';
+    demoNotesButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #fd7e14, #e85d04);
+    `;
+    demoNotesButton.addEventListener('mouseenter', () => {
+        demoNotesButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #ff8e24, #f86e14);
+        `;
+    });
+    demoNotesButton.addEventListener('mouseleave', () => {
+        demoNotesButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #fd7e14, #e85d04);
+        `;
+    });
+    demoNotesButton.addEventListener('click', () => {
+        fretboard.markMultipleNotes([
+            {
+                note: 'C',
+                backgroundColor: '#ffffff',
+                borderColor: '#ff4444',
+                borderWidth: 4,
+                textColor: '#333333',
+                size: 28,
+                isRoot: true
+            },
+            {
+                note: 'E',
+                backgroundColor: '#ffffff',
+                borderColor: '#44ff44',
+                borderWidth: 3,
+                textColor: '#333333',
+                size: 24
+            },
+            {
+                note: 'G',
+                backgroundColor: '#ffffff',
+                borderColor: '#4444ff',
+                borderWidth: 3,
+                textColor: '#333333',
+                size: 24
+            }
+        ]);
+    });
+    
+    // Demo specific octave button
+    const demoOctaveButton = document.createElement('button');
+    demoOctaveButton.textContent = 'Demo C/3';
+    demoOctaveButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #17a2b8, #138496);
+    `;
+    demoOctaveButton.addEventListener('mouseenter', () => {
+        demoOctaveButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #27b2c8, #1494a6);
+        `;
+    });
+    demoOctaveButton.addEventListener('mouseleave', () => {
+        demoOctaveButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #17a2b8, #138496);
+        `;
+    });
+    demoOctaveButton.addEventListener('click', () => {
+        fretboard.markNote('C/3', {
+            backgroundColor: '#ffffff',
+            borderColor: '#17a2b8',
+            borderWidth: 4,
+            textColor: '#333333',
+            size: 28,
+            showLabel: true
+        });
+    });
+    
+    // Clear chord lines button
+    const clearLinesButton = document.createElement('button');
+    clearLinesButton.textContent = 'Clear Lines';
+    clearLinesButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #e83e8c, #d91a72);
+    `;
+    clearLinesButton.addEventListener('mouseenter', () => {
+        clearLinesButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #f84e9c, #e92a82);
+        `;
+    });
+    clearLinesButton.addEventListener('mouseleave', () => {
+        clearLinesButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #e83e8c, #d91a72);
+        `;
+    });
+    clearLinesButton.addEventListener('click', () => {
+        fretboard.clearChordLines();
+    });
+    
+    // Demo chord shape button
+    const demoChordButton = document.createElement('button');
+    demoChordButton.textContent = 'Demo C Chord';
+    demoChordButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #20c997, #1ea085);
+    `;
+    demoChordButton.addEventListener('mouseenter', () => {
+        demoChordButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #30d9a7, #2eb095);
+        `;
+    });
+    demoChordButton.addEventListener('mouseleave', () => {
+        demoChordButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #20c997, #1ea085);
+        `;
+    });
+    demoChordButton.addEventListener('click', () => {
+        // Demo a C major chord shape with connecting lines
+        fretboard.drawChordShape('c-major', [
+            { string: 1, fret: 1, label: 'C', borderColor: '#ff4444', isRoot: true },
+            { string: 2, fret: 0, label: 'E', borderColor: '#44ff44' },
+            { string: 3, fret: 2, label: 'G', borderColor: '#4444ff' },
+            { string: 4, fret: 2, label: 'C', borderColor: '#ff4444' },
+            { string: 5, fret: 3, label: 'E', borderColor: '#44ff44' }
+        ], {
+            markerOptions: {
+                backgroundColor: '#ffffff',
+                borderWidth: 3,
+                textColor: '#333333',
+                size: 30
+            },
+            lineOptions: {
+                color: '#20c997',
+                lineWidth: 3,
+                style: 'solid',
+                opacity: 0.7,
+                label: 'C Major'
+            }
+        });
+    });
+    
+    // Demo line pattern button
+    const demoLineButton = document.createElement('button');
+    demoLineButton.textContent = 'Demo Line';
+    demoLineButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #6610f2, #520dc2);
+    `;
+    demoLineButton.addEventListener('mouseenter', () => {
+        demoLineButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #7620f2, #621dd2);
+        `;
+    });
+    demoLineButton.addEventListener('mouseleave', () => {
+        demoLineButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #6610f2, #520dc2);
+        `;
+    });
+    demoLineButton.addEventListener('click', () => {
+        // Demo a diagonal line pattern
+        fretboard.drawChordLine('demo-line', [
+            { string: 0, fret: 3 },
+            { string: 2, fret: 5 },
+            { string: 4, fret: 7 },
+            { string: 5, fret: 10 }
+        ], {
+            color: '#6610f2',
+            lineWidth: 4,
+            style: 'dashed',
+            label: 'Scale Pattern',
+            labelPosition: 'middle',
+            opacity: 0.8
+        });
+    });
+
+    // Note search controls
+    const noteSearchContainer = document.createElement('div');
+    noteSearchContainer.style.cssText = `
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        flex-wrap: wrap;
+    `;
+
+    const searchLabel = document.createElement('span');
+    searchLabel.textContent = 'Search:';
+    searchLabel.style.cssText = `
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
+        margin-right: 4px;
+    `;
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Note search (e.g., C, F#, C/4)';
+    searchInput.value = 'C';
+    searchInput.style.cssText = `
+        width: 120px;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 12px;
+    `;
+
+    const searchButton = document.createElement('button');
+    searchButton.textContent = 'Search & Mark';
+    searchButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #17a2b8, #138496);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    searchButton.addEventListener('mouseenter', () => {
+        searchButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #27b2c8, #1494a6);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    searchButton.addEventListener('mouseleave', () => {
+        searchButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #17a2b8, #138496);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+
+    const logResultsButton = document.createElement('button');
+    logResultsButton.textContent = 'Search & Log';
+    logResultsButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #ffc107, #e0a800);
+        padding: 6px 12px;
+        font-size: 12px;
+        color: #333;
+    `;
+    logResultsButton.addEventListener('mouseenter', () => {
+        logResultsButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #ffd117, #f0b800);
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #333;
+        `;
+    });
+    logResultsButton.addEventListener('mouseleave', () => {
+        logResultsButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #ffc107, #e0a800);
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #333;
+        `;
+    });
+
+    // Search functionality
+    searchButton.addEventListener('click', () => {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+            const results = fretboard.searchNote(searchTerm);
+            console.log(`Search results for "${searchTerm}":`, results);
+            
+            if (results.length > 0) {
+                // Mark all found positions
+                fretboard.clearMarkers();
+                results.forEach((result, index) => {
+                    fretboard.markFret(result.string, result.fret, {
+                        backgroundColor: '#ffffff',
+                        borderColor: '#17a2b8',
+                        borderWidth: 3,
+                        textColor: '#333333',
+                        size: 24,
+                        label: result.noteName + (result.octave !== null ? `/${result.octave}` : ''),
+                        useCustomStyle: true
+                    });
+                });
+                
+                // Show summary in console
+                console.log(`Found ${results.length} instances of "${searchTerm}":`);
+                results.forEach((result, index) => {
+                    console.log(`  ${index + 1}. ${result.position} -> ${result.note}`);
+                });
+            } else {
+                console.log(`No instances of "${searchTerm}" found on the fretboard.`);
+            }
+        }
+    });
+
+    logResultsButton.addEventListener('click', () => {
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+            const results = fretboard.searchNote(searchTerm);
+            
+            // Create a detailed console log
+            console.group(`🎸 Note Search Results for "${searchTerm}"`);
+            console.log(`Total instances found: ${results.length}`);
+            
+            if (results.length > 0) {
+                console.table(results.map(r => ({
+                    'String': r.string + 1,
+                    'Fret': r.fret,
+                    'Full Note': r.note,
+                    'Note Name': r.noteName,
+                    'Octave': r.octave,
+                    'String Tuning': r.stringName,
+                    'Position': r.position
+                })));
+                
+                // Group by octave if multiple octaves found
+                const byOctave = {};
+                results.forEach(r => {
+                    if (!byOctave[r.octave]) byOctave[r.octave] = [];
+                    byOctave[r.octave].push(r);
+                });
+                
+                if (Object.keys(byOctave).length > 1) {
+                    console.log('\n📊 Grouped by octave:');
+                    Object.keys(byOctave).sort().forEach(octave => {
+                        console.log(`  Octave ${octave}: ${byOctave[octave].length} instances`);
+                        byOctave[octave].forEach(r => {
+                            console.log(`    • String ${r.string + 1}, Fret ${r.fret}`);
+                        });
+                    });
+                }
+                
+                // Show fret distribution
+                const byFret = {};
+                results.forEach(r => {
+                    if (!byFret[r.fret]) byFret[r.fret] = 0;
+                    byFret[r.fret]++;
+                });
+                console.log('\n🎯 Fret distribution:');
+                Object.keys(byFret).sort((a, b) => parseInt(a) - parseInt(b)).forEach(fret => {
+                    console.log(`  Fret ${fret}: ${byFret[fret]} instances`);
+                });
+            } else {
+                console.log('❌ No instances found');
+            }
+            console.groupEnd();
+        }
+    });
+
+    // Allow Enter key to trigger search
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchButton.click();
+        }
+    });
+
+    noteSearchContainer.appendChild(searchLabel);
+    noteSearchContainer.appendChild(searchInput);
+    noteSearchContainer.appendChild(searchButton);
+    noteSearchContainer.appendChild(logResultsButton);
+    
+    // Chord visualization controls
+    const chordControlsContainer = document.createElement('div');
+    chordControlsContainer.style.cssText = `
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        flex-wrap: wrap;
+    `;
+    
+    // Chord type dropdown
+    const chordTypeLabel = document.createElement('span');
+    chordTypeLabel.textContent = 'Chords:';
+    chordTypeLabel.style.cssText = `
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
+        margin-right: 4px;
+    `;
+    
+    const chordTypeSelect = document.createElement('select');
+    chordTypeSelect.innerHTML = `
+        <option value="triads">Triads</option>
+        <option value="sevenths">Sevenths</option>
+    `;
+    chordTypeSelect.style.cssText = `
+        padding: 4px 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-right: 8px;
+    `;
+    chordTypeSelect.addEventListener('change', () => {
+        currentChordType = chordTypeSelect.value;
+        // Update displayed chord if one is currently shown
+        if (currentDisplayedChord !== null && currentDisplayedChord > 0) {
+            // Only update if a chord is selected (not scale)
+            showChordOnFretboard(currentDisplayedChord - 1);
+        }
+    });
+    
+    // Roman numeral chord buttons + Scale button
+    const romanNumerals = ['Scale', 'I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+    const chordButtons = [];
+    
+    romanNumerals.forEach((numeral, index) => {
+        const chordButton = document.createElement('span');
+        chordButton.textContent = numeral;
+        chordButton.dataset.chordIndex = index;
+        chordButton.style.cssText = `
+            padding: 6px 10px;
+            background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+            color: #333;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.1s ease;
+            user-select: none;
+            display: inline-block;
+            min-width: 24px;
+            text-align: center;
+        `;
+        
+        // Hover effects
+        chordButton.addEventListener('mouseenter', () => {
+            if (currentDisplayedChord !== index) {
+                chordButton.style.background = 'linear-gradient(to bottom, #e2e6ea, #dae0e5)';
+                chordButton.style.transform = 'translateY(-1px)';
+                // Show chord or scale temporarily on hover
+                if (index === 0) {
+                    // Scale button
+                    showScaleOnFretboard(true);
+                } else {
+                    // Chord button (adjust index for chord array)
+                    showChordOnFretboard(index - 1, true);
+                }
+            }
+        });
+        
+        chordButton.addEventListener('mouseleave', () => {
+            if (currentDisplayedChord !== index) {
+                chordButton.style.background = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
+                chordButton.style.transform = 'translateY(0)';
+                // Restore previous selection
+                if (currentDisplayedChord === null) {
+                    fretboard.clearMarkers();
+                    fretboard.clearChordLines();
+                    fretboardsShowingChords.delete(fretboard.containerId);
+                    fretboardsShowingScale.delete(fretboard.containerId);
+                } else if (currentDisplayedChord === 0) {
+                    // Restore scale
+                    showScaleOnFretboard();
+                } else {
+                    // Restore chord (adjust index for chord array)
+                    showChordOnFretboard(currentDisplayedChord - 1);
+                }
+            }
+        });
+        
+        // Click to toggle chord/scale display
+        chordButton.addEventListener('click', () => {
+            if (currentDisplayedChord === index) {
+                // If this option is already displayed, clear it
+                currentDisplayedChord = null;
+                fretboard.clearMarkers();
+                fretboard.clearChordLines();
+                fretboardsShowingChords.delete(fretboard.containerId);
+                fretboardsShowingScale.delete(fretboard.containerId);
+                updateChordButtonStyles();
+            } else {
+                // Display this option
+                currentDisplayedChord = index;
+                if (index === 0) {
+                    // Scale button
+                    showScaleOnFretboard();
+                } else {
+                    // Chord button (adjust index for chord array)
+                    showChordOnFretboard(index - 1);
+                }
+                updateChordButtonStyles();
+            }
+        });
+        
+        chordButtons.push(chordButton);
+        chordControlsContainer.appendChild(chordButton);
+    });
+    
+    chordControlsContainer.appendChild(chordTypeLabel);
+    chordControlsContainer.appendChild(chordTypeSelect);
+    
+    noteInputContainer.appendChild(noteInput);
+    noteInputContainer.appendChild(markNoteButton);
+    
+    controlsContainer.appendChild(clearButton);
+    controlsContainer.appendChild(showAllButton);
+    controlsContainer.appendChild(showScaleButton);
+    controlsContainer.appendChild(chordControlsContainer);
+    controlsContainer.appendChild(noteSearchContainer);
+    controlsContainer.appendChild(clearBoxesButton);
+    controlsContainer.appendChild(clearLinesButton);
+    controlsContainer.appendChild(demoBoxButton);
+    controlsContainer.appendChild(noteInputContainer);
+    controlsContainer.appendChild(demoNotesButton);
+    controlsContainer.appendChild(demoOctaveButton);
+    controlsContainer.appendChild(demoChordButton);
+    controlsContainer.appendChild(demoLineButton);
+    
+    // Insert controls before the fretboard
+    fretboard.container.insertBefore(controlsContainer, fretboard.fretboardElement);
+}
+
+/**
+ * Helper function to show chord on fretboard
+ */
+function showChordOnFretboard(chordIndex, isTemporary = false) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) return;
+    
+    try {
+        const primaryScale = getPrimaryScale();
+        const rootNote = getPrimaryRootNote();
+        
+        if (!primaryScale || !rootNote) {
+            console.warn('No primary scale or root note available');
+            return;
+        }
+        
+        // Get scale intervals
+        const [family, mode] = primaryScale.split('-');
+        const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+        
+        // Generate chords
+        const chordLength = currentChordType === 'sevenths' ? 4 : 3;
+        const syntheticChords = generateSyntheticChords({ intervals }, chordLength, rootNote);
+        
+        if (chordIndex >= 0 && chordIndex < syntheticChords.length) {
+            const chord = syntheticChords[chordIndex];
+            const romanNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+            const chordName = `${romanNumerals[chordIndex]} (${currentChordType})`;
+            
+            fretboard.displayChord(chord, chordName, {
+                clearFirst: true,
+                showLines: false
+            });
+        }
+    } catch (error) {
+        console.warn('Could not generate chord:', error);
+    }
+}
+
+/**
+ * Helper function to show scale on fretboard
+ */
+function showScaleOnFretboard(isTemporary = false) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) return;
+    
+    try {
+        const primaryScale = getPrimaryScale();
+        const rootNote = getPrimaryRootNote();
+        
+        if (!primaryScale || !rootNote) {
+            console.warn('No primary scale or root note available');
+            return;
+        }
+        
+        const [family, mode] = primaryScale.split('-');
+        const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+        const scaleNotes = getScaleNotes(rootNote, intervals);
+        
+        // Clear markers and lines first to prevent overlap
+        fretboard.clearMarkers();
+        fretboard.clearChordLines();
+        
+        fretboard.markScale(scaleNotes, rootNote);
+        
+        if (!isTemporary) {
+            // Add to scale tracking only if this is a permanent selection
+            fretboardsShowingScale.add(fretboard.containerId);
+            fretboardsShowingChords.delete(fretboard.containerId);
+        }
+    } catch (error) {
+        console.warn('Could not show scale:', error);
+    }
+}
+
+/**
+ * Helper function to update chord button styles
+ */
+function updateChordButtonStyles() {
+    const chordButtons = document.querySelectorAll('[data-chord-index]');
+    chordButtons.forEach((button, index) => {
+        const chordIndex = parseInt(button.dataset.chordIndex);
+        if (currentDisplayedChord === chordIndex) {
+            button.style.background = 'linear-gradient(to bottom, #007bff, #0056b3)';
+            button.style.color = 'white';
+            button.style.borderColor = '#0056b3';
+        } else {
+            button.style.background = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
+            button.style.color = '#333';
+            button.style.borderColor = '#dee2e6';
+        }
+    });
+}
+
+/**
+ * Update all fretboards that are currently showing the scale
+ * This function should be called whenever the primary scale changes
+ */
+function updateFretboardsForScaleChange(scaleData) {
+    if ((fretboardsShowingScale.size === 0 && fretboardsShowingChords.size === 0) || isUpdatingFretboards) return;
+    
+    try {
+        isUpdatingFretboards = true;
+        
+        const { primaryScale, rootNote, scaleNotes } = scaleData;
+        
+        if (!primaryScale || !rootNote || !scaleNotes) {
+            console.warn('Invalid scale data for fretboard update');
+            return;
+        }
+        
+        console.log(`Updating fretboards for scale change: ${rootNote} ${primaryScale}`);
+        
+        // Update all fretboards that are showing the scale
+        fretboardsShowingScale.forEach(containerId => {
+            const fretboard = fretboardInstances.get(containerId);
+            if (fretboard) {
+                fretboard.markScale(scaleNotes, rootNote);
+            }
+        });
+        
+        // Update all fretboards that are showing chords
+        fretboardsShowingChords.forEach(containerId => {
+            const fretboard = fretboardInstances.get(containerId);
+            if (fretboard && currentDisplayedChord !== null) {
+                // Re-generate and display the current chord with new scale
+                try {
+                    if (currentDisplayedChord === 0) {
+                        // Scale is selected, show scale
+                        showScaleOnFretboard();
+                    } else {
+                        // Chord is selected (adjust index for chord array)
+                        const [family, mode] = primaryScale.split('-');
+                        const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+                        const chordLength = currentChordType === 'sevenths' ? 4 : 3;
+                        const syntheticChords = generateSyntheticChords({ intervals }, chordLength, rootNote);
+                        
+                        const chordIndex = currentDisplayedChord - 1;
+                        if (chordIndex >= 0 && chordIndex < syntheticChords.length) {
+                            const chord = syntheticChords[chordIndex];
+                            const romanNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+                            const chordName = `${romanNumerals[chordIndex]} (${currentChordType})`;
+                            
+                            fretboard.displayChord(chord, chordName, {
+                                clearFirst: true,
+                                showLines: false
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Could not update chord for scale change:', error);
+                }
+            }
+        });
+    } catch (error) {
+        console.warn('Could not update fretboards for scale change:', error);
+    } finally {
+        isUpdatingFretboards = false;
+    }
+}
+
+// Listen for scale change events from the scale generator
+let lastScaleUpdateTime = 0;
+window.addEventListener('scaleChanged', (event) => {
+    // Debounce the updates to prevent rapid-fire events
+    const now = Date.now();
+    if (now - lastScaleUpdateTime < 50) { // Minimum 50ms between updates
+        return;
+    }
+    lastScaleUpdateTime = now;
+    
+    updateFretboardsForScaleChange(event.detail);
+});
+
+/**
+ * Global note search function - searches the main fretboard for a note
+ * @param {string} note - Note to search for (e.g., 'C', 'F#', 'C/4')
+ * @returns {Array} Array of position objects
+ */
+function searchFretboardNote(note) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return [];
+    }
+    return fretboard.searchNote(note);
+}
+
+/**
+ * Global function to search for multiple notes at once
+ * @param {Array} notes - Array of note names to search for
+ * @returns {Object} Object with note names as keys and position arrays as values
+ */
+function searchFretboardNotes(notes) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return {};
+    }
+    return fretboard.searchMultipleNotes(notes);
+}
+
+/**
+ * Quick search and mark function for console use
+ * @param {string} note - Note to search for and mark
+ * @param {Object} options - Optional styling options
+ */
+function quickSearchAndMark(note, options = {}) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return;
+    }
+    
+    const results = fretboard.searchNote(note);
+    console.log(`Found ${results.length} instances of "${note}":`, results);
+    
+    if (results.length > 0) {
+        fretboard.clearMarkers();
+        const defaultOptions = {
+            backgroundColor: '#ffffff',
+            borderColor: '#17a2b8',
+            borderWidth: 3,
+            textColor: '#333333',
+            size: 24,
+            useCustomStyle: true
+        };
+        
+        results.forEach(result => {
+            fretboard.markFret(result.string, result.fret, {
+                ...defaultOptions,
+                ...options,
+                label: result.noteName + (result.octave !== null ? `/${result.octave}` : '')
+            });
+        });
+    }
+    
+    return results;
+}
+
+/**
+ * Get all unique notes available on the fretboard
+ * @returns {Array} Array of unique note names
+ */
+function getFretboardNotes() {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return [];
+    }
+    return fretboard.getAllUniqueNotes();
+}
+
+/**
+ * Analyze note distribution on the fretboard
+ * @param {string} note - Note to analyze (optional, analyzes all if not provided)
+ */
+function analyzeFretboardNotes(note = null) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return;
+    }
+    
+    if (note) {
+        // Analyze specific note
+        const results = fretboard.searchNote(note);
+        console.group(`🎸 Analysis for note "${note}"`);
+        console.log(`Total instances: ${results.length}`);
+        
+        if (results.length > 0) {
+            // Fret distribution
+            const fretDist = {};
+            results.forEach(r => fretDist[r.fret] = (fretDist[r.fret] || 0) + 1);
+            console.log('Fret distribution:', fretDist);
+            
+            // String distribution
+            const stringDist = {};
+            results.forEach(r => stringDist[`String ${r.string + 1}`] = (stringDist[`String ${r.string + 1}`] || 0) + 1);
+            console.log('String distribution:', stringDist);
+            
+            // Octave distribution
+            const octaveDist = {};
+            results.forEach(r => octaveDist[`Octave ${r.octave}`] = (octaveDist[`Octave ${r.octave}`] || 0) + 1);
+            console.log('Octave distribution:', octaveDist);
+        }
+        console.groupEnd();
+    } else {
+        // Analyze all notes
+        const allNotes = fretboard.getAllUniqueNotes();
+        console.group('🎸 Complete Fretboard Analysis');
+        console.log(`Total unique notes: ${allNotes.length}`);
+        console.log('Available notes:', allNotes);
+        
+        const noteDistribution = {};
+        allNotes.forEach(noteName => {
+            const count = fretboard.searchNote(noteName).length;
+            noteDistribution[noteName] = count;
+        });
+        
+        console.log('Note frequency distribution:');
+        console.table(noteDistribution);
+        console.groupEnd();
+    }
+}
+
+/**
+ * Helper function to create common subscale box patterns
+ */
+function createSubscaleBoxPattern(fretboard, patternType, startFret, options = {}) {
+    const patterns = {
+        'pentatonic-box1': { strings: [0, 2], frets: 3, label: 'Pentatonic Box 1' },
+        'pentatonic-box2': { strings: [1, 3], frets: 3, label: 'Pentatonic Box 2' },
+        'major-scale-position1': { strings: [0, 4], frets: 4, label: 'Major Scale Pos 1' },
+        'minor-scale-position1': { strings: [0, 4], frets: 4, label: 'Minor Scale Pos 1' },
+        'chord-shape': { strings: [1, 2], frets: 2, label: 'Chord Shape' },
+        'three-string-run': { strings: [2, 4], frets: 3, label: 'Three String Run' },
+        'full-neck': { strings: [0, 5], frets: 12, label: 'Full Neck' }
+    };
+    
+    const pattern = patterns[patternType];
+    if (!pattern) {
+        console.warn(`Unknown pattern type: ${patternType}`);
+        return false;
+    }
+    
+    const endFret = Math.min(startFret + pattern.frets, 15);
+    const mergedOptions = {
+        label: pattern.label,
+        labelPosition: 'bottom',
+        color: '#ff6b35',
+        ...options
+    };
+    
+    fretboard.drawSubscaleBox(
+        `${patternType}-${startFret}`,
+        pattern.strings[0],
+        pattern.strings[1],
+        startFret,
+        endFret,
+        mergedOptions
+    );
+    
+    return true;
+}
+
+// Export the main functions
+export {
+    Fretboard,
+    createFretboard,
+    getFretboard,
+    initializeFretboard,
+    createSubscaleBoxPattern,
+    searchFretboardNote,
+    searchFretboardNotes,
+    quickSearchAndMark,
+    getFretboardNotes,
+    analyzeFretboardNotes,
+    GUITAR_TUNING,
+    SCALE_COLORS
+};
+
+
+
+// Initialize Fretboard
+let mainFretboard = null;
+try {
+    mainFretboard = initializeFretboard();
+    console.log('Fretboard initialized successfully');
+} catch (error) {
+    console.warn('Failed to initialize fretboard:', error);
+}
+
+// Make fretboard globally accessible for other modules
+window.mainFretboard = mainFretboard;
+
+// Make search functions globally accessible for console use
+window.searchFretboardNote = searchFretboardNote;
+window.searchFretboardNotes = searchFretboardNotes;
+window.quickSearchAndMark = quickSearchAndMark;
+window.getFretboardNotes = getFretboardNotes;
+window.analyzeFretboardNotes = analyzeFretboardNotes;

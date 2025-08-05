@@ -146,6 +146,16 @@ function updateCurrentScaleDisplay() {
         refreshProgressionDisplay();
     }
 
+    // Notify fretboards about scale changes via custom event
+    const scaleChangeEvent = new CustomEvent('scaleChanged', {
+        detail: {
+            primaryScale: getPrimaryScale(),
+            rootNote: getPrimaryRootNote(),
+            scaleNotes: scaleNotes
+        }
+    });
+    window.dispatchEvent(scaleChangeEvent);
+
     // let scale = scales[family][parseInt(mode, 10) - 1];
     // console.log("Current Scale:", scaleName, "Root Note:", rootNote);
     // console.log("Scale Notes:", scaleNotes);

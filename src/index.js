@@ -12,6 +12,7 @@ import {chords, processedChords, highlightKeysForChords, createChordRootNoteTabl
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
 import {modifiers, keyToNote} from './keyboard';
+import {initializeFretboard} from './frets';
 import './staves'; // Import stave functions - functions will be available on window object
 import { context,
     masterVolume,
@@ -230,6 +231,7 @@ updateCrossReferenceDisplay();
 // Export the update function so other modules can call it when selections change
 window.updateCrossReferenceDisplay = updateCrossReferenceDisplay;
 window.createScaleChordCrossReference = createScaleChordCrossReference;
+
 
 // Initialize Interval Practice Interface - now handled by React component
 // initializeIntervalPractice();
