@@ -9,7 +9,7 @@ let HeptatonicScales = {
         {'name': 'Ionian', 'intervals': ['W', 'W', 'H', 'W', 'W', 'W', 'H'], 'alternativeNames': ['Ionian', 'Major']},
         {'name': 'Dorian', 'intervals': ['W', 'H', 'W', 'W', 'W', 'H', 'W'], 'alternativeNames': ['Dorian']},
         {'name': 'Phrygian', 'intervals': ['H', 'W', 'W', 'W', 'H', 'W', 'W'], 'alternativeNames': ['Phrygian']},
-        {'name': 'Lydian', 'intervals': ['W', 'W', 'W', 'H', 'W', 'H', 'W'], 'alternativeNames': ['Lydian']},
+        {'name': 'Lydian', 'intervals':   ['W', 'W', 'W', 'H', 'W', 'W', 'H'], 'alternativeNames': ['Lydian']},
         {'name': 'Mixolydian', 'intervals': ['W', 'W', 'H', 'W', 'W', 'H', 'W'], 'alternativeNames': ['Mixolydian']},
         {'name': 'Aeolian', 'intervals': ['W', 'H', 'W', 'W', 'H', 'W', 'W'], 'alternativeNames': ['Aeolian', 'Natural Minor']},
         {'name': 'Locrian', 'intervals': ['H', 'W', 'W', 'H', 'W', 'W', 'W'], 'alternativeNames': ['Locrian']}

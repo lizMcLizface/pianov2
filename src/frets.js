@@ -179,8 +179,8 @@ class Fretboard {
         fretNumberRow.style.cssText = `
             position: absolute;
             bottom: 10px; /* Position within the container padding */
-            left: ${this.showStringNames ? '60px' : '40px'};
-            right: 40px;
+            left: 40px; /* Match fret grid left margin exactly */
+            right: 60px; /* Match fret grid right margin exactly */
             z-index: 10;
         `;
         
@@ -203,13 +203,13 @@ class Fretboard {
         `;
         fretNumberRow.appendChild(nutLabel);
         
-        // Add labels for each fret aligned with fret wires
+        // Add labels for each fret aligned with fret markers (center of fret spaces)
         for (let fret = 1; fret <= this.fretCount; fret++) {
             const fretLabel = document.createElement('div');
             fretLabel.textContent = fret.toString();
             
-            // Position label directly under each fret wire
-            const fretPosition = this.fretPositions[fret];
+            // Position label to align with fret markers (center of fret space)
+            const fretPosition = this.calculateFretPosition(fret);
             
             fretLabel.style.cssText = `
                 position: absolute;
