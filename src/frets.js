@@ -6,7 +6,7 @@ import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from '
 
 // Standard guitar tuning (lowest to highest strings) - displayed from top to bottom
 const GUITAR_TUNING = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
-const FRET_COUNT = 15; // Number of frets to display
+const FRET_COUNT = 21; // Number of frets to display
 
 // Calculate fret positions using the rule of 18 (each fret divides remaining string length by 18)
 function calculateFretPositions(fretCount) {
@@ -551,7 +551,7 @@ class Fretboard {
             `[data-string="${stringIndex}"][data-fret="${fret}"]`
         );
         
-        console.log(`Marking fret ${fret} on string ${stringIndex} with key ${key} -> `, fretElement);
+        // console.log(`Marking fret ${fret} on string ${stringIndex} with key ${key} -> `, fretElement);
         if (!fretElement) return;
         
         const {
@@ -563,7 +563,8 @@ class Fretboard {
             backgroundColor = '#ffffff',
             borderColor = '#ff4444',
             borderWidth = 3,
-            size = 26
+            size = 26,
+            disableAnimation = false
         } = options;
         
         // Remove any existing marker
@@ -601,7 +602,7 @@ class Fretboard {
                 border: ${borderWidthPx}px solid ${borderColor};
                 box-shadow: 0 ${Math.floor(markerSize * 0.15)}px ${Math.floor(markerSize * 0.3)}px rgba(0,0,0,0.4);
                 z-index: 15;
-                ${isRoot ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
+                ${(isRoot && !disableAnimation) ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
             `;
         } else {
             // Use the original styling system
@@ -623,7 +624,7 @@ class Fretboard {
                 border: ${isRoot ? '3px solid rgba(255,255,255,0.6)' : '2px solid rgba(255,255,255,0.3)'};
                 box-shadow: 0 ${isRoot ? '3px 8px' : '2px 6px'} rgba(0,0,0,0.4);
                 z-index: 15;
-                ${isRoot ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
+                ${(isRoot && !disableAnimation) ? 'animation: rootPulse 2s infinite ease-in-out;' : ''}
             `;
         }
         
@@ -637,9 +638,10 @@ class Fretboard {
             backgroundColor, 
             borderColor, 
             borderWidth, 
-            size 
+            size,
+            disableAnimation
         });
-        console.log(`Marked fret ${fret} on string ${stringIndex} with key ${key}`);
+        // console.log(`Marked fret ${fret} on string ${stringIndex} with key ${key}`);
     }
     
     /**
@@ -814,7 +816,8 @@ class Fretboard {
             backgroundColor = '#ffffff',
             textColor = '#333333',
             borderWidth = 3,
-            size = 28
+            size = 28,
+            showScaleContext = true
         } = options;
         
         if (clearFirst) {
@@ -822,11 +825,49 @@ class Fretboard {
             this.clearChordLines();
         }
         
+        // First, mark all scale notes as grey background if scale context is enabled
+        if (showScaleContext) {
+            try {
+                const primaryScale = getPrimaryScale();
+                const rootNote = getPrimaryRootNote();
+                
+                if (primaryScale && rootNote) {
+                    const [family, mode] = primaryScale.split('-');
+                    const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+                    const scaleNotes = getScaleNotes(rootNote, intervals);
+                    const normalizedScaleNotes = scaleNotes.map(note => this.extractNoteName(note));
+                    
+                    // Mark all scale notes with subtle grey markers (no labels)
+                    this.tuning.forEach((stringNote, stringIndex) => {
+                        for (let fret = 0; fret <= this.fretCount; fret++) {
+                            const note = this.calculateNote(stringNote, fret);
+                            const noteName = this.extractNoteName(note);
+                            
+                            if (normalizedScaleNotes.includes(noteName)) {
+                                this.markFret(stringIndex, fret, {
+                                    backgroundColor: '#f8f9fa',
+                                    borderColor: '#dee2e6',
+                                    borderWidth: 1,
+                                    textColor: '#6c757d',
+                                    size: 20,
+                                    label: '', // No label for context markers
+                                    isRoot: false,
+                                    useCustomStyle: true
+                                });
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not add scale context to chord display:', error);
+            }
+        }
+        
         // Color mapping for chord tones
         const colorMap = [rootColor, thirdColor, fifthColor, seventhColor];
         const roleNames = ['Root', '3rd', '5th', '7th'];
         
-        // Find all positions for each chord tone
+        // Find all positions for each chord tone and mark them with prominent colors
         const chordPositions = [];
         
         chordNotes.forEach((note, index) => {
@@ -834,6 +875,7 @@ class Fretboard {
             const positions = this.findNotePositions(noteName);
             
             positions.forEach(pos => {
+                // Override any existing marker (including scale context markers) with chord tone marker
                 this.markFret(pos.string, pos.fret, {
                     backgroundColor,
                     borderColor: colorMap[index % colorMap.length],
@@ -842,7 +884,8 @@ class Fretboard {
                     size: index === 0 ? size + 2 : size, // Root gets slightly larger
                     label: noteName,
                     isRoot: index === 0,
-                    useCustomStyle: true
+                    useCustomStyle: true,
+                    disableAnimation: true  // Disable animation for chord display
                 });
                 
                 // Store position for potential line drawing
@@ -1511,6 +1554,441 @@ class Fretboard {
             });
         }
     }
+
+    /**
+     * Define chord patterns based on string positions and fret offsets
+     * Each pattern defines fingering relative to the root position
+     */
+    static getChordPatterns() {
+        return {
+            // Major chord patterns
+            'major_A_string': {
+                name: 'Major (A String Root)',
+                description: 'Major chord with root on A string',
+                rootString: 4, // A string (0-indexed from high E)
+                notes: [
+                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
+                    { string: 3, fretOffset: 2, interval: 3, label: '3' }, // Major 3rd on D string
+                    { string: 2, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on G string
+                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root on B string
+                    { string: 0, fretOffset: 0, interval: 3, label: '3' }  // Major 3rd on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+            
+            'major_E_string': {
+                name: 'Major (E String Root)',
+                description: 'Major chord with root on low E string',
+                rootString: 5, // Low E string
+                notes: [
+                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
+                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on A string
+                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root on D string
+                    { string: 2, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd on G string
+                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th on B string
+                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            'major_open_C': {
+                name: 'C Major Open',
+                description: 'Open C major chord',
+                rootString: 4, // A string where C is on 3rd fret
+                notes: [
+                    { string: 4, fretOffset: 0, interval: 1, label: 'C' }, // C on A string 3rd fret
+                    { string: 3, fretOffset: -1, interval: 5, label: 'G' }, // G on D string 2nd fret  
+                    { string: 2, fretOffset: -3, interval: 1, label: 'C' }, // C on G string open
+                    { string: 1, fretOffset: -2, interval: 3, label: 'E' }, // E on B string 1st fret
+                    { string: 0, fretOffset: -3, interval: 1, label: 'C' }  // C on high E string open
+                ],
+                openVoicingOnly: true,
+                fixedPosition: 3, // Only works when root is on 3rd fret of A string
+                minFret: 3,
+                maxFret: 3
+            },
+
+            'major_open_G': {
+                name: 'G Major Open',
+                description: 'Open G major chord',
+                rootString: 5, // Low E string where G is on 3rd fret
+                notes: [
+                    { string: 5, fretOffset: 0, interval: 1, label: 'G' }, // G on low E string 3rd fret
+                    { string: 4, fretOffset: -1, interval: 5, label: 'D' }, // D on A string 2nd fret
+                    { string: 3, fretOffset: -3, interval: 1, label: 'G' }, // G on D string open
+                    { string: 2, fretOffset: -3, interval: 3, label: 'B' }, // B on G string open
+                    { string: 1, fretOffset: 0, interval: 5, label: 'D' }, // D on B string 3rd fret
+                    { string: 0, fretOffset: 0, interval: 1, label: 'G' }  // G on high E string 3rd fret
+                ],
+                openVoicingOnly: true,
+                fixedPosition: 3,
+                minFret: 3,
+                maxFret: 3
+            },
+
+            // Minor chord patterns
+            'minor_A_string': {
+                name: 'Minor (A String Root)',
+                description: 'Minor chord with root on A string',
+                rootString: 4,
+                notes: [
+                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
+                    { string: 3, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on D string
+                    { string: 2, fretOffset: 1, interval: 'b3', label: 'b3' }, // Minor 3rd on G string
+                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root on B string
+                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            'minor_E_string': {
+                name: 'Minor (E String Root)',
+                description: 'Minor chord with root on low E string',
+                rootString: 5,
+                notes: [
+                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
+                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on A string
+                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root on D string
+                    { string: 2, fretOffset: 0, interval: 'b3', label: 'b3' }, // Minor 3rd on G string
+                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th on B string
+                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            // Dominant 7th patterns
+            'dominant7_A_string': {
+                name: 'Dominant 7th (A String Root)',
+                description: 'Dominant 7th chord with root on A string',
+                rootString: 4,
+                notes: [
+                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
+                    { string: 3, fretOffset: 0, interval: 'b7', label: 'b7' }, // Flat 7th
+                    { string: 2, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th
+                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root
+                    { string: 0, fretOffset: 0, interval: 3, label: '3' }  // Major 3rd
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            'dominant7_E_string': {
+                name: 'Dominant 7th (E String Root)',
+                description: 'Dominant 7th chord with root on low E string',
+                rootString: 5,
+                notes: [
+                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
+                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th
+                    { string: 3, fretOffset: 0, interval: 'b7', label: 'b7' }, // Flat 7th
+                    { string: 2, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd
+                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th
+                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            // Diminished patterns (for vii° chord)
+            'diminished_A_string': {
+                name: 'Diminished (A String Root)',
+                description: 'Diminished chord with root on A string',
+                rootString: 4,
+                notes: [
+                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
+                    { string: 3, fretOffset: 1, interval: 'b3', label: 'b3' }, // Minor 3rd
+                    { string: 2, fretOffset: 1, interval: 'b5', label: 'b5' }, // Diminished 5th
+                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }  // Root
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            'diminished_E_string': {
+                name: 'Diminished (E String Root)',
+                description: 'Diminished chord with root on low E string',
+                rootString: 5,
+                notes: [
+                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
+                    { string: 4, fretOffset: 1, interval: 'b5', label: 'b5' }, // Diminished 5th
+                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root
+                    { string: 2, fretOffset: 0, interval: 'b3', label: 'b3' } // Minor 3rd
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            // Simplified 3-string patterns for easier visualization
+            'major_simple_high': {
+                name: 'Major Simple (High Strings)',
+                description: 'Simple major chord on high 3 strings',
+                rootString: 2, // G string
+                notes: [
+                    { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
+                    { string: 1, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd on B string
+                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            'minor_simple_high': {
+                name: 'Minor Simple (High Strings)',
+                description: 'Simple minor chord on high 3 strings',
+                rootString: 2, // G string
+                notes: [
+                    { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
+                    { string: 1, fretOffset: 0, interval: 'b3', label: 'b3' }, // Minor 3rd on B string
+                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
+                ],
+                openVoicingOnly: false,
+                minFret: 1,
+                maxFret: 12
+            },
+
+            // Add more patterns as needed...
+        };
+    }
+
+    /**
+     * Calculate the actual fret positions for a chord pattern at a given root position
+     * @param {Object} pattern - The chord pattern definition
+     * @param {number} rootFret - The fret where the root note should be placed
+     * @returns {Array|null} Array of {string, fret, interval, label} objects or null if invalid
+     */
+    calculateChordPatternPositions(pattern, rootFret) {
+        const positions = [];
+        
+        // Check if this pattern is restricted to open voicing
+        if (pattern.openVoicingOnly && pattern.fixedPosition !== undefined) {
+            if (rootFret !== pattern.fixedPosition) {
+                return null; // Pattern only works at fixed position
+            }
+        }
+        
+        // Check fret range constraints
+        if (rootFret < pattern.minFret || rootFret > pattern.maxFret) {
+            return null;
+        }
+        
+        // Calculate positions for each note in the pattern
+        for (const note of pattern.notes) {
+            const actualFret = rootFret + note.fretOffset;
+            
+            // Check if fret is valid (0-15 range)
+            if (actualFret < 0 || actualFret > this.fretCount) {
+                continue; // Skip invalid fret positions
+            }
+            
+            positions.push({
+                string: note.string,
+                fret: actualFret,
+                interval: note.interval,
+                label: note.label
+            });
+        }
+        
+        return positions.length > 0 ? positions : null;
+    }
+
+    /**
+     * Find all possible chord pattern matches for given chord notes
+     * @param {Array} chordNotes - Array of note names that make up the chord
+     * @param {string} rootNote - The root note of the chord
+     * @param {Array} patternNames - Optional array of specific pattern names to check
+     * @returns {Array} Array of matching pattern results
+     */
+    findChordPatternMatches(chordNotes, rootNote, patternNames = null) {
+        const patterns = Fretboard.getChordPatterns();
+        const matches = [];
+        
+        // Convert chord notes to a set for easy lookup
+        const chordNoteSet = new Set(chordNotes.map(note => this.extractNoteName(note)));
+        
+        // Extract just the note name from the root note (remove octave)
+        const rootNoteName = this.extractNoteName(rootNote);
+        
+        // Check each pattern (or only specified patterns)
+        const patternsToCheck = patternNames ? 
+            patternNames.filter(name => patterns[name]).map(name => ({name, pattern: patterns[name]})) :
+            Object.entries(patterns).map(([name, pattern]) => ({name, pattern}));
+        
+        for (const {name, pattern} of patternsToCheck) {
+            console.log(`Checking pattern: ${name} for root note: ${rootNoteName} (all octaves)`);
+            // Find ALL positions of the root note (all octaves) for this pattern
+            const rootPositions = this.findNotePositions(rootNoteName);
+            
+            for (const rootPos of rootPositions) {
+                // Only check positions on the pattern's root string
+                if (rootPos.string !== pattern.rootString) {
+                    console.log(`Skipping pattern ${name} for root ${rootNoteName} at ${rootPos.string}:${rootPos.fret} - root string mismatch (expected string ${pattern.rootString})`);
+                    continue;
+                }
+                
+                console.log(`Testing pattern ${name} with root ${rootNoteName} at string ${rootPos.string}, fret ${rootPos.fret}`);
+                
+                const positions = this.calculateChordPatternPositions(pattern, rootPos.fret);
+                if (!positions) {
+                    console.log(`Skipping pattern ${name} for root ${rootNoteName} at fret ${rootPos.fret} - invalid positions`);
+                    continue;
+                }
+                
+                // Check if all pattern notes match the chord
+                let isValidMatch = true;
+                const patternNotes = [];
+                
+                for (const pos of positions) {
+                    const noteAtPosition = this.getNoteAt(pos.string, pos.fret);
+                    if (noteAtPosition) {
+                        console.log(`Found note ${noteAtPosition} at position ${pos.string}:${pos.fret}`);
+                        const noteName = this.extractNoteName(noteAtPosition);
+                        patternNotes.push(noteName);
+                        
+                        // Check if this note is in the chord
+                        if (!chordNoteSet.has(noteName)) {
+                            isValidMatch = false;
+                            console.log(`Pattern ${name} for root ${rootNoteName} at fret ${rootPos.fret} - note ${noteName} not in chord [${Array.from(chordNoteSet).join(', ')}]`);
+                            break;
+                        }
+                    } else {
+                        console.log(`Pattern ${name} - no note found at string ${pos.string}, fret ${pos.fret}`);
+                        isValidMatch = false;
+                        break;
+                    }
+                }
+                
+                if (isValidMatch && patternNotes.length > 0) {
+                    matches.push({
+                        patternName: name,
+                        pattern: pattern,
+                        rootPosition: rootPos,
+                        positions: positions,
+                        patternNotes: patternNotes
+                    });
+                }
+            }
+        }
+        
+        return matches;
+    }
+
+    /**
+     * Display a chord using pattern matching
+     * @param {Array} chordNotes - Array of note names that make up the chord
+     * @param {string} rootNote - The root note of the chord
+     * @param {Object} options - Display options
+     */
+    displayChordWithPatterns(chordNotes, rootNote, options = {}) {
+        const {
+            clearFirst = true,
+            showAllMatches = false,
+            preferredPatterns = null,
+            markerOptions = {},
+            lineOptions = {},
+            drawLines = true,
+            highlightRoot = true
+        } = options;
+        
+        if (clearFirst) {
+            this.clearMarkers();
+            this.clearChordLines();
+        }
+        
+        console.log('chord notes:', chordNotes)
+        // Find pattern matches
+        const matches = this.findChordPatternMatches(chordNotes, rootNote, preferredPatterns);
+        
+        if (matches.length === 0) {
+            console.log(`No chord patterns found for ${rootNote} chord with notes: ${chordNotes.join(', ')}`);
+            return;
+        }
+        
+        // Use the first match (or all matches if showAllMatches is true)
+        const matchesToDisplay = showAllMatches ? matches : [matches[0]];
+        
+        for (const match of matchesToDisplay) {
+            const patternId = `pattern-${match.patternName}-${match.rootPosition.fret}`;
+            
+            // Create markers for each position
+            const markerPositions = match.positions.map(pos => {
+                const noteAtPos = this.getNoteAt(pos.string, pos.fret);
+                const isRoot = this.extractNoteName(noteAtPos) === this.extractNoteName(rootNote);
+                
+                return {
+                    string: pos.string,
+                    fret: pos.fret,
+                    label: pos.label,
+                    backgroundColor: markerOptions.backgroundColor || '#ffffff',
+                    borderColor: isRoot && highlightRoot ? 
+                        (markerOptions.rootColor || '#ff4444') : 
+                        (markerOptions.borderColor || '#ff6b35'),
+                    borderWidth: isRoot && highlightRoot ? 4 : 3,
+                    textColor: markerOptions.textColor || '#333333',
+                    size: isRoot && highlightRoot ? 30 : 26,
+                    isRoot: isRoot,
+                    ...markerOptions
+                };
+            });
+            
+            // Draw the chord shape
+            this.drawChordShape(patternId, markerPositions, {
+                markerOptions: markerOptions,
+                lineOptions: {
+                    color: lineOptions.color || '#ff6b35',
+                    lineWidth: lineOptions.lineWidth || 2,
+                    style: lineOptions.style || 'solid',
+                    opacity: lineOptions.opacity || 0.6,
+                    label: `${match.pattern.name}`,
+                    ...lineOptions
+                },
+                drawLines: drawLines,
+                clearFirst: false // Already cleared above
+            });
+            
+            console.log(`Displaying chord pattern: ${match.pattern.name} at fret ${match.rootPosition.fret}`);
+        }
+        
+        return matches;
+    }
+
+    /**
+     * Get all available chord patterns for a specific chord type
+     * @param {string} chordType - Type of chord (e.g., 'major', 'minor', 'dominant7')
+     * @returns {Array} Array of pattern names matching the chord type
+     */
+    getPatternsByChordType(chordType) {
+        const patterns = Fretboard.getChordPatterns();
+        return Object.keys(patterns).filter(name => name.includes(chordType));
+    }
+
+    /**
+     * Display all possible patterns for a chord
+     * @param {Array} chordNotes - Array of note names that make up the chord
+     * @param {string} rootNote - The root note of the chord
+     * @param {string} chordType - Type of chord to filter patterns
+     * @param {Object} options - Display options
+     */
+    showAllChordPatterns(chordNotes, rootNote, chordType = null, options = {}) {
+        const preferredPatterns = chordType ? this.getPatternsByChordType(chordType) : null;
+        
+        return this.displayChordWithPatterns(chordNotes, rootNote, {
+            ...options,
+            showAllMatches: true,
+            preferredPatterns: preferredPatterns
+        });
+    }
 }
 
 // Global fretboard instances
@@ -1525,6 +2003,21 @@ let fretboardsShowingChords = new Set();
 // Track current chord display state
 let currentChordType = 'triads'; // 'triads' or 'sevenths'
 let currentDisplayedChord = null; // Currently displayed chord index (0-6)
+let isInHoverState = false; // Track if we're currently in a temporary hover state
+
+// Color cycle for chord pattern lines (based on lowest fret position)
+const CHORD_LINE_COLORS = [
+    '#ff6b35', // Orange
+    '#4ecdc4', // Teal
+    '#45b7d1', // Blue
+    '#f9ca24', // Yellow
+    '#f0932b', // Dark orange
+    '#eb4d4b', // Red
+    '#6c5ce7', // Purple
+    '#a55eea', // Light purple
+    '#26de81', // Green
+    '#fd79a8'  // Pink
+];
 
 // Flag to prevent infinite update loops
 let isUpdatingFretboards = false;
@@ -1608,12 +2101,17 @@ function createFretboardControls(fretboard) {
         clearButton.style.cssText = buttonStyle;
     });
     clearButton.addEventListener('click', () => {
+        // Clear hover state flag
+        isInHoverState = false;
+        
         fretboard.clearMarkers();
         fretboard.clearChordLines();
         // Clear all tracking state
         fretboardsShowingScale.delete(fretboard.containerId);
         fretboardsShowingChords.delete(fretboard.containerId);
         currentDisplayedChord = null;
+        // Clear chord info display
+        updateChordInfoDisplay();
         // Update chord button styles
         updateChordButtonStyles();
     });
@@ -2140,20 +2638,21 @@ function createFretboardControls(fretboard) {
     const chordControlsContainer = document.createElement('div');
     chordControlsContainer.style.cssText = `
         display: flex;
-        gap: 8px;
+        gap: 0px;
         align-items: center;
         background: rgba(255, 255, 255, 0.1);
-        padding: 8px;
+        padding: 0px;
         border-radius: 6px;
         border: 1px solid #ccc;
         flex-wrap: wrap;
+        height: 48px;
     `;
     
     // Chord type dropdown
     const chordTypeLabel = document.createElement('span');
     chordTypeLabel.textContent = 'Chords:';
     chordTypeLabel.style.cssText = `
-        font-size: 12px;
+        font-size: 20px;
         font-weight: bold;
         color: #333;
         margin-right: 4px;
@@ -2195,13 +2694,16 @@ function createFretboardControls(fretboard) {
             border: 1px solid #dee2e6;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 24px;
             font-weight: bold;
-            transition: all 0.1s ease;
+            transition: all 0.001s ease;
             user-select: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             min-width: 24px;
             text-align: center;
+            height: 46px;
         `;
         
         // Hover effects
@@ -2209,6 +2711,8 @@ function createFretboardControls(fretboard) {
             if (currentDisplayedChord !== index) {
                 chordButton.style.background = 'linear-gradient(to bottom, #e2e6ea, #dae0e5)';
                 chordButton.style.transform = 'translateY(-1px)';
+                // Set hover state flag
+                isInHoverState = true;
                 // Show chord or scale temporarily on hover
                 if (index === 0) {
                     // Scale button
@@ -2224,6 +2728,8 @@ function createFretboardControls(fretboard) {
             if (currentDisplayedChord !== index) {
                 chordButton.style.background = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
                 chordButton.style.transform = 'translateY(0)';
+                // Clear hover state flag
+                isInHoverState = false;
                 // Restore previous selection
                 if (currentDisplayedChord === null) {
                     fretboard.clearMarkers();
@@ -2242,6 +2748,9 @@ function createFretboardControls(fretboard) {
         
         // Click to toggle chord/scale display
         chordButton.addEventListener('click', () => {
+            // Clear hover state flag since we're making a permanent selection
+            isInHoverState = false;
+            
             if (currentDisplayedChord === index) {
                 // If this option is already displayed, clear it
                 currentDisplayedChord = null;
@@ -2249,6 +2758,8 @@ function createFretboardControls(fretboard) {
                 fretboard.clearChordLines();
                 fretboardsShowingChords.delete(fretboard.containerId);
                 fretboardsShowingScale.delete(fretboard.containerId);
+                // Clear chord info display
+                updateChordInfoDisplay();
                 updateChordButtonStyles();
             } else {
                 // Display this option
@@ -2271,22 +2782,228 @@ function createFretboardControls(fretboard) {
     chordControlsContainer.appendChild(chordTypeLabel);
     chordControlsContainer.appendChild(chordTypeSelect);
     
+    // Create chord info display
+    const chordInfoContainer = document.createElement('div');
+    chordInfoContainer.id = 'chord-info-display';
+    chordInfoContainer.style.cssText = `
+        margin: 10px 0;
+        padding: 12px 16px;
+        background: linear-gradient(to bottom, #e8f4fd, #d1ecf1);
+        border-radius: 8px;
+        border: 1px solid #bee5eb;
+        display: none;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    `;
+    
+    const chordNameDisplay = document.createElement('div');
+    chordNameDisplay.id = 'chord-name-display';
+    chordNameDisplay.style.cssText = `
+        font-size: 18px;
+        font-weight: bold;
+        color: #0c5460;
+        margin-bottom: 6px;
+    `;
+    
+    const chordNotesDisplay = document.createElement('div');
+    chordNotesDisplay.id = 'chord-notes-display';
+    chordNotesDisplay.style.cssText = `
+        font-size: 14px;
+        color: #0c5460;
+        font-weight: 500;
+    `;
+    
+    chordInfoContainer.appendChild(chordNameDisplay);
+    chordInfoContainer.appendChild(chordNotesDisplay);
+    
     noteInputContainer.appendChild(noteInput);
     noteInputContainer.appendChild(markNoteButton);
     
     controlsContainer.appendChild(clearButton);
     controlsContainer.appendChild(showAllButton);
-    controlsContainer.appendChild(showScaleButton);
+    // controlsContainer.appendChild(showScaleButton);
     controlsContainer.appendChild(chordControlsContainer);
-    controlsContainer.appendChild(noteSearchContainer);
-    controlsContainer.appendChild(clearBoxesButton);
-    controlsContainer.appendChild(clearLinesButton);
-    controlsContainer.appendChild(demoBoxButton);
-    controlsContainer.appendChild(noteInputContainer);
-    controlsContainer.appendChild(demoNotesButton);
-    controlsContainer.appendChild(demoOctaveButton);
-    controlsContainer.appendChild(demoChordButton);
-    controlsContainer.appendChild(demoLineButton);
+    controlsContainer.appendChild(chordInfoContainer);
+    
+    // Create chord pattern demo controls
+    const patternDemoContainer = document.createElement('div');
+    patternDemoContainer.style.cssText = `
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        flex-wrap: wrap;
+    `;
+    
+    const patternLabel = document.createElement('span');
+    patternLabel.textContent = 'Chord Patterns:';
+    patternLabel.style.cssText = `
+        font-size: 14px;
+        font-weight: bold;
+        color: #333;
+        margin-right: 8px;
+    `;
+    
+    // C Major Pattern Demo
+    const cMajorPatternButton = document.createElement('button');
+    cMajorPatternButton.textContent = 'C Major Patterns';
+    cMajorPatternButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #28a745, #1e7e34);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    cMajorPatternButton.addEventListener('mouseenter', () => {
+        cMajorPatternButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #34ce57, #2d8e47);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    cMajorPatternButton.addEventListener('mouseleave', () => {
+        cMajorPatternButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #28a745, #1e7e34);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    cMajorPatternButton.addEventListener('click', () => {
+        const chordNotes = ['C', 'E', 'G'];
+        const rootNote = 'C';
+        const matches = fretboard.displayChordWithPatterns(chordNotes, rootNote, {
+            clearFirst: true,
+            showAllMatches: false,
+            preferredPatterns: ['major_A_string', 'major_E_string', 'major_open_C'],
+            drawLines: true,
+            highlightRoot: true
+        });
+        console.log('C Major pattern matches:', matches);
+    });
+    
+    // A Minor Pattern Demo
+    const aMinorPatternButton = document.createElement('button');
+    aMinorPatternButton.textContent = 'A Minor Patterns';
+    aMinorPatternButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #6f42c1, #5a2d91);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    aMinorPatternButton.addEventListener('mouseenter', () => {
+        aMinorPatternButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #7952d1, #6a3da1);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    aMinorPatternButton.addEventListener('mouseleave', () => {
+        aMinorPatternButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #6f42c1, #5a2d91);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    aMinorPatternButton.addEventListener('click', () => {
+        const chordNotes = ['A', 'C', 'E'];
+        const rootNote = 'A';
+        const matches = fretboard.displayChordWithPatterns(chordNotes, rootNote, {
+            clearFirst: true,
+            showAllMatches: false,
+            preferredPatterns: ['minor_A_string', 'minor_E_string'],
+            drawLines: true,
+            highlightRoot: true
+        });
+        console.log('A Minor pattern matches:', matches);
+    });
+    
+    // G7 Pattern Demo
+    const g7PatternButton = document.createElement('button');
+    g7PatternButton.textContent = 'G7 Patterns';
+    g7PatternButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #fd7e14, #e85d04);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    g7PatternButton.addEventListener('mouseenter', () => {
+        g7PatternButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #ff8e24, #f86e14);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    g7PatternButton.addEventListener('mouseleave', () => {
+        g7PatternButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #fd7e14, #e85d04);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    g7PatternButton.addEventListener('click', () => {
+        const chordNotes = ['G', 'B', 'D', 'F'];
+        const rootNote = 'G';
+        const matches = fretboard.displayChordWithPatterns(chordNotes, rootNote, {
+            clearFirst: true,
+            showAllMatches: false,
+            preferredPatterns: ['dominant7_A_string', 'dominant7_E_string'],
+            drawLines: true,
+            highlightRoot: true
+        });
+        console.log('G7 pattern matches:', matches);
+    });
+    
+    // Show All Patterns Demo
+    const allPatternsButton = document.createElement('button');
+    allPatternsButton.textContent = 'Show All C Major';
+    allPatternsButton.style.cssText = buttonStyle + `
+        background: linear-gradient(to bottom, #dc3545, #c82333);
+        padding: 6px 12px;
+        font-size: 12px;
+    `;
+    allPatternsButton.addEventListener('mouseenter', () => {
+        allPatternsButton.style.cssText = buttonStyle + buttonHoverStyle + `
+            background: linear-gradient(to bottom, #e74c3c, #d32f2f);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    allPatternsButton.addEventListener('mouseleave', () => {
+        allPatternsButton.style.cssText = buttonStyle + `
+            background: linear-gradient(to bottom, #dc3545, #c82333);
+            padding: 6px 12px;
+            font-size: 12px;
+        `;
+    });
+    allPatternsButton.addEventListener('click', () => {
+        const chordNotes = ['C', 'E', 'G'];
+        const rootNote = 'C';
+        const matches = fretboard.showAllChordPatterns(chordNotes, rootNote, 'major', {
+            clearFirst: true,
+            drawLines: true,
+            highlightRoot: true,
+            lineOptions: {
+                opacity: 0.4  // Make lines more transparent when showing multiple patterns
+            }
+        });
+        console.log('All C Major pattern matches:', matches);
+    });
+    
+    patternDemoContainer.appendChild(patternLabel);
+    patternDemoContainer.appendChild(cMajorPatternButton);
+    patternDemoContainer.appendChild(aMinorPatternButton);
+    patternDemoContainer.appendChild(g7PatternButton);
+    patternDemoContainer.appendChild(allPatternsButton);
+    
+    controlsContainer.appendChild(patternDemoContainer);
+    // controlsContainer.appendChild(noteSearchContainer);
+    // controlsContainer.appendChild(clearBoxesButton);
+    // controlsContainer.appendChild(clearLinesButton);
+    // controlsContainer.appendChild(demoBoxButton);
+    // controlsContainer.appendChild(noteInputContainer);
+    // controlsContainer.appendChild(demoNotesButton);
+    // controlsContainer.appendChild(demoOctaveButton);
+    // controlsContainer.appendChild(demoChordButton);
+    // controlsContainer.appendChild(demoLineButton);
     
     // Insert controls before the fretboard
     fretboard.container.insertBefore(controlsContainer, fretboard.fretboardElement);
@@ -2320,11 +3037,57 @@ function showChordOnFretboard(chordIndex, isTemporary = false) {
             const chord = syntheticChords[chordIndex];
             const romanNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
             const chordName = `${romanNumerals[chordIndex]} (${currentChordType})`;
+            console.log(`Displaying chord: ${chordName} (${chord.join(', ')})`);
             
+            // Update chord info display
+            updateChordInfoDisplay(chordName, chord);
+            
+            // Always start with traditional chord display to show full scale context
             fretboard.displayChord(chord, chordName, {
                 clearFirst: true,
-                showLines: false
+                showLines: false,
+                showScaleContext: true
             });
+            
+            // Then add chord pattern lines on top
+            const chordMatches = fretboard.findChordPatternMatches(chord, chord[0]);
+            
+            if (chordMatches.length > 0) {
+                // Sort matches by lowest fret position for color assignment
+                const sortedMatches = chordMatches.sort((a, b) => {
+                    const minFretA = Math.min(...a.positions.map(pos => pos.fret));
+                    const minFretB = Math.min(...b.positions.map(pos => pos.fret));
+                    return minFretA - minFretB;
+                });
+                
+                // Add chord pattern lines on top of the traditional markers
+                sortedMatches.forEach((match, matchIndex) => {
+                    const colorIndex = matchIndex % CHORD_LINE_COLORS.length;
+                    const lineColor = CHORD_LINE_COLORS[colorIndex];
+                    const patternId = `roman-${chordIndex}-${match.patternName}-${match.rootPosition.fret}`;
+                    
+                    // Draw connecting lines with thick lines and no labels
+                    if (match.positions.length > 1) {
+                        const linePoints = match.positions.map(pos => ({
+                            string: pos.string,
+                            fret: pos.fret
+                        }));
+                        
+                        fretboard.drawChordLine(patternId, linePoints, {
+                            color: lineColor,
+                            lineWidth: 40, // Thicker lines for chord patterns
+                            style: 'solid',
+                            opacity: 0.8,
+                            label: '', // No text labels as requested
+                            labelPosition: 'middle'
+                        });
+                    }
+                });
+                
+                console.log(`Displaying traditional chord markers with ${sortedMatches.length} chord pattern lines for ${chordName}`);
+            } else {
+                console.log(`Displaying traditional chord markers for ${chordName} (no chord patterns found)`);
+            }
         }
     } catch (error) {
         console.warn('Could not generate chord:', error);
@@ -2351,6 +3114,10 @@ function showScaleOnFretboard(isTemporary = false) {
         const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
         const scaleNotes = getScaleNotes(rootNote, intervals);
         
+        // Update chord info display to show scale information
+        const scaleName = `${rootNote} ${family} (Mode ${mode})`;
+        updateChordInfoDisplay(scaleName, scaleNotes);
+        
         // Clear markers and lines first to prevent overlap
         fretboard.clearMarkers();
         fretboard.clearChordLines();
@@ -2364,6 +3131,29 @@ function showScaleOnFretboard(isTemporary = false) {
         }
     } catch (error) {
         console.warn('Could not show scale:', error);
+    }
+}
+
+/**
+ * Helper function to update chord info display
+ */
+function updateChordInfoDisplay(chordName = null, chordNotes = null) {
+    const chordInfoContainer = document.getElementById('chord-info-display');
+    const chordNameDisplay = document.getElementById('chord-name-display');
+    const chordNotesDisplay = document.getElementById('chord-notes-display');
+    
+    if (!chordInfoContainer || !chordNameDisplay || !chordNotesDisplay) {
+        return; // Elements not found, probably not initialized yet
+    }
+    
+    if (chordName && chordNotes) {
+        // Show chord information
+        chordNameDisplay.textContent = chordName;
+        chordNotesDisplay.textContent = `Notes: ${chordNotes.join(' - ')}`;
+        chordInfoContainer.style.display = 'block';
+    } else {
+        // Hide chord information
+        chordInfoContainer.style.display = 'none';
     }
 }
 
@@ -2391,6 +3181,7 @@ function updateChordButtonStyles() {
  * This function should be called whenever the primary scale changes
  */
 function updateFretboardsForScaleChange(scaleData) {
+    // Skip if no fretboards are showing scales or chords, or if already updating
     if ((fretboardsShowingScale.size === 0 && fretboardsShowingChords.size === 0) || isUpdatingFretboards) return;
     
     try {
@@ -2417,6 +3208,14 @@ function updateFretboardsForScaleChange(scaleData) {
         fretboardsShowingChords.forEach(containerId => {
             const fretboard = fretboardInstances.get(containerId);
             if (fretboard && currentDisplayedChord !== null) {
+                // If we're in a hover state, show the full scale instead of chord
+                if (isInHoverState) {
+                    fretboard.clearMarkers();
+                    fretboard.clearChordLines();
+                    fretboard.markScale(scaleNotes, rootNote);
+                    return;
+                }
+                
                 // Re-generate and display the current chord with new scale
                 try {
                     if (currentDisplayedChord === 0) {
@@ -2431,14 +3230,8 @@ function updateFretboardsForScaleChange(scaleData) {
                         
                         const chordIndex = currentDisplayedChord - 1;
                         if (chordIndex >= 0 && chordIndex < syntheticChords.length) {
-                            const chord = syntheticChords[chordIndex];
-                            const romanNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
-                            const chordName = `${romanNumerals[chordIndex]} (${currentChordType})`;
-                            
-                            fretboard.displayChord(chord, chordName, {
-                                clearFirst: true,
-                                showLines: false
-                            });
+                            // Use the updated showChordOnFretboard function which includes pattern matching
+                            showChordOnFretboard(chordIndex);
                         }
                     }
                 } catch (error) {
@@ -2455,13 +3248,26 @@ function updateFretboardsForScaleChange(scaleData) {
 
 // Listen for scale change events from the scale generator
 let lastScaleUpdateTime = 0;
+let lastScaleData = null;
 window.addEventListener('scaleChanged', (event) => {
     // Debounce the updates to prevent rapid-fire events
     const now = Date.now();
-    if (now - lastScaleUpdateTime < 50) { // Minimum 50ms between updates
+    if (now - lastScaleUpdateTime < 200) { // Increased debounce to 200ms
         return;
     }
+    
+    // Check if the scale data has actually changed
+    const currentScaleData = event.detail;
+    const scaleKey = `${currentScaleData.rootNote}-${currentScaleData.primaryScale}`;
+    const lastScaleKey = lastScaleData ? `${lastScaleData.rootNote}-${lastScaleData.primaryScale}` : null;
+    
+    if (scaleKey === lastScaleKey) {
+        // Scale hasn't actually changed, skip update
+        return;
+    }
+    
     lastScaleUpdateTime = now;
+    lastScaleData = currentScaleData;
     
     updateFretboardsForScaleChange(event.detail);
 });
@@ -2638,6 +3444,142 @@ function createSubscaleBoxPattern(fretboard, patternType, startFret, options = {
     return true;
 }
 
+/**
+ * Global function to display chord patterns on the main fretboard
+ * @param {Array} chordNotes - Array of note names that make up the chord
+ * @param {string} rootNote - The root note of the chord
+ * @param {Object} options - Display options
+ * @returns {Array} Array of matching patterns
+ */
+function displayChordPatterns(chordNotes, rootNote, options = {}) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return [];
+    }
+    return fretboard.displayChordWithPatterns(chordNotes, rootNote, options);
+}
+
+/**
+ * Global function to show all chord patterns for a specific chord type
+ * @param {Array} chordNotes - Array of note names that make up the chord
+ * @param {string} rootNote - The root note of the chord
+ * @param {string} chordType - Type of chord (e.g., 'major', 'minor', 'dominant7')
+ * @param {Object} options - Display options
+ * @returns {Array} Array of matching patterns
+ */
+function showAllChordPatterns(chordNotes, rootNote, chordType = null, options = {}) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return [];
+    }
+    return fretboard.showAllChordPatterns(chordNotes, rootNote, chordType, options);
+}
+
+/**
+ * Get all available chord patterns
+ * @returns {Object} Object containing all chord pattern definitions
+ */
+function getChordPatterns() {
+    return Fretboard.getChordPatterns();
+}
+
+/**
+ * Get pattern names for a specific chord type
+ * @param {string} chordType - Type of chord (e.g., 'major', 'minor', 'dominant7')
+ * @returns {Array} Array of pattern names matching the chord type
+ */
+function getPatternsByChordType(chordType) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return [];
+    }
+    return fretboard.getPatternsByChordType(chordType);
+}
+
+/**
+ * Quick chord pattern demo function for console use
+ * @param {string} chordName - Name of chord (e.g., 'C major', 'A minor', 'G7')
+ * @param {Object} options - Optional display options
+ */
+function quickChordPattern(chordName, options = {}) {
+    const fretboard = getFretboard('fretNotPlaceholder');
+    if (!fretboard) {
+        console.warn('Main fretboard not found');
+        return;
+    }
+    
+    // Parse chord name and determine notes
+    const parseChord = (name) => {
+        const lowerName = name.toLowerCase();
+        
+        // Extract root note (first character, potentially with # or b)
+        let root = name.charAt(0).toUpperCase();
+        let i = 1;
+        if (i < name.length && (name.charAt(i) === '#' || name.charAt(i) === 'b')) {
+            root += name.charAt(i);
+            i++;
+        }
+        
+        // Determine chord type
+        let chordType = '';
+        let notes = [];
+        
+        if (lowerName.includes('major') || (!lowerName.includes('minor') && !lowerName.includes('7'))) {
+            chordType = 'major';
+            notes = [root, getThird(root, 'major'), getFifth(root)];
+        } else if (lowerName.includes('minor')) {
+            chordType = 'minor';
+            notes = [root, getThird(root, 'minor'), getFifth(root)];
+        } else if (lowerName.includes('7')) {
+            chordType = 'dominant7';
+            notes = [root, getThird(root, 'major'), getFifth(root), getSeventh(root, 'dominant')];
+        }
+        
+        return { root, chordType, notes };
+    };
+    
+    // Helper functions to calculate chord tones (simplified)
+    const getThird = (root, type) => {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootIndex = notes.indexOf(root);
+        const offset = type === 'major' ? 4 : 3;
+        return notes[(rootIndex + offset) % 12];
+    };
+    
+    const getFifth = (root) => {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootIndex = notes.indexOf(root);
+        return notes[(rootIndex + 7) % 12];
+    };
+    
+    const getSeventh = (root, type) => {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootIndex = notes.indexOf(root);
+        const offset = type === 'dominant' ? 10 : 11;
+        return notes[(rootIndex + offset) % 12];
+    };
+    
+    try {
+        const { root, chordType, notes } = parseChord(chordName);
+        console.log(`🎸 Displaying patterns for ${chordName}: ${notes.join(' - ')}`);
+        
+        const matches = fretboard.displayChordWithPatterns(notes, root, {
+            clearFirst: true,
+            preferredPatterns: getPatternsByChordType(chordType),
+            ...options
+        });
+        
+        console.log(`Found ${matches.length} pattern matches for ${chordName}`);
+        return matches;
+    } catch (error) {
+        console.error(`Could not parse chord "${chordName}":`, error);
+        return [];
+    }
+}
+
 // Export the main functions
 export {
     Fretboard,
@@ -2650,6 +3592,11 @@ export {
     quickSearchAndMark,
     getFretboardNotes,
     analyzeFretboardNotes,
+    displayChordPatterns,
+    showAllChordPatterns,
+    getChordPatterns,
+    getPatternsByChordType,
+    quickChordPattern,
     GUITAR_TUNING,
     SCALE_COLORS
 };
@@ -2674,3 +3621,10 @@ window.searchFretboardNotes = searchFretboardNotes;
 window.quickSearchAndMark = quickSearchAndMark;
 window.getFretboardNotes = getFretboardNotes;
 window.analyzeFretboardNotes = analyzeFretboardNotes;
+
+// Make chord pattern functions globally accessible for console use
+window.displayChordPatterns = displayChordPatterns;
+window.showAllChordPatterns = showAllChordPatterns;
+window.getChordPatterns = getChordPatterns;
+window.getPatternsByChordType = getPatternsByChordType;
+window.quickChordPattern = quickChordPattern;
