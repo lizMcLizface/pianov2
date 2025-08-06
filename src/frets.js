@@ -3,6 +3,7 @@ import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from '.
 import {createHeptatonicScaleTable, selectedRootNote, selectedScales, getPrimaryScale, getPrimaryRootNote} from './scaleGenerator';
 import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI} from './midi';
+import {getChordPatterns, getPatternsByChordType} from './chordPatterns';
 
 // Standard guitar tuning (lowest to highest strings) - displayed from top to bottom
 const GUITAR_TUNING = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
@@ -1556,213 +1557,6 @@ class Fretboard {
     }
 
     /**
-     * Define chord patterns based on string positions and fret offsets
-     * Each pattern defines fingering relative to the root position
-     */
-    static getChordPatterns() {
-        return {
-            // Major chord patterns
-            'major_A_string': {
-                name: 'Major (A String Root)',
-                description: 'Major chord with root on A string',
-                rootString: 4, // A string (0-indexed from high E)
-                notes: [
-                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
-                    { string: 3, fretOffset: 2, interval: 3, label: '3' }, // Major 3rd on D string
-                    { string: 2, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on G string
-                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root on B string
-                    { string: 0, fretOffset: 0, interval: 3, label: '3' }  // Major 3rd on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-            
-            'major_E_string': {
-                name: 'Major (E String Root)',
-                description: 'Major chord with root on low E string',
-                rootString: 5, // Low E string
-                notes: [
-                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
-                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on A string
-                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root on D string
-                    { string: 2, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd on G string
-                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th on B string
-                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            'major_open_C': {
-                name: 'C Major Open',
-                description: 'Open C major chord',
-                rootString: 4, // A string where C is on 3rd fret
-                notes: [
-                    { string: 4, fretOffset: 0, interval: 1, label: 'C' }, // C on A string 3rd fret
-                    { string: 3, fretOffset: -1, interval: 5, label: 'G' }, // G on D string 2nd fret  
-                    { string: 2, fretOffset: -3, interval: 1, label: 'C' }, // C on G string open
-                    { string: 1, fretOffset: -2, interval: 3, label: 'E' }, // E on B string 1st fret
-                    { string: 0, fretOffset: -3, interval: 1, label: 'C' }  // C on high E string open
-                ],
-                openVoicingOnly: true,
-                fixedPosition: 3, // Only works when root is on 3rd fret of A string
-                minFret: 3,
-                maxFret: 3
-            },
-
-            'major_open_G': {
-                name: 'G Major Open',
-                description: 'Open G major chord',
-                rootString: 5, // Low E string where G is on 3rd fret
-                notes: [
-                    { string: 5, fretOffset: 0, interval: 1, label: 'G' }, // G on low E string 3rd fret
-                    { string: 4, fretOffset: -1, interval: 5, label: 'D' }, // D on A string 2nd fret
-                    { string: 3, fretOffset: -3, interval: 1, label: 'G' }, // G on D string open
-                    { string: 2, fretOffset: -3, interval: 3, label: 'B' }, // B on G string open
-                    { string: 1, fretOffset: 0, interval: 5, label: 'D' }, // D on B string 3rd fret
-                    { string: 0, fretOffset: 0, interval: 1, label: 'G' }  // G on high E string 3rd fret
-                ],
-                openVoicingOnly: true,
-                fixedPosition: 3,
-                minFret: 3,
-                maxFret: 3
-            },
-
-            // Minor chord patterns
-            'minor_A_string': {
-                name: 'Minor (A String Root)',
-                description: 'Minor chord with root on A string',
-                rootString: 4,
-                notes: [
-                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
-                    { string: 3, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on D string
-                    { string: 2, fretOffset: 1, interval: 'b3', label: 'b3' }, // Minor 3rd on G string
-                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root on B string
-                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            'minor_E_string': {
-                name: 'Minor (E String Root)',
-                description: 'Minor chord with root on low E string',
-                rootString: 5,
-                notes: [
-                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
-                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th on A string
-                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root on D string
-                    { string: 2, fretOffset: 0, interval: 'b3', label: 'b3' }, // Minor 3rd on G string
-                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th on B string
-                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            // Dominant 7th patterns
-            'dominant7_A_string': {
-                name: 'Dominant 7th (A String Root)',
-                description: 'Dominant 7th chord with root on A string',
-                rootString: 4,
-                notes: [
-                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
-                    { string: 3, fretOffset: 0, interval: 'b7', label: 'b7' }, // Flat 7th
-                    { string: 2, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th
-                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root
-                    { string: 0, fretOffset: 0, interval: 3, label: '3' }  // Major 3rd
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            'dominant7_E_string': {
-                name: 'Dominant 7th (E String Root)',
-                description: 'Dominant 7th chord with root on low E string',
-                rootString: 5,
-                notes: [
-                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
-                    { string: 4, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th
-                    { string: 3, fretOffset: 0, interval: 'b7', label: 'b7' }, // Flat 7th
-                    { string: 2, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd
-                    { string: 1, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th
-                    { string: 0, fretOffset: 0, interval: 1, label: 'R' }  // Root
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            // Diminished patterns (for vii° chord)
-            'diminished_A_string': {
-                name: 'Diminished (A String Root)',
-                description: 'Diminished chord with root on A string',
-                rootString: 4,
-                notes: [
-                    { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
-                    { string: 3, fretOffset: 1, interval: 'b3', label: 'b3' }, // Minor 3rd
-                    { string: 2, fretOffset: 1, interval: 'b5', label: 'b5' }, // Diminished 5th
-                    { string: 1, fretOffset: 1, interval: 1, label: 'R' }  // Root
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            'diminished_E_string': {
-                name: 'Diminished (E String Root)',
-                description: 'Diminished chord with root on low E string',
-                rootString: 5,
-                notes: [
-                    { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
-                    { string: 4, fretOffset: 1, interval: 'b5', label: 'b5' }, // Diminished 5th
-                    { string: 3, fretOffset: 2, interval: 1, label: 'R' }, // Root
-                    { string: 2, fretOffset: 0, interval: 'b3', label: 'b3' } // Minor 3rd
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            // Simplified 3-string patterns for easier visualization
-            'major_simple_high': {
-                name: 'Major Simple (High Strings)',
-                description: 'Simple major chord on high 3 strings',
-                rootString: 2, // G string
-                notes: [
-                    { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
-                    { string: 1, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd on B string
-                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            'minor_simple_high': {
-                name: 'Minor Simple (High Strings)',
-                description: 'Simple minor chord on high 3 strings',
-                rootString: 2, // G string
-                notes: [
-                    { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
-                    { string: 1, fretOffset: 0, interval: 'b3', label: 'b3' }, // Minor 3rd on B string
-                    { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
-                ],
-                openVoicingOnly: false,
-                minFret: 1,
-                maxFret: 12
-            },
-
-            // Add more patterns as needed...
-        };
-    }
-
-    /**
      * Calculate the actual fret positions for a chord pattern at a given root position
      * @param {Object} pattern - The chord pattern definition
      * @param {number} rootFret - The fret where the root note should be placed
@@ -1811,7 +1605,7 @@ class Fretboard {
      * @returns {Array} Array of matching pattern results
      */
     findChordPatternMatches(chordNotes, rootNote, patternNames = null) {
-        const patterns = Fretboard.getChordPatterns();
+        const patterns = getChordPatterns();
         const matches = [];
         
         // Convert chord notes to a set for easy lookup
@@ -1969,8 +1763,7 @@ class Fretboard {
      * @returns {Array} Array of pattern names matching the chord type
      */
     getPatternsByChordType(chordType) {
-        const patterns = Fretboard.getChordPatterns();
-        return Object.keys(patterns).filter(name => name.includes(chordType));
+        return getPatternsByChordType(chordType);
     }
 
     /**
@@ -3475,28 +3268,6 @@ function showAllChordPatterns(chordNotes, rootNote, chordType = null, options = 
         return [];
     }
     return fretboard.showAllChordPatterns(chordNotes, rootNote, chordType, options);
-}
-
-/**
- * Get all available chord patterns
- * @returns {Object} Object containing all chord pattern definitions
- */
-function getChordPatterns() {
-    return Fretboard.getChordPatterns();
-}
-
-/**
- * Get pattern names for a specific chord type
- * @param {string} chordType - Type of chord (e.g., 'major', 'minor', 'dominant7')
- * @returns {Array} Array of pattern names matching the chord type
- */
-function getPatternsByChordType(chordType) {
-    const fretboard = getFretboard('fretNotPlaceholder');
-    if (!fretboard) {
-        console.warn('Main fretboard not found');
-        return [];
-    }
-    return fretboard.getPatternsByChordType(chordType);
 }
 
 /**

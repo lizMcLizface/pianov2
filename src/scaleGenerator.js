@@ -15,13 +15,13 @@ try {
 
 // Global array to store selected scales
 let selectedScales = ['Major-1']; // Default to first scale
-let exclusiveMode = true; // Toggle between exclusive and multiple selection modes
+let exclusiveMode = false; // Toggle between exclusive and multiple selection modes
 
 // Primary scale index for navigation through multiple selected scales
 let primaryScaleIndex = 0;
 
 // Global variable to store selected root notes (can be array or single string)
-let selectedRootNote = 'C'; // Default to C
+let selectedRootNote = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']; // Default to C
 
 // Primary root note index for navigation through multiple selected root notes
 let primaryRootNoteIndex = 0;
