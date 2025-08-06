@@ -243,37 +243,6 @@ export function getChordPatterns() {
             maxFret: 18
         },
 
-        // // Simplified 3-string patterns for easier visualization
-        // 'major_simple_high': {
-        //     name: 'Major Simple (High Strings)',
-        //     description: 'Simple major chord on high 3 strings',
-        //     rootString: 2, // G string
-        //     notes: [
-        //         { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
-        //         { string: 1, fretOffset: 1, interval: 3, label: '3' }, // Major 3rd on B string
-        //         { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
-        //     ],
-        //     openVoicingOnly: false,
-        //     minFret: 1,
-        //     maxFret: 12
-        // },
-
-        // 'minor_simple_high': {
-        //     name: 'Minor Simple (High Strings)',
-        //     description: 'Simple minor chord on high 3 strings',
-        //     rootString: 2, // G string
-        //     notes: [
-        //         { string: 2, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
-        //         { string: 1, fretOffset: 0, interval: 'b3', label: 'b3' }, // Minor 3rd on B string
-        //         { string: 0, fretOffset: 0, interval: 5, label: '5' }  // Perfect 5th on high E string
-        //     ],
-        //     openVoicingOnly: false,
-        //     minFret: 1,
-        //     maxFret: 12
-        // },
-
-        // Additional patterns can be easily added here...
-        
         // Major 7th patterns
         'major7_A_string': {
             name: 'Major 7th (A String Root)',
@@ -281,14 +250,14 @@ export function getChordPatterns() {
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
-                { string: 3, fretOffset: 1, interval: 7, label: '7' }, // Major 7th
-                { string: 2, fretOffset: 2, interval: 5, label: '5' }, // Perfect 5th
-                { string: 1, fretOffset: 1, interval: 1, label: 'R' }, // Root
-                { string: 0, fretOffset: 0, interval: 3, label: '3' }  // Major 3rd
+                { string: 3, fretOffset: -1, interval: 7, label: '7' }, // Major 7th
+                { string: 2, fretOffset: 0, interval: 5, label: '5' }, // Perfect 5th
+                { string: 1, fretOffset: -2, interval: 1, label: 'R' }, // Root
+                { string: 0, fretOffset: -3, interval: 3, label: '3' }  // Major 3rd
             ],
             openVoicingOnly: false,
-            minFret: 1,
-            maxFret: 12
+            minFret: 3,
+            maxFret: 18
         },
 
         'minor7_A_string': {
