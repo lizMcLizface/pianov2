@@ -7,12 +7,12 @@ import $ from 'jquery';
 import { metronome, reset } from './metronome';
 import {processChord} from './intervals';
 import {HeptatonicScales, scales, getScaleNotes, highlightKeysForScales} from './scales';
-import {createHeptatonicScaleTable, selectedRootNote, selectedScales, navigateToNextScale, navigateToPreviousScale, navigateToNextRootNote, navigateToPreviousRootNote, refreshChordsForRootNote} from './scaleGenerator';
-import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes} from './chords';
+import {createHeptatonicScaleTable, selectedRootNote, selectedScales, navigateToNextScale, navigateToPreviousScale, navigateToNextRootNote, navigateToPreviousRootNote, refreshChordsForRootNote, getPrimaryScale, getPrimaryRootNote} from './scaleGenerator';
+import {chords, processedChords, highlightKeysForChords, createChordRootNoteTable, createChordSuffixTable, selectedChordRootNote, selectedChordSuffixes, createChordButtonGrid} from './chords';
 import {noteToMidi, noteToName, keys, getElementByNote, getElementByMIDI, initializeMouseInput} from './midi';
 import {createScaleChordCrossReference, updateCrossReferenceDisplay} from './cross';
 import {modifiers, keyToNote} from './keyboard';
-import {initializeFretboard} from './frets';
+import {initializeFretboard, getFretboard, showChordOnFretboard, showScaleOnFretboard, currentDisplayedChord} from './frets';
 import './staves'; // Import stave functions - functions will be available on window object
 import { context,
     masterVolume,
@@ -231,6 +231,16 @@ updateCrossReferenceDisplay();
 // Export the update function so other modules can call it when selections change
 window.updateCrossReferenceDisplay = updateCrossReferenceDisplay;
 window.createScaleChordCrossReference = createScaleChordCrossReference;
+
+// Export scale and fretboard functions for chord button grid
+window.getPrimaryScale = getPrimaryScale;
+window.getPrimaryRootNote = getPrimaryRootNote;
+window.getScaleNotes = getScaleNotes;
+window.HeptatonicScales = HeptatonicScales;
+window.getFretboard = getFretboard;
+window.showChordOnFretboard = showChordOnFretboard;
+window.showScaleOnFretboard = showScaleOnFretboard;
+window.currentDisplayedChord = currentDisplayedChord;
 
 
 // Initialize Interval Practice Interface - now handled by React component

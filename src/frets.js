@@ -1807,6 +1807,9 @@ let currentChordType = 'triads'; // 'triads' or 'sevenths'
 let currentDisplayedChord = null; // Currently displayed chord index (0-6)
 let isInHoverState = false; // Track if we're currently in a temporary hover state
 
+// Track chord grid state
+let currentChordGridSelection = null; // Track permanent chord grid selections {note, chordType}
+
 // Color cycle for chord pattern lines (based on lowest fret position)
 const CHORD_LINE_COLORS = [
     '#ff6b35', // Orange
@@ -1851,6 +1854,11 @@ function initializeFretboard() {
     
     // Create control panel
     createFretboardControls(mainFretboard);
+    
+    // Set the scale button as active by default and show the scale
+    currentDisplayedChord = 0; // Scale button is index 0
+    showScaleOnFretboard();
+    updateChordButtonStyles();
     
     return mainFretboard;
 }
@@ -1912,6 +1920,7 @@ function createFretboardControls(fretboard) {
         fretboardsShowingScale.delete(fretboard.containerId);
         fretboardsShowingChords.delete(fretboard.containerId);
         currentDisplayedChord = null;
+        currentChordGridSelection = null; // Clear chord grid selection
         // Clear chord info display
         updateChordInfoDisplay();
         // Update chord button styles
@@ -2532,19 +2541,8 @@ function createFretboardControls(fretboard) {
                 chordButton.style.transform = 'translateY(0)';
                 // Clear hover state flag
                 isInHoverState = false;
-                // Restore previous selection
-                if (currentDisplayedChord === null) {
-                    fretboard.clearMarkers();
-                    fretboard.clearChordLines();
-                    fretboardsShowingChords.delete(fretboard.containerId);
-                    fretboardsShowingScale.delete(fretboard.containerId);
-                } else if (currentDisplayedChord === 0) {
-                    // Restore scale
-                    showScaleOnFretboard();
-                } else {
-                    // Restore chord (adjust index for chord array)
-                    showChordOnFretboard(currentDisplayedChord - 1);
-                }
+                // Use centralized restoration function that handles both Roman numerals and chord grid
+                restoreFretboardState();
             }
         });
         
@@ -2552,6 +2550,9 @@ function createFretboardControls(fretboard) {
         chordButton.addEventListener('click', () => {
             // Clear hover state flag since we're making a permanent selection
             isInHoverState = false;
+            
+            // Clear any chord grid selection since we're now using Roman numerals
+            currentChordGridSelection = null;
             
             if (currentDisplayedChord === index) {
                 // If this option is already displayed, clear it
@@ -2796,7 +2797,7 @@ function createFretboardControls(fretboard) {
     patternDemoContainer.appendChild(g7PatternButton);
     patternDemoContainer.appendChild(allPatternsButton);
     
-    controlsContainer.appendChild(patternDemoContainer);
+    // controlsContainer.appendChild(patternDemoContainer);
     // controlsContainer.appendChild(noteSearchContainer);
     // controlsContainer.appendChild(clearBoxesButton);
     // controlsContainer.appendChild(clearLinesButton);
@@ -2809,6 +2810,359 @@ function createFretboardControls(fretboard) {
     
     // Insert controls before the fretboard
     fretboard.container.insertBefore(controlsContainer, fretboard.fretboardElement);
+    
+    // Add chord button grid after the fretboard
+    const chordGrid = createChordButtonGrid();
+    if (chordGrid) {
+        fretboard.container.appendChild(chordGrid);
+    }
+}
+
+/**
+ * Create chord button grid directly (avoiding circular dependency)
+ */
+function createChordButtonGrid() {
+    const chromaticNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const commonChordTypes = ['Major', 'Minor', '7', '5', 'dim', 'dim7', 'aug', 'sus2', 'sus4', 'maj7', 'm7', 'm7b5'];
+    
+    let gridContainer = document.createElement('div');
+    gridContainer.style.cssText = `
+        margin: 20px auto;
+        max-width: 600px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+    gridContainer.id = 'chordButtonGridContainer';
+    
+    let gridLabel = document.createElement('h3');
+    gridLabel.textContent = 'Chord Pattern Grid';
+    gridLabel.style.cssText = `
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        color: #333;
+    `;
+    
+    let grid = document.createElement('table');
+    grid.style.cssText = `
+        border-collapse: collapse;
+        margin: 0 auto;
+        border: 2px solid #333;
+        background: white;
+    `;
+    
+    // Create header row with chord types
+    let headerRow = document.createElement('tr');
+    
+    // Empty corner cell
+    let cornerCell = document.createElement('th');
+    cornerCell.style.cssText = `
+        width: 30px;
+        height: 30px;
+        border: 1px solid #333;
+        background: #2a2a2a;
+        color: white;
+        font-weight: bold;
+        font-size: 10px;
+        text-align: center;
+        vertical-align: middle;
+        padding: 0;
+    `;
+    headerRow.appendChild(cornerCell);
+    
+    // Add chord type header cells
+    for (let chordType of commonChordTypes) {
+        let cell = document.createElement('th');
+        cell.style.cssText = `
+            width: 30px;
+            height: 30px;
+            border: 1px solid #333;
+            background: #2a2a2a;
+            color: white;
+            font-weight: bold;
+            font-size: 8px;
+            text-align: center;
+            vertical-align: middle;
+            padding: 0;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        `;
+        cell.textContent = chordType;
+        headerRow.appendChild(cell);
+    }
+    
+    grid.appendChild(headerRow);
+    
+    // Create rows for each chromatic note
+    for (let note of chromaticNotes) {
+        let row = document.createElement('tr');
+        
+        // Create note label cell
+        let noteCell = document.createElement('td');
+        noteCell.textContent = note;
+        noteCell.style.cssText = `
+            width: 30px;
+            height: 30px;
+            border: 1px solid #333;
+            font-weight: bold;
+            background: #383838;
+            color: white;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 10px;
+            padding: 0;
+        `;
+        row.appendChild(noteCell);
+        
+        // Create chord button cells - make the cells themselves clickable
+        for (let chordType of commonChordTypes) {
+            let cell = document.createElement('td');
+            cell.style.cssText = `
+                width: 30px;
+                height: 30px;
+                border: 1px solid #333;
+                text-align: center;
+                vertical-align: middle;
+                background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                user-select: none;
+                padding: 0;
+                position: relative;
+            `;
+            
+            // Add hover and click functionality directly to the cell
+            cell.addEventListener('mouseenter', () => {
+                cell.style.background = 'linear-gradient(to bottom, #e2e6ea, #dae0e5)';
+                cell.style.transform = 'scale(1.1)';
+                cell.style.zIndex = '10';
+                
+                // Show chord pattern on fretboard temporarily
+                showChordPatternOnFretboard(note, chordType, true);
+            });
+            
+            cell.addEventListener('mouseleave', () => {
+                cell.style.background = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
+                cell.style.transform = 'scale(1)';
+                cell.style.zIndex = '1';
+                
+                // Restore previous fretboard state
+                restoreFretboardState();
+            });
+            
+            cell.addEventListener('click', () => {
+                // Toggle persistent display
+                showChordPatternOnFretboard(note, chordType, false);
+            });
+            
+            row.appendChild(cell);
+        }
+        
+        grid.appendChild(row);
+    }
+    
+    gridContainer.appendChild(gridLabel);
+    gridContainer.appendChild(grid);
+    
+    return gridContainer;
+}
+
+/**
+ * Show chord pattern on fretboard with scale context (local version)
+ */
+function showChordPatternOnFretboard(rootNote, chordType, isTemporary) {
+    try {
+        // If this is a permanent selection, update the tracking state
+        if (!isTemporary) {
+            currentChordGridSelection = { note: rootNote, chordType: chordType };
+            // Clear Roman numeral selection since we're now showing a chord grid selection
+            currentDisplayedChord = null;
+            updateChordButtonStyles();
+        }
+        
+        // Get current scale information
+        const primaryScale = getPrimaryScale();
+        const scaleRootNote = getPrimaryRootNote();
+        
+        if (primaryScale && scaleRootNote) {
+            const [family, mode] = primaryScale.split('-');
+            const intervals = HeptatonicScales[family][parseInt(mode, 10) - 1].intervals;
+            const scaleNotes = getScaleNotes(scaleRootNote, intervals);
+            
+            // Process the chord to get its notes
+            const chordName = rootNote + chordType;
+            const chordInfo = processChord(chordName);
+            
+            if (chordInfo && chordInfo.notes) {
+                // Get the fretboard instance
+                const fretboard = getFretboard('fretNotPlaceholder');
+                if (fretboard) {
+                    // Clear previous markers and lines
+                    fretboard.clearMarkers();
+                    fretboard.clearChordLines();
+                    
+                    // First, mark all scale notes in grey
+                    scaleNotes.forEach(note => {
+                        const noteName = typeof note === 'string' && note.includes('/') ? note.split('/')[0] : note;
+                        const positions = fretboard.findNotePositions(noteName);
+                        
+                        positions.forEach(pos => {
+                            fretboard.markFret(pos.string, pos.fret, {
+                                backgroundColor: '#e0e0e0',
+                                borderColor: '#999999',
+                                borderWidth: 1,
+                                textColor: '#666666',
+                                size: 20,
+                                label: noteName,
+                                isRoot: false,
+                                useCustomStyle: true
+                            });
+                        });
+                    });
+                    
+                    // Then, mark chord notes with their usual colorings
+                    const chordNotes = chordInfo.notes.map(note => 
+                        typeof note === 'string' && note.includes('/') ? note.split('/')[0] : note
+                    );
+                    
+                    // Remove scale notes octave info for comparison
+                    const scaleNoteNames = scaleNotes.map(note => 
+                        typeof note === 'string' && note.includes('/') ? note.split('/')[0] : note
+                    );
+                    
+                    const colorMap = ['#ff4444', '#ffcc44', '#44ff44', '#4444ff']; // Root, 3rd, 5th, 7th
+                    
+                    chordNotes.forEach((note, index) => {
+                        const positions = fretboard.findNotePositions(note);
+                        const isInScale = scaleNoteNames.includes(note);
+                        const isRoot = index === 0;
+                        
+                        positions.forEach(pos => {
+                            fretboard.markFret(pos.string, pos.fret, {
+                                backgroundColor: '#ffffff',
+                                borderColor: isInScale ? colorMap[index % colorMap.length] : '#000000ff', // Distinct color for out-of-scale notes
+                                borderWidth: isRoot ? 4 : 3,
+                                textColor: '#333333',
+                                size: isRoot ? 30 : 26,
+                                label: note,
+                                isRoot: isRoot,
+                                useCustomStyle: true
+                            });
+                        });
+                    });
+                    
+                    // Add chord pattern lines - map chord types to pattern types
+                    const chordTypeMapping = {
+                        'Major': 'major',
+                        'Minor': 'minor',
+                        '7': 'dominant7',
+                        'maj7': 'major7',
+                        'm7': 'minor7',
+                        'dim': 'dim',
+                        'dim7': 'dim7',
+                        'aug': 'aug',
+                        'sus2': 'sus2',
+                        'sus4': 'sus4',
+                        '5': 'power',
+                        'm7b5': 'm7b5'
+                    };
+                    
+                    const patternType = chordTypeMapping[chordType];
+                    if (patternType) {
+                        // Get patterns only for this specific chord type to optimize performance
+                        const specificPatterns = getPatternsByChordType(patternType);
+                        const chordMatches = fretboard.findChordPatternMatches(chordNotes, chordNotes[0], specificPatterns);
+                        
+                        if (chordMatches.length > 0) {
+                            // Sort matches by lowest fret position for color assignment
+                            const sortedMatches = chordMatches.sort((a, b) => {
+                                const minFretA = Math.min(...a.positions.map(pos => pos.fret));
+                                const minFretB = Math.min(...b.positions.map(pos => pos.fret));
+                                return minFretA - minFretB;
+                            });
+                            
+                            // Color cycle for chord pattern lines
+                            const CHORD_LINE_COLORS = [
+                                '#ff6b35', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b',
+                                '#eb4d4b', '#6c5ce7', '#a55eea', '#26de81', '#fd79a8'
+                            ];
+                            
+                            // Add chord pattern lines on top of the traditional markers
+                            sortedMatches.forEach((match, matchIndex) => {
+                                const lineColor = CHORD_LINE_COLORS[matchIndex % CHORD_LINE_COLORS.length];
+                                const linePoints = match.positions.map(pos => ({
+                                    string: pos.string,
+                                    fret: pos.fret
+                                }));
+                                
+                                // Only draw lines if we have at least 2 points
+                                if (linePoints.length >= 2) {
+                                    fretboard.drawChordLine(`${chordName}-pattern-${matchIndex}`, linePoints, {
+                                        color: lineColor,
+                                        lineWidth: 30,
+                                        style: 'solid',
+                                        opacity: 0.7,
+                                    });
+                                }
+                            });
+                            
+                            console.log(`Displaying ${chordName} with ${sortedMatches.length} chord pattern lines ${isTemporary ? 'temporarily' : 'persistently'}`);
+                        } else {
+                            console.log(`Displaying ${chordName} (no chord patterns found for type: ${patternType})`);
+                        }
+                    } else {
+                        console.log(`Displaying ${chordName} (no pattern mapping for chord type: ${chordType})`);
+                    }
+                    
+                    console.log(`Scale: ${scaleRootNote} ${family} (${scaleNoteNames.join(', ')})`);
+                    console.log(`Chord: ${chordNotes.join(', ')}`);
+                    
+                    // Update chord info display for chord grid selections (both hover and click)
+                    const chordDisplayName = `${rootNote} ${chordType}`;
+                    updateChordInfoDisplay(chordDisplayName, chordNotes);
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Could not display chord pattern:', error);
+        // Fallback to basic chord display
+        const chordInfo = processChord(rootNote + chordType);
+        if (chordInfo && chordInfo.notes) {
+            highlightKeysForChords(chordInfo.notes);
+        }
+    }
+}
+
+/**
+ * Restore fretboard to previous state (local version)
+ */
+function restoreFretboardState() {
+    // Check if we have a permanent chord grid selection
+    if (currentChordGridSelection) {
+        // Restore the chord grid selection
+        showChordPatternOnFretboard(currentChordGridSelection.note, currentChordGridSelection.chordType, false);
+        return;
+    }
+    
+    // Try to restore the previous Roman numeral state
+    if (currentDisplayedChord === null) {
+        // Clear fretboard and chord info display
+        const fretboard = getFretboard('fretNotPlaceholder');
+        if (fretboard) {
+            fretboard.clearMarkers();
+            fretboard.clearChordLines();
+        }
+        updateChordInfoDisplay(); // Clear chord info display
+    } else if (currentDisplayedChord === 0) {
+        // Show scale
+        showScaleOnFretboard();
+    } else {
+        // Show current chord
+        showChordOnFretboard(currentDisplayedChord - 1);
+    }
 }
 
 /**
@@ -3377,6 +3731,9 @@ export {
     getChordPatterns,
     getPatternsByChordType,
     quickChordPattern,
+    showChordOnFretboard,
+    showScaleOnFretboard,
+    currentDisplayedChord,
     GUITAR_TUNING,
     SCALE_COLORS
 };

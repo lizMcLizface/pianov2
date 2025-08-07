@@ -23,6 +23,7 @@ export function getChordPatterns() {
         'major_E_string': {
             name: 'Major (E String Root)',
             description: 'Major chord with root on low E string',
+            chordType: 'major',
             rootString: 5, // Low E string
             notes: [
                 { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
@@ -41,6 +42,7 @@ export function getChordPatterns() {
         'major_A_string': {
             name: 'Major (A String Root)',
             description: 'Major chord with root on A string',
+            chordType: 'major',
             rootString: 4, // A string (0-indexed from high E)
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
@@ -56,6 +58,7 @@ export function getChordPatterns() {
         'major_G_string': {
             name: 'Major (G String Root)',
             description: 'Major chord with root on G string',
+            chordType: 'major',
             rootString: 2, // G string
             notes: [
                 { string: 3, fretOffset: 0, interval: 1, label: 'R' }, // Root on G string
@@ -70,6 +73,7 @@ export function getChordPatterns() {
         'major_D_string': {
             name: 'Major (D String Root)',
             description: 'Major chord with root on D string',
+            chordType: 'major',
             rootString: 3, // D string
             notes: [
                 { string: 3, fretOffset: 0, interval: 3, label: 'R' }, // Major 3rd on G string
@@ -85,6 +89,7 @@ export function getChordPatterns() {
         'major_open_C': {
             name: 'C Major Open',
             description: 'Open C major chord',
+            chordType: 'major',
             rootString: 4, // A string where C is on 3rd fret
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'C' }, // C on A string 3rd fret
@@ -100,6 +105,7 @@ export function getChordPatterns() {
         'minor_open_C': {
             name: 'C Minor Open',
             description: 'Open C minor chord',
+            chordType: 'minor',
             rootString: 4, // A string where C is on 3rd fret
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'C' }, // C on A string 3rd fret
@@ -115,6 +121,7 @@ export function getChordPatterns() {
         'major_open_G': {
             name: 'G Major Open',
             description: 'Open G major chord',
+            chordType: 'major',
             rootString: 5, // Low E string where G is on 3rd fret
             notes: [
                 { string: 5, fretOffset: 0, interval: 1, label: 'G' }, // G on low E string 3rd fret
@@ -134,6 +141,7 @@ export function getChordPatterns() {
         'minor_A_string': {
             name: 'Minor (A String Root)',
             description: 'Minor chord with root on A string',
+            chordType: 'minor',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root on A string
@@ -149,6 +157,7 @@ export function getChordPatterns() {
         'minor_D_string': {
             name: 'Minor (D String Root)',
             description: 'Minor chord with root on D string',
+            chordType: 'minor',
             rootString: 3,
             notes: [
                 { string: 3, fretOffset: 0, interval: 1, label: 'R' }, // Root on D string
@@ -164,6 +173,7 @@ export function getChordPatterns() {
         'minor_E_string': {
             name: 'Minor (E String Root)',
             description: 'Minor chord with root on low E string',
+            chordType: 'minor',
             rootString: 5,
             notes: [
                 { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root on low E string
@@ -182,6 +192,7 @@ export function getChordPatterns() {
         'dominant7_A_string': {
             name: 'Dominant 7th (A String Root)',
             description: 'Dominant 7th chord with root on A string',
+            chordType: 'dominant7',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -198,6 +209,7 @@ export function getChordPatterns() {
         'dominant7_E_string': {
             name: 'Dominant 7th (E String Root)',
             description: 'Dominant 7th chord with root on low E string',
+            chordType: 'dominant7',
             rootString: 5,
             notes: [
                 { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -215,6 +227,7 @@ export function getChordPatterns() {
         // Diminished patterns (for vii° chord)
         'diminished_A_string': {
             name: 'Diminished (A String Root)',
+            chordType: 'dim',
             description: 'Diminished chord with root on A string',
             rootString: 4,
             notes: [
@@ -231,6 +244,7 @@ export function getChordPatterns() {
         'diminished_E_string': {
             name: 'Diminished (E String Root)',
             description: 'Diminished chord with root on low E string',
+            chordType: 'dim',
             rootString: 5,
             notes: [
                 { string: 5, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -247,6 +261,7 @@ export function getChordPatterns() {
         'major7_A_string': {
             name: 'Major 7th (A String Root)',
             description: 'Major 7th chord with root on A string',
+            chordType: 'major7',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -263,6 +278,7 @@ export function getChordPatterns() {
         'minor7_A_string': {
             name: 'Minor 7th (A String Root)',
             description: 'Minor 7th chord with root on A string',
+            chordType: 'minor7',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -280,6 +296,7 @@ export function getChordPatterns() {
         'sus2_A_string': {
             name: 'Sus2 (A String Root)',
             description: 'Sus2 chord with root on A string',
+            chordType: 'sus2',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -296,6 +313,7 @@ export function getChordPatterns() {
         'sus4_A_string': {
             name: 'Sus4 (A String Root)',
             description: 'Sus4 chord with root on A string',
+            chordType: 'sus4',
             rootString: 4,
             notes: [
                 { string: 4, fretOffset: 0, interval: 1, label: 'R' }, // Root
@@ -318,7 +336,7 @@ export function getChordPatterns() {
  */
 export function getPatternsByChordType(chordType) {
     const patterns = getChordPatterns();
-    return Object.keys(patterns).filter(name => name.includes(chordType));
+    return Object.keys(patterns).filter(name => patterns[name].chordType === chordType);
 }
 
 /**
